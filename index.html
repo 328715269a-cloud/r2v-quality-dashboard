@@ -55,6 +55,7 @@
           <section class="panel"><div class="section-head"><div><h2>P级分布</h2><p>按问题点统计，不重复扣准确率</p></div></div><div id="severityBars" class="bars"></div></section>
         </div>
         <section class="panel table-panel daily-panel"><div class="section-head"><div><h2>每日准确率</h2><p id="periodSummary">按生产日统计，可选择单日或累计多天</p></div></div><div class="table-wrap"><table><thead><tr><th>生产日</th><th>质检有效量</th><th>最终错误</th><th>标注质检准确率</th><th>验收轮次</th><th>验收不通过</th><th>质检验收准确率</th></tr></thead><tbody id="dailyTable"></tbody></table></div></section>
+        <section class="panel table-panel daily-panel"><div class="section-head"><div><h2>每人每日准确率</h2><p>按生产日和标注人拆分，申诉成功后错误数和准确率自动回算</p></div></div><div class="table-wrap"><table><thead><tr><th>生产日</th><th>标注人</th><th>被质检</th><th>P0</th><th>P1</th><th>P2反馈</th><th>有效错误</th><th>申诉成功</th><th>质检准确率</th></tr></thead><tbody id="dailyPeopleTable"></tbody></table></div></section>
         <section class="panel table-panel"><div class="section-head"><div><h2>人员质量概览</h2><p>质检与验收口径分开显示</p></div><button class="text-button" data-go="people">查看全部</button></div><div class="table-wrap"><table><thead><tr><th>人员</th><th>质检量</th><th>P0</th><th>P1</th><th>P2</th><th>申诉成功</th><th>质检准确率</th><th>验收准确率</th></tr></thead><tbody id="overviewPeople"></tbody></table></div></section>
       </section>
 
@@ -68,7 +69,7 @@
       </section>
 
       <section id="appealsView" class="view">
-        <section class="panel table-panel"><div class="section-head"><div><h2>申诉中心</h2><p>仅质检P0/P1可申诉，成功后自动剔除</p></div></div><div class="table-wrap"><table><thead><tr><th>TID</th><th>标注人</th><th>等级</th><th>质检意见</th><th>申诉理由</th><th>状态</th><th>更新时间</th><th></th></tr></thead><tbody id="appealsTable"></tbody></table></div></section>
+        <section class="panel table-panel"><div class="section-head"><div><h2>申诉中心</h2><p>仅质检P0/P1可申诉。质检裁决会记录操作人和时间，成功后自动剔除错误</p></div></div><div class="table-wrap"><table><thead><tr><th>TID</th><th>标注人</th><th>等级</th><th>质检意见</th><th>申诉理由</th><th>提交人</th><th>状态</th><th>质检裁决人</th><th>裁决说明</th><th>更新时间</th><th></th></tr></thead><tbody id="appealsTable"></tbody></table></div></section>
       </section>
 
       <section id="importsView" class="view">
