@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="R2V 标注、质检与验收质量管理看板">
   <title>R2V 质量管理看板</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260714-3">
 </head>
 <body>
   <div id="appShell" class="app-shell">
@@ -80,7 +80,7 @@
           <label class="upload-box"><span class="upload-index">03</span><strong>质检—验收流水 CSV</strong><small>识别验收轮次、原标注人和原质检人</small><input id="acceptanceFlowInput" type="file" accept=".csv"></label>
         </div>
         <div class="import-actions"><button id="importBtn" class="button primary">解析并保存到共享看板</button><span id="selectedFiles">尚未选择文件</span></div>
-        <section class="panel import-log"><div class="section-head"><div><h2>上传记录</h2><p>所有人的上传都保存在同一数据库</p></div></div><div id="importHistory" class="history-list"></div></section>
+        <section class="panel import-log"><div class="section-head"><div><h2>上传记录</h2><p>所有人的上传都保存在同一数据库</p></div><button id="adminToggle" class="button secondary small">管理员设置</button></div><div id="adminPanel" class="admin-panel hidden"><div><h3>修改管理员密码</h3><form id="changePinForm" class="admin-form"><label>原密码<input name="oldPin" type="password" inputmode="numeric" required autocomplete="current-password"></label><label>新密码<input name="newPin" type="password" inputmode="numeric" pattern="[0-9]{4,12}" required autocomplete="new-password"></label><button class="button secondary small" type="submit">修改密码</button></form></div><div id="deleteConfirm" class="delete-confirm hidden"><div><strong id="deleteFileName"></strong><p>删除后，该次上传产生的流水或反馈会从统计中移除。</p></div><label>管理员密码<input id="deletePin" type="password" inputmode="numeric" autocomplete="current-password"></label><button id="confirmDelete" class="button danger small">确认删除</button><button id="cancelDelete" class="button secondary small">取消</button></div><div><h3>管理员操作记录</h3><div id="adminAudit" class="history-list compact"></div></div></div><div id="importHistory" class="history-list"></div></section>
       </section>
     </main>
   </div>
@@ -92,6 +92,6 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=20260714-2"></script>
+  <script src="app.js?v=20260714-3"></script>
 </body>
 </html>
