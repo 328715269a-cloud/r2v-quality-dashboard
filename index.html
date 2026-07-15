@@ -70,7 +70,7 @@
       </section>
 
       <section id="appealsView" class="view">
-        <section class="panel table-panel"><div class="section-head"><div><h2>申诉中心</h2><p>仅质检P0/P1可申诉。质检裁决会记录操作人和时间，成功后自动剔除错误</p></div></div><div class="table-wrap"><table><thead><tr><th>TID</th><th>标注人</th><th>等级</th><th>质检意见</th><th>申诉理由</th><th>提交人</th><th>状态</th><th>质检裁决人</th><th>裁决说明</th><th>更新时间</th><th></th></tr></thead><tbody id="appealsTable"></tbody></table></div></section>
+        <section class="panel table-panel"><div class="section-head filters"><div><h2>申诉中心</h2><p id="appealFilterCount">仅展示可申诉的质检 P0/P1 Case，每一列都可组合筛选</p></div><div><button id="clearAppealFilters" class="button secondary small" type="button">清除筛选</button></div></div><div class="table-wrap"><table class="filter-table appeal-table"><thead><tr class="column-headings"><th>日期</th><th>TID</th><th>标注人</th><th>等级</th><th>质检意见</th><th>申诉理由</th><th>提交人</th><th>状态</th><th>质检裁决人</th><th>裁决说明</th><th>更新时间</th><th></th></tr><tr class="column-filters"><th><select id="appealDateFilter" aria-label="筛选日期"><option value="all">全部</option></select></th><th><input id="appealTidFilter" aria-label="筛选TID" placeholder="包含…"></th><th><select id="appealAnnotatorFilter" aria-label="筛选标注人"><option value="all">全部</option></select></th><th><select id="appealSeverityFilter" aria-label="筛选等级"><option value="all">全部</option></select></th><th><input id="appealIssueFilter" aria-label="筛选质检意见" placeholder="包含…"></th><th><input id="appealReasonFilter" aria-label="筛选申诉理由" placeholder="包含…"></th><th><select id="appealSubmitterFilter" aria-label="筛选提交人"><option value="all">全部</option></select></th><th><select id="appealStatusFilter" aria-label="筛选状态"><option value="all">全部</option></select></th><th><select id="appealDeciderFilter" aria-label="筛选质检裁决人"><option value="all">全部</option></select></th><th><input id="appealDecisionFilter" aria-label="筛选裁决说明" placeholder="包含…"></th><th><select id="appealUpdatedFilter" aria-label="筛选更新时间"><option value="all">全部</option></select></th><th></th></tr></thead><tbody id="appealsTable"></tbody></table></div></section>
       </section>
 
       <section id="importsView" class="view">
@@ -93,6 +93,6 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=20260716-1"></script>
+  <script src="app.js?v=20260716-2"></script>
 </body>
 </html>
