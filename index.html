@@ -56,17 +56,17 @@
           <section class="panel"><div class="section-head"><div><h2>P级分布</h2><p>按问题点统计，不重复扣准确率</p></div></div><div id="severityBars" class="bars"></div></section>
         </div>
         <section class="panel table-panel daily-panel"><div class="section-head"><div><h2>每日准确率</h2><p id="periodSummary">按生产日统计，可选择单日或累计多天</p></div></div><div class="table-wrap"><table><thead><tr><th>生产日</th><th>质检有效量</th><th>最终错误</th><th>标注质检准确率</th><th>验收轮次</th><th>验收不通过</th><th>质检验收准确率</th></tr></thead><tbody id="dailyTable"></tbody></table></div></section>
-        <section class="panel table-panel daily-panel"><div class="section-head"><div><h2>每人每日准确率</h2><p>按生产日和标注人拆分，申诉成功后错误数和准确率自动回算</p></div></div><div class="table-wrap"><table><thead><tr><th>生产日</th><th>标注人</th><th>被质检</th><th>P0</th><th>P1</th><th>P2反馈</th><th>有效错误</th><th>申诉成功</th><th>质检准确率</th></tr></thead><tbody id="dailyPeopleTable"></tbody></table></div></section>
-        <section class="panel table-panel"><div class="section-head"><div><h2>人员质量概览</h2><p>质检与验收口径分开显示</p></div><button class="text-button" data-go="people">查看全部</button></div><div class="table-wrap"><table><thead><tr><th>人员</th><th>质检量</th><th>P0</th><th>P1</th><th>P2</th><th>申诉成功</th><th>质检准确率</th><th>验收准确率</th></tr></thead><tbody id="overviewPeople"></tbody></table></div></section>
+        <section class="panel table-panel daily-panel"><div class="section-head"><div><h2>每人每日准确率</h2><p>首次结论归属生产日；返修通过不覆盖历史错误，申诉成功才回算</p></div></div><div class="table-wrap"><table><thead><tr><th>生产日</th><th>标注人</th><th>被质检</th><th>P0</th><th>P1</th><th>P2改判数</th><th>有效错误</th><th>申诉成功</th><th>质检准确率</th></tr></thead><tbody id="dailyPeopleTable"></tbody></table></div></section>
+        <section class="panel table-panel"><div class="section-head"><div><h2>人员质量概览</h2><p>P0/P1计入准确率，P2改判数单独统计</p></div><button class="text-button" data-go="people">查看全部</button></div><div class="table-wrap"><table><thead><tr><th>人员</th><th>质检量</th><th>P0</th><th>P1</th><th>P2改判数</th><th>申诉成功</th><th>质检准确率</th><th>验收准确率</th></tr></thead><tbody id="overviewPeople"></tbody></table></div></section>
       </section>
 
       <section id="peopleView" class="view">
-        <section class="panel table-panel"><div class="section-head"><div><h2>标注人员</h2><p>申诉成功只影响质检准确率</p></div><input id="peopleSearch" class="search" placeholder="搜索姓名"></div><div class="table-wrap"><table><thead><tr><th>人员</th><th>质检量</th><th>P0</th><th>P1</th><th>P2</th><th>有效错误</th><th>质检准确率</th><th>验收轮次</th><th>验收不通过</th><th>验收准确率</th></tr></thead><tbody id="peopleTable"></tbody></table></div></section>
+        <section class="panel table-panel"><div class="section-head"><div><h2>标注人员</h2><p>P2改判数不扣最终准确率；双方拒绝的无效Case不进入分母</p></div><input id="peopleSearch" class="search" placeholder="搜索姓名"></div><div class="table-wrap"><table><thead><tr><th>人员</th><th>质检量</th><th>P0</th><th>P1</th><th>P2改判数</th><th>有效错误</th><th>质检准确率</th><th>验收轮次</th><th>验收不通过</th><th>验收准确率</th></tr></thead><tbody id="peopleTable"></tbody></table></div></section>
         <section class="panel table-panel"><div class="section-head"><div><h2>质检人员</h2><p>按放行后的最终验收结果统计</p></div></div><div class="table-wrap"><table><thead><tr><th>质检员</th><th>放行验收轮次</th><th>验收通过</th><th>验收不通过</th><th>验收准确率</th></tr></thead><tbody id="inspectorsTable"></tbody></table></div></section>
       </section>
 
       <section id="casesView" class="view">
-        <section class="panel table-panel"><div class="section-head filters"><div><h2>Case 明细</h2><p>一行一个问题点，可查看图片与归责依据</p></div><div><select id="caseSource"><option value="all">全部来源</option><option value="quality">质检</option><option value="acceptance">验收</option></select><select id="caseSeverity"><option value="all">全部等级</option><option>P0</option><option>P1</option><option>P2</option><option value="待定级">待定级</option></select><input id="caseSearch" class="search" placeholder="搜索TID、人员、意见"></div></div><div class="table-wrap"><table><thead><tr><th>日期</th><th>来源</th><th>TID</th><th>标注人</th><th>质检人</th><th>等级</th><th>问题类别</th><th>问题说明</th><th>状态</th><th></th></tr></thead><tbody id="casesTable"></tbody></table></div></section>
+        <section class="panel table-panel"><div class="section-head filters"><div><h2>Case 明细</h2><p>导出内容与当前日期、来源、等级和搜索条件一致</p></div><div><select id="caseSource"><option value="all">全部来源</option><option value="quality">质检</option><option value="acceptance">验收</option></select><select id="caseSeverity"><option value="all">全部等级</option><option>P0</option><option>P1</option><option>P2</option><option value="待定级">待定级</option></select><input id="caseSearch" class="search" placeholder="搜索TID、人员、意见"><button id="exportCasesBtn" class="button secondary small" type="button">导出 Excel</button></div></div><div class="table-wrap"><table><thead><tr><th>日期</th><th>来源</th><th>TID</th><th>标注人</th><th>质检人</th><th>等级</th><th>问题类别</th><th>问题说明</th><th>状态</th><th></th></tr></thead><tbody id="casesTable"></tbody></table></div></section>
       </section>
 
       <section id="appealsView" class="view">
@@ -93,6 +93,6 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=20260714-4"></script>
+  <script src="app.js?v=20260715-1"></script>
 </body>
 </html>
