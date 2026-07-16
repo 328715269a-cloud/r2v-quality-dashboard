@@ -25,3 +25,14 @@ select[data-field="changed"]:has(option[value="false"]:checked) { border-color:o
 select[data-field="changed"]:has(option[value="true"]:checked) { border-color:oklch(72% .09 155); background:oklch(94% .035 155); color:oklch(37% .11 155); font-weight:700; }
 .review-select { min-width:170px; }
 .case-table { min-width:1840px; }
+select[data-field="review"] { font-weight:700; transition:background .18s ease-out,border-color .18s ease-out,color .18s ease-out; }
+select[data-field="review"]:has(option[value=""]:checked) { border-color:var(--line); background:var(--surface); color:var(--muted); font-weight:500; }
+select[data-field="review"]:has(option[value="同 ID 判定错误"]:checked) { border-color:oklch(76% .08 305); background:oklch(94% .035 305); color:oklch(42% .11 305); }
+select[data-field="review"]:has(option[value="ID 漏标"]:checked) { border-color:oklch(77% .09 20); background:oklch(94% .035 20); color:oklch(43% .15 20); }
+select[data-field="review"]:has(option[value="参考图数量不足"]:checked) { border-color:oklch(79% .1 75); background:oklch(95% .04 75); color:oklch(43% .11 65); }
+select[data-field="review"]:has(option[value="景别错误"]:checked) { border-color:oklch(76% .08 245); background:oklch(94% .035 245); color:oklch(40% .12 245); }
+select[data-field="review"]:has(option[value="机位高度错误"]:checked) { border-color:oklch(76% .075 215); background:oklch(94% .03 215); color:oklch(39% .1 215); }
+select[data-field="review"]:has(option[value="主体朝向错误"]:checked) { border-color:oklch(75% .075 175); background:oklch(94% .03 175); color:oklch(38% .1 175); }
+select[data-field="review"]:has(option[value="光影错误"]:checked) { border-color:oklch(79% .1 95); background:oklch(95% .04 95); color:oklch(43% .11 90); }
+select[data-field="review"]:has(option[value="时段错误"]:checked) { border-color:oklch(76% .075 275); background:oklch(94% .03 275); color:oklch(41% .11 275); }
+select[data-field="review"]:has(option[value="造型是否一致错误"]:checked) { border-color:oklch(77% .08 345); background:oklch(94% .035 345); color:oklch(42% .12 345); }
