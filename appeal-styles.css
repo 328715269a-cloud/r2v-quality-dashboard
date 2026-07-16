@@ -21,3 +21,7 @@
 .decision-readonly { padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--canvas); }
 .decision-readonly span { color:var(--muted); font-size:.68rem; }
 .decision-readonly p { margin:5px 0 0; line-height:1.55; }
+select[data-field="changed"]:has(option[value="false"]:checked) { border-color:oklch(78% .1 75); background:oklch(95% .035 75); color:oklch(43% .11 65); font-weight:700; }
+select[data-field="changed"]:has(option[value="true"]:checked) { border-color:oklch(72% .09 155); background:oklch(94% .035 155); color:oklch(37% .11 155); font-weight:700; }
+.review-select { min-width:170px; }
+.case-table { min-width:1840px; }
