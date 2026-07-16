@@ -36,3 +36,4 @@ select[data-field="review"]:has(option[value="主体朝向错误"]:checked) { bo
 select[data-field="review"]:has(option[value="光影错误"]:checked) { border-color:oklch(79% .1 95); background:oklch(95% .04 95); color:oklch(43% .11 90); }
 select[data-field="review"]:has(option[value="时段错误"]:checked) { border-color:oklch(76% .075 275); background:oklch(94% .03 275); color:oklch(41% .11 275); }
 select[data-field="review"]:has(option[value="造型是否一致错误"]:checked) { border-color:oklch(77% .08 345); background:oklch(94% .035 345); color:oklch(42% .12 345); }
+select[data-field="review"]:has(option[value="有疑问"]:checked) { border-color:oklch(77% .08 55); background:oklch(95% .035 55); color:oklch(43% .12 45); }
