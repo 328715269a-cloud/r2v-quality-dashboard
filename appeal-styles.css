@@ -1,0 +1,23 @@
+.appeal-status { display:inline-flex; align-items:center; border-radius:99px; padding:4px 9px; font-size:.69rem; font-weight:800; line-height:1.2; }
+.appeal-status.info { color:oklch(39% .12 245); background:oklch(92% .04 245); }
+.appeal-status.success { color:oklch(38% .11 155); background:oklch(92% .04 155); }
+.appeal-status.danger { color:oklch(43% .16 27); background:oklch(93% .045 27); }
+.appeal-status.pending { color:oklch(45% .11 75); background:oklch(94% .045 75); }
+.appeal-status.p2 { color:oklch(40% .09 220); background:oklch(93% .04 220); }
+.appeal-row.submitted { background:oklch(98% .008 245); }
+.appeal-row.approved { background:oklch(98% .012 155); }
+.appeal-row.rejected { background:oklch(98% .012 27); }
+.appeal-row:hover { background:oklch(96.5% .018 240)!important; }
+.appeal-summary { display:flex; align-items:flex-start; gap:12px; margin-bottom:14px; }
+.appeal-summary p { margin:1px 0 0; line-height:1.55; }
+.appeal-decision-section .appeal-form label { font-size:.78rem; font-weight:750; }
+.appeal-decision-section .appeal-form label span { margin-left:5px; color:var(--muted); font-size:.68rem; font-weight:500; }
+.appeal-actions { display:flex; gap:9px; }
+.decision-success { border-color:oklch(70% .08 155); background:oklch(94% .035 155); color:oklch(38% .11 155); }
+.decision-success:hover { background:oklch(90% .055 155); }
+.decision-failure { border-color:oklch(76% .08 27); background:oklch(95% .035 27); color:oklch(43% .16 27); }
+.decision-failure:hover { background:oklch(91% .055 27); }
+.field-error { margin:0; color:var(--danger); font-size:.72rem; }
+.decision-readonly { padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--canvas); }
+.decision-readonly span { color:var(--muted); font-size:.68rem; }
+.decision-readonly p { margin:5px 0 0; line-height:1.55; }
