@@ -1,0 +1,42 @@
+name: Verify dashboard release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        run: node --check app.js
+      - name: Check required dashboard fields
+        run: |
+          grep -q 'caseReviewFilter' index.html
+          grep -q '错误Case复盘' index.html
+          grep -q 'R2V_ASSET_VERSION = Date.now()' index.html
+      - name: Confirm GitHub Pages published this version
+        shell: bash
+        run: |
+          expected="$(sha256sum app.js | cut -d' ' -f1)"
+          for attempt in {1..12}; do
+            curl -fsSL --retry 3 "https://328715269a-cloud.github.io/r2v-quality-dashboard/app.js?sha=${GITHUB_SHA}-${attempt}" -o /tmp/online-app.js || true
+            if [ -s /tmp/online-app.js ]; then
+              actual="$(sha256sum /tmp/online-app.js | cut -d' ' -f1)"
+              if [ "$actual" = "$expected" ]; then
+                echo "GitHub Pages is serving the current app.js"
+                exit 0
+              fi
+            fi
+            sleep 20
+          done
+          echo "GitHub Pages did not publish the current app.js within four minutes."
+          exit 1

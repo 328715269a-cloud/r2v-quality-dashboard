@@ -5,8 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="R2V 标注、质检与验收质量管理看板">
   <title>R2V 质量管理看板</title>
-  <link rel="stylesheet" href="styles.css?v=20260714-3">
-  <link rel="stylesheet" href="appeal-styles.css?v=20260717-1">
+  <script>
+    window.R2V_ASSET_VERSION = Date.now();
+    document.write('<link rel="stylesheet" href="styles.css?v=' + window.R2V_ASSET_VERSION + '">');
+    document.write('<link rel="stylesheet" href="appeal-styles.css?v=' + window.R2V_ASSET_VERSION + '">');
+  </script>
 </head>
 <body>
   <div id="appShell" class="app-shell">
@@ -93,7 +96,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="config.js"></script>
-  <script src="app.js?v=20260717-2"></script>
+  <script>
+    document.write('<script src="config.js?v=' + window.R2V_ASSET_VERSION + '"><\/script>');
+    document.write('<script src="app.js?v=' + window.R2V_ASSET_VERSION + '"><\/script>');
+  </script>
 </body>
 </html>
