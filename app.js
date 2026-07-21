@@ -59,8 +59,9 @@ function buildQualityRounds(){
 
 function buildAcceptanceRounds(){
   const groups=groupBy(activeEvents(),e=>e.tid);const rounds=[];
-  for(const [tid,events0] of Object.entries(groups)){const events=events0.sort((a,b)=>new Date(a.event_time)-new Date(b.event_time));const entries=events.map((e,i)=>e.event_name==='进入验收池'?i:-1).filter(i=>i>=0);
-    entries.forEach((start,ri)=>{const end=entries[ri+1]??events.length;const decisions=[];for(let i=start;i<end;i++)if(['验收通过','验收不通过'].includes(events[i].event_name))decisions.push({e:events[i],i});if(!decisions.length)return;const final=decisions.at(-1);let qc=null;for(let i=final.i-1;i>=0;i--)if(events[i].event_name==='质检通过'&&events[i].operator_name){qc={e:events[i],i};break;}const ai=qc?.i??start;rounds.push({key:`${tid}:${ri+1}`,tid,round:ri+1,entryDate:events[start].event_time,resultDate:final.e.event_time,result:final.e.event_name==='验收通过'?'passed':'failed',reason:final.e.reject_reason||'',inspector:normalizeName(qc?.e.operator_name)||'待匹配',annotator:originalAnnotator(events,ai),events:events.slice(start,end)});});
+  for(const [tid,events0] of Object.entries(groups)){const events=events0.sort((a,b)=>new Date(a.event_time)-new Date(b.event_time)),entries=events.map((e,i)=>e.event_name==='进入验收池'?i:-1).filter(i=>i>=0),segments=[];
+    if(entries.length)entries.forEach((start,ri)=>segments.push({start,end:entries[ri+1]??events.length}));else if(state.workstream==='multi'){let start=-1;events.forEach((e,i)=>{if(e.event_name==='验收派单'&&start<0)start=i;if(start>=0&&['验收通过','验收不通过'].includes(e.event_name)){segments.push({start,end:i+1});start=-1;}});}
+    segments.forEach(({start,end},ri)=>{const decisions=[];for(let i=start;i<end;i++)if(['验收通过','验收不通过'].includes(events[i].event_name))decisions.push({e:events[i],i});if(!decisions.length)return;const final=decisions.at(-1);let qc=null;for(let i=final.i-1;i>=0;i--)if(events[i].event_name==='质检通过'&&events[i].operator_name){qc={e:events[i],i};break;}const ai=qc?.i??start;rounds.push({key:`${tid}:${ri+1}`,tid,round:ri+1,entryDate:events[start].event_time,resultDate:final.e.event_time,result:final.e.event_name==='验收通过'?'passed':'failed',reason:final.e.reject_reason||'',inspector:normalizeName(qc?.e.operator_name)||'待匹配',annotator:originalAnnotator(events,ai),events:events.slice(start,end)});});
   }return rounds;
 }
 
