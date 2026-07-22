@@ -23,6 +23,10 @@ jobs:
           grep -q 'caseReviewFilter' index.html
           grep -q '错误Case复盘' index.html
           grep -q 'R2V_ASSET_VERSION = Date.now()' index.html
+      - name: Check annotation ownership safeguards
+        run: |
+          node scripts/verify-owner-resolution.mjs
+          grep -q "manualMatchUpdatedAt" app.js
       - name: Confirm GitHub Pages published this version
         shell: bash
         run: |
