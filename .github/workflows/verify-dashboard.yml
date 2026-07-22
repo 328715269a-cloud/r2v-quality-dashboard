@@ -26,6 +26,7 @@ jobs:
       - name: Check annotation ownership safeguards
         run: |
           node scripts/verify-owner-resolution.mjs
+          node scripts/verify-p2-reporting.mjs
           grep -q "manualMatchUpdatedAt" app.js
       - name: Confirm GitHub Pages published this version
         shell: bash
