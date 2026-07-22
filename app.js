@@ -49,7 +49,7 @@ function sortedEvents(tid){return activeEvents().filter(e=>e.tid===tid).sort((a,
 function lastBefore(events,index,predicate){for(let i=index-1;i>=0;i--)if(predicate(events[i]))return events[i];return null;}
 function isAnnotationEvent(e){return ['标注','标注派单'].includes(e?.event_name);}
 function originalAnnotator(events,index){const cutoff=new Date(events[index]?.event_time).valueOf(),ordered=events.filter(e=>isAnnotationEvent(e)&&e.operator_name&&new Date(e.event_time).valueOf()<=cutoff).sort((a,b)=>new Date(a.event_time)-new Date(b.event_time)),completed=ordered.filter(e=>e.event_name==='标注').at(-1),firstAssignment=ordered.find(e=>e.event_name==='标注派单'),chosen=completed||firstAssignment;return chosen?normalizeName(chosen.operator_name):'待匹配';}
-function annotationOwnerByDate(events,feedbackDate){const cutoff=day(feedbackDate),ordered=events.filter(e=>isAnnotationEvent(e)&&e.operator_name&&(!cutoff||day(e.event_time)<=cutoff)).sort((a,b)=>new Date(a.event_time)-new Date(b.event_time)),completed=ordered.filter(e=>e.event_name==='标注').at(-1),firstAssignment=ordered.find(e=>e.event_name==='标注派单'),chosen=completed||firstAssignment;return chosen?normalizeName(chosen.operator_name):'';}
+function annotationOwnerByDate(events){const ordered=events.filter(e=>isAnnotationEvent(e)&&e.operator_name).sort((a,b)=>new Date(a.event_time)-new Date(b.event_time)),firstSubmission=ordered.find(e=>e.event_name==='标注'),firstAssignment=ordered.find(e=>e.event_name==='标注派单'),chosen=firstSubmission||firstAssignment;return chosen?normalizeName(chosen.operator_name):'';}
 
 function buildQualityRounds(){
   const groups=groupBy(activeEvents().filter(e=>e.channel==='quality'),e=>e.tid);const rounds=[];
