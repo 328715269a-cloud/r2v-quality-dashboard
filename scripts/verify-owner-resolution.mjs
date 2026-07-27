@@ -10,10 +10,13 @@ const resolveAnnotationOwner=Function('isAnnotationEvent','normalizeName',`${res
 const submit='\u6807\u6ce8',assign='\u6807\u6ce8\u6d3e\u5355';
 const event=(event_time,event_name,operator_name)=>({event_time,event_name,operator_name});
 const scenarios=[
-  ['unsubmitted reassignment keeps the first assignment',[event('2026-01-01',assign,'A'),event('2026-01-02',assign,'B')],{},'A'],
+  ['assignment without submission stays unmatched',[event('2026-01-01',assign,'A')],{},''],
+  ['unsubmitted reassignment stays unmatched',[event('2026-01-01',assign,'A'),event('2026-01-02',assign,'B')],{},''],
+  ['released assignment stays unmatched',[event('2026-01-01',assign,'A'),event('2026-01-02','超时释放','A')],{},''],
   ['the first real submitter beats assignments',[event('2026-01-01',assign,'A'),event('2026-01-02',assign,'B'),event('2026-01-03',submit,'B')],{},'B'],
   ['historical feedback keeps the first submitted owner',[event('2026-01-01',assign,'A'),event('2026-01-02',submit,'A'),event('2026-01-03',assign,'B'),event('2026-01-04',submit,'B')],{},'A'],
   ['a later quality round uses its latest submitted version',[event('2026-01-01',assign,'A'),event('2026-01-02',submit,'A'),event('2026-01-03',assign,'B'),event('2026-01-04',submit,'B')],{before:'2026-01-05',submission:'last'},'B'],
+  ['a future submission cannot own an earlier round',[event('2026-01-01',assign,'A'),event('2026-01-03',submit,'A')],{before:'2026-01-02',submission:'last'},''],
 ];
 
 for(const [name,events,options,expected] of scenarios){
