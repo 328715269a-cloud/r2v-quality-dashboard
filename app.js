@@ -12,6 +12,7 @@ function pct(n,d){return d ? `${(n/d*100).toFixed(1)}%` : '—';}
 function day(v){if(!v)return ''; const d=new Date(v); return Number.isNaN(d.valueOf())?String(v).slice(0,10):d.toISOString().slice(0,10);}
 function dateTime(v){if(!v)return '—';const d=new Date(v);if(Number.isNaN(d.valueOf()))return String(v).replace('T',' ').slice(0,16);return new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(d).replaceAll('/','-');}
 function loadSopSettings(){const row=state.adminAudit.filter(a=>a.action==='sop_settings_updated').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0],d=row?.detail||{};state.sopSettings={enabled:d.enabled===true,startDate:String(d.startDate||''),qualityEnabled:d.qualityEnabled!==false,acceptanceEnabled:d.acceptanceEnabled!==false,updatedBy:row?.actor||'',updatedAt:row?.created_at||''};}
+async function loadSopSettingsFromCloud(){const {data,error}=await db.from('r2v_quality_admin_audit').select('id,action,actor,detail,created_at').eq('action','sop_settings_updated').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(1).maybeSingle();if(error)throw error;if(data&&!state.adminAudit.some(a=>a.id===data.id))state.adminAudit.push(data);loadSopSettings();}
 function statisticsType(c){const s=state.sopSettings,date=day(c.feedback_date||c.case_date);if(!s.enabled||!s.startDate||date<s.startDate)return '原生产';if(c.kind==='quality'&&!s.qualityEnabled)return '原生产';if(c.kind==='acceptance'&&!s.acceptanceEnabled)return '原生产';const events=activeEvents().filter(e=>e.tid===c.tid),resultNames=c.kind==='quality'?['质检通过','质检不通过','质检打回']:['验收通过','验收不通过','验收打回'],restartNames=c.kind==='quality'?['标注']:['进入验收池','验收派单'],historical=events.some(e=>resultNames.includes(e.event_name)&&day(e.event_time)<s.startDate),restarted=events.some(e=>restartNames.includes(e.event_name)&&day(e.event_time)>=s.startDate&&day(e.event_time)<=date);return historical&&restarted?'新SOP复检':'新规正常生产';}
 function statisticsTypeBadge(c){return statisticsTypeLabel(statisticsType(c));}
 function statisticsTypeLabel(type){const tone=type==='新SOP复检'?'recheck':type==='新规正常生产'?'normal':'original';return `<span class="statistics-type ${tone}">${type}</span>`;}
@@ -45,7 +46,7 @@ async function loadAll(){
   try{
     showStatus('正在读取全部历史流水…');
     for(const [key,table,order,tie,max] of tables){const rows=[];for(let from=0;from<max;from+=1000){let query=db.from(table).select('*').order(order,{ascending:key==='roles'});if(tie!==order)query=query.order(tie,{ascending:true});const {data,error}=await query.range(from,Math.min(from+999,max-1));if(error)throw error;rows.push(...(data||[]));if(!data||data.length<1000)break;}state[key]=rows;}
-    loadSopSettings();rebuild();renderAll();
+    await loadSopSettingsFromCloud();rebuild();renderAll();
   }catch(e){showStatus(`数据库尚未就绪：${e.message}。请先执行 supabase-schema.sql。`,true);}
 }
 
