@@ -42,7 +42,7 @@ begin
   select *
     into settings
   from private.r2v_quality_admin_settings
-  where id = true;
+  where singleton = true;
 
   if settings.pin_hash is null
      or extensions.crypt(coalesce(p_pin, ''), settings.pin_hash) <> settings.pin_hash then
