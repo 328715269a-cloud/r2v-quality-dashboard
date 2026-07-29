@@ -8,6 +8,7 @@ const isAnnotationEvent=e=>['\u6807\u6ce8','\u6807\u6ce8\u6d3e\u5355'].includes(
 const normalizeName=(value='')=>String(value).trim();
 const resolveAnnotationOwner=Function('isAnnotationEvent','normalizeName',`${resolverSource};return resolveAnnotationOwner;`)(isAnnotationEvent,normalizeName);
 const submit='\u6807\u6ce8',assign='\u6807\u6ce8\u6d3e\u5355';
+const retained='\u5386\u53f2\u6807\u6ce8\u8d23\u4efb\u4eba',manualRetained='\u5386\u53f2\u4eba\u5de5\u6807\u6ce8\u8d23\u4efb\u4eba';
 const event=(event_time,event_name,operator_name)=>({event_time,event_name,operator_name});
 const scenarios=[
   ['assignment without submission stays unmatched',[event('2026-01-01',assign,'A')],{},''],
@@ -17,6 +18,8 @@ const scenarios=[
   ['historical feedback keeps the first submitted owner',[event('2026-01-01',assign,'A'),event('2026-01-02',submit,'A'),event('2026-01-03',assign,'B'),event('2026-01-04',submit,'B')],{},'A'],
   ['a later quality round uses its latest submitted version',[event('2026-01-01',assign,'A'),event('2026-01-02',submit,'A'),event('2026-01-03',assign,'B'),event('2026-01-04',submit,'B')],{before:'2026-01-05',submission:'last'},'B'],
   ['a future submission cannot own an earlier round',[event('2026-01-01',assign,'A'),event('2026-01-03',submit,'A')],{before:'2026-01-02',submission:'last'},''],
+  ['retained owner supports a round after history cleanup',[event('2026-01-01',retained,'A')],{before:'2026-01-02',submission:'last'},'A'],
+  ['manual retained owner keeps priority over later submissions',[event('2026-01-01',manualRetained,'A'),event('2026-01-02',submit,'B')],{before:'2026-01-03',submission:'last'},'A'],
 ];
 
 for(const [name,events,options,expected] of scenarios){

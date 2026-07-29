@@ -1,7 +1,7 @@
 const cfg = window.R2V_QUALITY_CONFIG || {};
 const db = window.supabase?.createClient?.(cfg.supabaseUrl, cfg.supabaseKey);
 const $ = (id) => document.getElementById(id);
-const SINGLE_DATA_START='2026-07-16';
+const SINGLE_DATA_START='2026-07-20';
 const state = { events: [], feedback: [], appeals: [], roles: [], imports: [], adminAudit: [], cases: [], qualityRounds: [], acceptanceRounds: [], sharedVersions: ['', '', ''], sopSettings: {enabled:false,startDate:'',qualityEnabled:true,acceptanceEnabled:true}, pendingDelete: null, actor: localStorage.getItem('r2v_quality_actor') || '', workstream: localStorage.getItem('r2v_quality_workstream')==='multi'?'multi':'single' };
 const WORKSTREAMS={single:'单镜头',multi:'多镜头'};
 const inspectorFallback = new Set(['于蕊','唐子旖','连晓燕','乔一佳','王雨鲲','相伟达']);
@@ -69,15 +69,15 @@ async function loadAll(){
 
 function sortedEvents(tid){return activeEvents().filter(e=>e.tid===tid).sort((a,b)=>new Date(a.event_time)-new Date(b.event_time));}
 function lastBefore(events,index,predicate){for(let i=index-1;i>=0;i--)if(predicate(events[i]))return events[i];return null;}
-function isAnnotationEvent(e){return ['标注','标注派单'].includes(e?.event_name);}
-function resolveAnnotationOwner(events,{before='',submission='first'}={}){const cutoff=before?new Date(before).valueOf():Infinity,submissions=events.filter(e=>e?.event_name==='标注'&&e.operator_name&&new Date(e.event_time).valueOf()<=cutoff).sort((a,b)=>new Date(a.event_time)-new Date(b.event_time)),chosen=submission==='last'?submissions.at(-1):submissions[0];return chosen?normalizeName(chosen.operator_name):'';}
+function isAnnotationEvent(e){return ['标注','标注派单','历史标注责任人','历史人工标注责任人'].includes(e?.event_name);}
+function resolveAnnotationOwner(events,{before='',submission='first'}={}){const cutoff=before?new Date(before).valueOf():Infinity,submissions=events.filter(e=>['标注','历史标注责任人','历史人工标注责任人'].includes(e?.event_name)&&e.operator_name&&new Date(e.event_time).valueOf()<=cutoff).sort((a,b)=>new Date(a.event_time)-new Date(b.event_time)),manual=submissions.filter(e=>e.event_name==='历史人工标注责任人').at(-1),chosen=manual||(submission==='last'?submissions.at(-1):submissions[0]);return chosen?normalizeName(chosen.operator_name):'';}
 function originalAnnotator(events,index){return resolveAnnotationOwner(events,{before:events[index]?.event_time,submission:'last'})||'待匹配';}
 function annotationOwnerByDate(events,date=''){const before=date?`${day(date)}T23:59:59+08:00`:'';return resolveAnnotationOwner(events,{before});}
 
 function buildQualityRounds(){
   const groups=groupBy(activeEvents().filter(e=>e.channel==='quality'),e=>e.tid);const rounds=[];
   for(const [tid,events0] of Object.entries(groups)){const events=events0.sort((a,b)=>new Date(a.event_time)-new Date(b.event_time));let round=0;
-    events.forEach((e,i)=>{if(!['质检通过','质检不通过','质检打回'].includes(e.event_name))return;if(e.event_name==='质检打回'&&lastBefore(events,i,x=>x.event_name==='验收打回')&&!lastBefore(events,i,x=>x.event_name==='标注'&&new Date(x.event_time)>new Date(lastBefore(events,i,y=>y.event_name==='验收打回')?.event_time||0)))return;round++;rounds.push({key:`${tid}:${round}`,tid,round,event:e.event_name,date:e.event_time,annotator:originalAnnotator(events,i),inspector:normalizeName(e.operator_name)||'待匹配',reason:e.reject_reason||'',first:round===1,invalid:e.event_name==='质检不通过'});});
+    events.forEach((e,i)=>{if(!['质检通过','质检不通过','质检打回'].includes(e.event_name))return;if(e.event_name==='质检打回'&&lastBefore(events,i,x=>x.event_name==='验收打回')&&!lastBefore(events,i,x=>x.event_name==='标注'&&new Date(x.event_time)>new Date(lastBefore(events,i,y=>y.event_name==='验收打回')?.event_time||0)))return;const manualInspector=lastBefore(events,i,x=>x.event_name==='历史人工质检责任人'&&x.operator_name);round++;rounds.push({key:`${tid}:${round}`,tid,round,event:e.event_name,date:e.event_time,annotator:originalAnnotator(events,i),inspector:normalizeName(manualInspector?.operator_name||e.operator_name)||'待匹配',reason:e.reject_reason||'',first:round===1,invalid:e.event_name==='质检不通过'});});
   }return rounds;
 }
 
@@ -85,7 +85,7 @@ function buildAcceptanceRounds(){
   const groups=groupBy(activeEvents(),e=>e.tid);const rounds=[];
   for(const [tid,events0] of Object.entries(groups)){const events=events0.sort((a,b)=>new Date(a.event_time)-new Date(b.event_time)),entries=events.map((e,i)=>e.event_name==='进入验收池'?i:-1).filter(i=>i>=0),segments=[];
     if(entries.length)entries.forEach((start,ri)=>segments.push({start,end:entries[ri+1]??events.length}));else if(state.workstream==='multi'){let start=-1;events.forEach((e,i)=>{if(e.event_name==='验收派单'&&start<0)start=i;if(start>=0&&['验收通过','验收不通过'].includes(e.event_name)){segments.push({start,end:i+1});start=-1;}});}
-    segments.forEach(({start,end},ri)=>{const decisions=[];for(let i=start;i<end;i++)if(['验收通过','验收不通过'].includes(events[i].event_name))decisions.push({e:events[i],i});if(!decisions.length)return;const final=decisions.at(-1);let qc=null;for(let i=final.i-1;i>=0;i--)if(events[i].event_name==='质检通过'&&events[i].operator_name){qc={e:events[i],i};break;}const ai=qc?.i??start;rounds.push({key:`${tid}:${ri+1}`,tid,round:ri+1,entryDate:events[start].event_time,resultDate:final.e.event_time,result:final.e.event_name==='验收通过'?'passed':'failed',reason:final.e.reject_reason||'',inspector:normalizeName(qc?.e.operator_name)||'待匹配',annotator:originalAnnotator(events,ai),events:events.slice(start,end)});});
+    segments.forEach(({start,end},ri)=>{const decisions=[];for(let i=start;i<end;i++)if(['验收通过','验收不通过'].includes(events[i].event_name))decisions.push({e:events[i],i});if(!decisions.length)return;const final=decisions.at(-1);let qc=null;for(let i=final.i-1;i>=0;i--)if(events[i].event_name==='历史人工质检责任人'&&events[i].operator_name){qc={e:events[i],i};break;}if(!qc)for(let i=final.i-1;i>=0;i--)if(['质检通过','历史质检责任人'].includes(events[i].event_name)&&events[i].operator_name){qc={e:events[i],i};break;}const ai=qc?.i??start;rounds.push({key:`${tid}:${ri+1}`,tid,round:ri+1,entryDate:events[start].event_time,resultDate:final.e.event_time,result:final.e.event_name==='验收通过'?'passed':'failed',reason:final.e.reject_reason||'',inspector:normalizeName(qc?.e.operator_name)||'待匹配',annotator:originalAnnotator(events,ai),events:events.slice(start,end)});});
   }return rounds;
 }
 
