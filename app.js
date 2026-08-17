@@ -9,6 +9,9 @@ async function uploadStorageObject(bucket,path,blob,contentType=blob.type||'appl
 }
 const SINGLE_DATA_START='2026-07-20';
 const FIRST_PASS_QUALITY_START='2026-08-01';
+const EVENT_CACHE_VERSION=3;
+const EVENT_COLUMNS='event_key,tid,channel,event_time,event_name,operator_name,reject_reason,import_id';
+const FEEDBACK_COLUMNS='feedback_key,tid,feedback_date,source,severity,issue_category,issue_detail,inspector_name,movie_name,needs_change,changed,annotator_reply,needs_recheck,evidence,raw_row,import_id,created_at,updated_at';
 const state = { events: [], feedback: [], appeals: [], roles: [], imports: [], adminAudit: [], cases: [], qualityRounds: [], acceptanceRounds: [], eventsByTid: new Map(), qualityRoundsByTid: new Map(), appealsByFeedbackKey: new Map(), importById: new Map(), sharedVersions: ['', '', ''], sopSettings: {enabled:false,startDate:'',qualityEnabled:true,acceptanceEnabled:true}, pendingDelete: null, actor: localStorage.getItem('r2v_quality_actor') || '', workstream: localStorage.getItem('r2v_quality_workstream')==='multi'?'multi':'single', view:'overview' };
 const WORKSTREAMS={single:'单镜头',multi:'多镜头'};
 const inspectorFallback = new Set(['于蕊','唐子旖','连晓燕','乔一佳','王雨鲲','相伟达']);
@@ -40,34 +43,65 @@ function rowWorkstream(row){if(row?.raw_row?.workstream==='multi')return 'multi'
 function activeEvents(){return state.events;}
 function activeFeedback(){return state.feedback.filter(f=>f.raw_row?.excludedDuplicate!==true);}
 function activeImports(){return state.imports.filter(i=>importWorkstream(i)===state.workstream);}
-function periodBounds(){const v=$('periodSelect')?.value||'all',today=day(new Date());if(v==='all')return {start:'',end:'',label:'全部累计'};if(v==='custom'){const start=$('startDate')?.value||'',end=$('endDate')?.value||'';return {start,end,label:start||end?`${start||'最早'} 至 ${end||'最新'}`:'请选择日期'};}const d=new Date(`${today}T00:00:00Z`);d.setUTCDate(d.getUTCDate()-Number(v)+1);return {start:day(d),end:today,label:v==='1'?today:`${day(d)} 至 ${today}`};}
+function periodBounds(){const v=$('periodSelect')?.value||'idle',today=day(new Date());if(v==='idle')return {start:'',end:'',label:'请选择日期'};if(v==='all')return {start:'',end:'',label:'全部累计'};if(v==='custom'){const start=$('startDate')?.value||'',end=$('endDate')?.value||'';return {start,end,label:start||end?`${start||'最早'} 至 ${end||'最新'}`:'请选择日期'};}const d=new Date(`${today}T00:00:00Z`);d.setUTCDate(d.getUTCDate()-Number(v)+1);return {start:day(d),end:today,label:v==='1'?today:`${day(d)} 至 ${today}`};}
 function inPeriod(date){const key=day(date),{start,end}=periodBounds();if(!key)return false;return (!start||key>=start)&&(!end||key<=end);}
-function syncPeriodDates(){const select=$('periodSelect'),today=day(new Date()),todayOption=select.querySelector('option[value="1"]');todayOption.textContent=`单日（今天：${today}）`;const v=select.value;if(v==='custom')return;if(v==='all'){$('startDate').value='';$('endDate').value='';return;}const bounds=periodBounds();$('startDate').value=bounds.start;$('endDate').value=bounds.end;}
-function setPeriodPreset(){syncPeriodDates();renderAll();}
+function syncPeriodDates(){const select=$('periodSelect'),today=day(new Date()),todayOption=select.querySelector('option[value="1"]');todayOption.textContent=`单日（今天：${today}）`;const v=select.value;if(v==='custom')return;if(v==='all'||v==='idle'){$('startDate').value='';$('endDate').value='';return;}const bounds=periodBounds();$('startDate').value=bounds.start;$('endDate').value=bounds.end;}
+async function setPeriodPreset(){syncPeriodDates();await loadAll();}
 function useCustomDates(){if($('startDate').value||$('endDate').value)$('periodSelect').value='custom';}
-function applyPeriod(){const start=$('startDate').value,end=$('endDate').value;if(start&&end&&start>end)return showStatus('开始日不能晚于结束日。',true);renderAll();showStatus(`已按 ${periodBounds().label} 重新计算。`);}
+async function applyPeriod(){const start=$('startDate').value,end=$('endDate').value;if(start&&end&&start>end)return showStatus('开始日不能晚于结束日。',true);await loadAll();showStatus(`已按 ${periodBounds().label} 重新计算。`);}
 
 async function ensureActor(){if(state.actor)return state.actor;const name=prompt('请输入你的姓名。上传、申诉和裁决会记录这个名字。','');if(!name?.trim())return '';state.actor=name.trim();localStorage.setItem('r2v_quality_actor',state.actor);renderIdentity();return state.actor;}
 function renderIdentity(){$('identityBtn').textContent=state.actor||'设置姓名';}
+
+function eventCacheKey(workstream){return `${location.origin}${location.pathname}__event-cache-${workstream}-v${EVENT_CACHE_VERSION}`;}
+async function readEventCache(workstream){if(!('caches' in window))return null;try{const response=await (await caches.open('r2v-quality-data')).match(eventCacheKey(workstream));if(!response)return null;const value=await response.json();return value?.version===EVENT_CACHE_VERSION&&Array.isArray(value.rows)&&Array.isArray(value.importIds)?value:null;}catch(error){console.warn('本地流水缓存读取失败，已回退云端读取',error);return null;}}
+async function writeEventCache(workstream,rows,importIds){if(!('caches' in window))return;try{const cache=await caches.open('r2v-quality-data'),body=JSON.stringify({version:EVENT_CACHE_VERSION,savedAt:new Date().toISOString(),importIds:[...new Set(importIds)],rows});await cache.put(eventCacheKey(workstream),new Response(body,{headers:{'Content-Type':'application/json'}}));}catch(error){console.warn('本地流水缓存写入失败，不影响云端数据',error);}}
+function scheduleEventCacheWrite(workstream,rows,importIds){const save=()=>writeEventCache(workstream,rows,importIds);if('requestIdleCallback' in window)requestIdleCallback(save,{timeout:5000});else setTimeout(save,100);}
 
 async function loadAll(){
   if(!db){showStatus('云端配置未加载，请刷新页面。',true);return;}
   try{
     showStatus(`正在按${workstreamLabel()}读取所需数据…`);
-    const page=async(table,order,tie,max,configure=query=>query)=>{const rows=[];for(let from=0;from<max;from+=1000){let query=configure(db.from(table).select('*').order(order,{ascending:table==='r2v_quality_staff_roles'}));if(tie!==order)query=query.order(tie,{ascending:true});const {data,error}=await query.range(from,Math.min(from+999,max-1));if(error)throw error;rows.push(...(data||[]));if(!data||data.length<1000)break;}return rows;};
+    const page=async(table,order,tie,max,configure=query=>query,columns='*')=>{const rows=[];for(let from=0;from<max;from+=1000){let query=configure(db.from(table).select(columns).order(order,{ascending:table==='r2v_quality_staff_roles'}));if(tie!==order)query=query.order(tie,{ascending:true});const {data,error}=await query.range(from,Math.min(from+999,max-1));if(error)throw error;rows.push(...(data||[]));if(!data||data.length<1000)break;}return rows;};
     state.imports=await page('r2v_quality_imports','created_at','id',10000);
     state.importById=new Map(state.imports.map(item=>[item.id,item]));
-    const importIds=state.imports.filter(i=>importWorkstream(i)===state.workstream).map(i=>i.id),eventRows=[],feedbackRows=[];
-    const batches=await mapConcurrent(chunk(importIds,20),4,async ids=>Promise.all([
-      page('r2v_quality_events','event_time','event_key',200000,q=>{q=q.in('import_id',ids);return state.workstream==='single'?q.gte('event_time',`${SINGLE_DATA_START}T00:00:00+08:00`):q;}),
-      page('r2v_quality_feedback','updated_at','feedback_key',100000,q=>{q=q.in('import_id',ids);return state.workstream==='single'?q.gte('feedback_date',SINGLE_DATA_START):q;})
-    ]));
-    for(const [events,feedback] of batches){eventRows.push(...events);feedbackRows.push(...feedback);}
-    if(state.workstream==='single'){
-      eventRows.push(...await page('r2v_quality_events','event_time','event_key',200000,q=>q.is('import_id',null).gte('event_time',`${SINGLE_DATA_START}T00:00:00+08:00`)));
-      feedbackRows.push(...await page('r2v_quality_feedback','updated_at','feedback_key',100000,q=>q.is('import_id',null).gte('feedback_date',SINGLE_DATA_START)));
+    const importIds=state.imports.filter(i=>importWorkstream(i)===state.workstream).map(i=>i.id),allowedImportIds=new Set(importIds),eventRows=[],feedbackRows=[],bounds=periodBounds(),idle=$('periodSelect')?.value==='idle',scoped=!!(bounds.start||bounds.end);
+    const applyEventRange=q=>{if(bounds.start)q=q.gte('event_time',`${bounds.start}T00:00:00+08:00`);if(bounds.end){const next=new Date(`${bounds.end}T00:00:00Z`);next.setUTCDate(next.getUTCDate()+1);q=q.lt('event_time',`${day(next)}T00:00:00+08:00`);}return q;},applyFeedbackRange=q=>{if(bounds.start)q=q.gte('feedback_date',bounds.start);if(bounds.end)q=q.lte('feedback_date',bounds.end);return q;};
+    if(idle){
+      showStatus('请选择单日或日期范围，系统只加载该范围需要的数据。');
+    }else if(scoped){
+      const [seedEventBatches,seedFeedbackBatches]=await Promise.all([
+        mapConcurrent(chunk(importIds,20),4,ids=>page('r2v_quality_events','event_time','event_key',200000,q=>applyEventRange(q.in('import_id',ids)),EVENT_COLUMNS)),
+        mapConcurrent(chunk(importIds,20),4,ids=>page('r2v_quality_feedback','updated_at','feedback_key',100000,q=>applyFeedbackRange(q.in('import_id',ids)),FEEDBACK_COLUMNS))
+      ]),seedEvents=seedEventBatches.flat(),seedFeedback=seedFeedbackBatches.flat();
+      if(state.workstream==='single'){
+        seedEvents.push(...await page('r2v_quality_events','event_time','event_key',200000,q=>applyEventRange(q.is('import_id',null)),EVENT_COLUMNS));
+        seedFeedback.push(...await page('r2v_quality_feedback','updated_at','feedback_key',100000,q=>applyFeedbackRange(q.is('import_id',null)),FEEDBACK_COLUMNS));
+      }
+      const tids=[...new Set([...seedEvents.map(row=>row.tid),...seedFeedback.map(row=>row.tid)].filter(Boolean))];
+      if(tids.length){
+        const [tidEventBatches,tidFeedbackBatches]=await Promise.all([
+          mapConcurrent(chunk(tids,80),4,ids=>page('r2v_quality_events','event_time','event_key',200000,q=>q.in('tid',ids),EVENT_COLUMNS)),
+          mapConcurrent(chunk(tids,120),4,ids=>page('r2v_quality_feedback','updated_at','feedback_key',100000,q=>q.in('tid',ids),FEEDBACK_COLUMNS))
+        ]);
+        eventRows.push(...tidEventBatches.flat().filter(row=>(row.import_id&&allowedImportIds.has(row.import_id))||(!row.import_id&&state.workstream==='single')));
+        feedbackRows.push(...tidFeedbackBatches.flat().filter(row=>rowWorkstream(row)===state.workstream));
+      }
+    }else{
+      const cached=await readEventCache(state.workstream),cachedIds=new Set((cached?.importIds||[]).filter(id=>allowedImportIds.has(id))),missingEventImportIds=importIds.filter(id=>!cachedIds.has(id));
+      if(cached?.rows?.length)eventRows.push(...cached.rows.filter(row=>row.import_id&&allowedImportIds.has(row.import_id)));
+      const [eventBatches,feedbackBatches]=await Promise.all([
+        mapConcurrent(chunk(missingEventImportIds,20),4,ids=>page('r2v_quality_events','event_time','event_key',200000,q=>{q=q.in('import_id',ids);return state.workstream==='single'?q.gte('event_time',`${SINGLE_DATA_START}T00:00:00+08:00`):q;},EVENT_COLUMNS)),
+        mapConcurrent(chunk(importIds,20),4,ids=>page('r2v_quality_feedback','updated_at','feedback_key',100000,q=>{q=q.in('import_id',ids);return state.workstream==='single'?q.gte('feedback_date',SINGLE_DATA_START):q;},FEEDBACK_COLUMNS))
+      ]);
+      eventRows.push(...eventBatches.flat());feedbackRows.push(...feedbackBatches.flat());
+      if(state.workstream==='single'){
+        eventRows.push(...await page('r2v_quality_events','event_time','event_key',200000,q=>q.is('import_id',null).gte('event_time',`${SINGLE_DATA_START}T00:00:00+08:00`),EVENT_COLUMNS));
+        feedbackRows.push(...await page('r2v_quality_feedback','updated_at','feedback_key',100000,q=>q.is('import_id',null).gte('feedback_date',SINGLE_DATA_START),FEEDBACK_COLUMNS));
+      }
     }
     state.events=dedupeBy(eventRows,'event_key');state.feedback=dedupeBy(feedbackRows,'feedback_key');
+    if(!scoped)scheduleEventCacheWrite(state.workstream,state.events.filter(row=>row.import_id),importIds);
     [state.appeals,state.roles,state.adminAudit]=await Promise.all([
       page('r2v_quality_appeals','updated_at','id',50000),
       page('r2v_quality_staff_roles','person_name','person_name',10000),
@@ -256,7 +290,7 @@ function mergeRowsByKey(current,updates,key){const merged=new Map(current.map(ro
 async function fetchChangedRows(table,since,order,key,max=5000){const rows=[];for(let from=0;from<max;from+=1000){let query=db.from(table).select('*').gt(order,since).order(order,{ascending:true}).order(key,{ascending:true}).range(from,Math.min(from+999,max-1));const {data,error}=await query;if(error)throw error;rows.push(...(data||[]));if(!data||data.length<1000)break;}return rows;}
 async function syncSharedState(){if(!db||sharedSyncBusy||sharedSyncPaused())return;sharedSyncBusy=true;try{const remote=await fetchSharedVersions(),[feedbackChanged,appealChanged,importsChanged]=remote.map((version,index)=>version!==state.sharedVersions[index]);if(importsChanged){await loadAll();return;}if(!feedbackChanged&&!appealChanged)return;const [feedbackUpdates,appealUpdates]=await Promise.all([feedbackChanged?fetchChangedRows('r2v_quality_feedback',state.sharedVersions[0],'updated_at','feedback_key'):[],appealChanged?fetchChangedRows('r2v_quality_appeals',state.sharedVersions[1],'updated_at','id'):[]]);if(feedbackUpdates.length){const relevant=feedbackUpdates.filter(row=>rowWorkstream(row)===state.workstream);state.feedback=mergeRowsByKey(state.feedback,relevant,'feedback_key');}if(appealUpdates.length)state.appeals=mergeRowsByKey(state.appeals,appealUpdates,'id');state.sharedVersions=remote;rebuild();renderAll();}catch(error){console.warn('共享状态同步失败',error);}finally{sharedSyncBusy=false;}}
 $('refreshBtn').onclick=async()=>{await loadAll();};
-setInterval(syncSharedState,12000);
+setInterval(syncSharedState,30000);
 window.addEventListener('focus',()=>setTimeout(syncSharedState,300));
 $('exportAppealsBtn').onclick=exportAppeals;
 $('exportCasesBtn').onclick=exportCases;

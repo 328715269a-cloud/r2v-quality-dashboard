@@ -28,6 +28,10 @@ jobs:
           node scripts/verify-owner-resolution.mjs
           node scripts/verify-p2-reporting.mjs
           grep -q "manualMatchUpdatedAt" app.js
+      - name: Check click-only evidence loading
+        run: node scripts/verify-evidence-lazy-loading.mjs
+      - name: Check date-scoped loading safeguards
+        run: node scripts/verify-lazy-loading.mjs
       - name: Confirm GitHub Pages published this version
         shell: bash
         run: |
