@@ -36,3 +36,4 @@ body{overflow-x:hidden}
 .group-accuracy-metrics span{font-size:12px;color:var(--muted)}
 .group-accuracy-metrics strong{font-size:20px}
 .group-accuracy-metrics strong.rate{color:var(--accent)}
+.table-pager{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;border:1px solid var(--line,#d7e1e8);border-top:0;border-radius:0 0 14px 14px;background:#fff;color:#607080;font-size:14px}.table-pager>div{display:flex;gap:8px}.table-pager button{min-width:72px;padding:8px 12px;border:1px solid #cbd8e1;border-radius:9px;background:#fff;color:#173047;font-weight:700;cursor:pointer}.table-pager button:hover:not(:disabled){border-color:#0785cb;color:#0785cb}.table-pager button:disabled{opacity:.45;cursor:not-allowed}
