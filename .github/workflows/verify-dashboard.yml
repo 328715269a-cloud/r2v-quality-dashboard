@@ -32,6 +32,8 @@ jobs:
         run: node scripts/verify-evidence-lazy-loading.mjs
       - name: Check date-scoped loading safeguards
         run: node scripts/verify-lazy-loading.mjs
+      - name: Check password-protected TID and annotator edits
+        run: node scripts/verify-admin-identity-edit.mjs
       - name: Confirm GitHub Pages published this version
         shell: bash
         run: |

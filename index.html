@@ -96,6 +96,18 @@
   <div id="drawerBackdrop" class="drawer-backdrop hidden"></div>
   <aside id="caseDrawer" class="drawer" aria-hidden="true"><button id="closeDrawer" class="drawer-close" aria-label="关闭">×</button><div id="drawerContent"></div></aside>
 
+  <div id="identityEditBackdrop" class="admin-edit-backdrop hidden"></div>
+  <section id="identityEditDialog" class="admin-edit-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="identityEditTitle">
+    <form id="identityEditForm">
+      <div class="admin-edit-head"><div><p class="eyebrow">ADMIN EDIT</p><h2 id="identityEditTitle">管理员修改</h2></div><button id="identityEditClose" class="admin-edit-close" type="button" aria-label="关闭">×</button></div>
+      <p id="identityEditContext" class="admin-edit-context"></p>
+      <label id="identityEditValueLabel" class="admin-edit-field">新内容<input id="identityEditValue" name="value" type="text" required autocomplete="off"></label>
+      <label class="admin-edit-field">管理员密码<input id="identityEditPin" name="pin" type="password" inputmode="numeric" required autocomplete="current-password"></label>
+      <p id="identityEditError" class="admin-edit-error hidden" role="alert"></p>
+      <div class="admin-edit-actions"><button id="identityEditCancel" class="button secondary" type="button">取消</button><button id="identityEditSubmit" class="button primary" type="submit">确认保存</button></div>
+    </form>
+  </section>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>

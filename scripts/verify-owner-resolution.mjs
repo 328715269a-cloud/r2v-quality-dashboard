@@ -27,5 +27,6 @@ for(const [name,events,options,expected] of scenarios){
   if(actual!==expected)throw new Error(`${name}: expected ${expected}, received ${actual}`);
 }
 
-if(!source.includes('manual.manualAnnotator||tidManual.manualAnnotator||roundAnnotator||datedAnnotator'))throw new Error('manual annotator priority changed');
-console.log(`Verified ${scenarios.length} annotation ownership scenarios and manual override priority.`);
+if(!source.includes("manual.manualAnnotator||roundAnnotator||datedAnnotator"))throw new Error('case-scoped manual annotator priority changed');
+if(source.includes('tidManual.manualAnnotator'))throw new Error('manual annotator must not spread to every round sharing a TID');
+console.log(`Verified ${scenarios.length} annotation ownership scenarios and case-scoped manual override priority.`);
