@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" href="data:,">
+  <title>R2V 新作业模式</title>
+  <link rel="stylesheet" href="styles.css?v=20260911-prod4">
+  <link rel="stylesheet" href="/work-mode-entry.20260910.css">
+</head>
+<body>
+  <section id="identityGate" class="identity-gate" aria-labelledby="identityHeading">
+    <div class="identity-card">
+      <div class="identity-brand"><span class="brand-mark">R2V</span><span>新作业模式</span></div>
+      <div class="identity-entry-switch" role="group" aria-label="选择入口"><button id="workerEntry" type="button" aria-pressed="true" aria-controls="identityForm">作业人员</button><button id="adminEntry" type="button" aria-pressed="false" aria-controls="identityAdminForm">管理员</button></div>
+      <h1 id="identityHeading">进入工作台</h1>
+      <p id="identityIntro" class="hidden"></p>
+      <form id="identityForm" class="identity-form">
+        <label class="field" for="identityName"><span>中文名</span><input id="identityName" name="name" type="text" placeholder="填写中文名" required maxlength="20" autocomplete="name"></label>
+        <label class="field" for="identityMode"><span>作业类型</span><select id="identityMode" name="mode" required><option value="single">单镜头</option><option value="multi">多镜头</option></select></label>
+        <div class="form-grid">
+          <label class="field" for="identityGroup"><span>小组</span><select id="identityGroup" name="group" required></select></label>
+          <label class="field" for="identityRole"><span>角色</span><select id="identityRole" name="role" required><option value="annotation">标注</option><option value="qc">组长 / 质检</option><option value="acceptance">验收</option></select></label>
+        </div>
+        <label id="identityRolePinField" class="field hidden" for="identityRolePin"><span>身份校验码</span><input id="identityRolePin" name="rolePin" type="password" inputmode="numeric" autocomplete="off" maxlength="64"></label>
+        <details id="identityLegacyDetails" class="identity-legacy hidden" hidden><summary>此前身份</summary><label class="field" for="identityLegacy"><span>此前使用的身份</span><select id="identityLegacy" name="legacyAssignee" aria-describedby="identityLegacyHelp" disabled><option value=""></option></select><small id="identityLegacyHelp"></small></label></details>
+        <button class="btn primary" type="submit">进入工作台</button>
+      </form>
+      <form id="identityAdminForm" class="identity-form hidden" autocomplete="off">
+        <label class="field" for="identityAdminName"><span>管理员用户名</span><input id="identityAdminName" name="name" type="text" required maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="请输入管理员用户名"></label>
+        <label class="field" for="identityAdminPin"><span>管理员密码</span><input id="identityAdminPin" name="pin" type="password" inputmode="numeric" required maxlength="64" autocomplete="off"></label>
+        <button class="btn primary" type="submit">进入任务管理</button>
+      </form>
+      <p class="identity-note">任务与操作记录保存到云端。</p>
+      <a class="identity-current-mode" href="/" target="_blank" rel="noopener noreferrer">当前作业模式 <small>新窗口</small></a>
+    </div>
+  </section>
+  <div id="appShell" class="app-shell hidden">
+    <aside class="sidebar" aria-label="新作业模式导航">
+      <div class="brand"><span class="brand-mark">R2V</span><span class="brand-copy"><strong class="brand-title">新作业模式</strong><small class="brand-subtitle">小组 · 标注 · 质检 · 验收</small></span></div>
+      <nav aria-label="作业页面">
+        <button class="nav-item active" type="button" data-view="overview"><span aria-hidden="true">⌂</span><span>小组总览</span></button>
+        <button class="nav-item" type="button" data-view="dispatch"><span aria-hidden="true">＋</span><span>任务导入</span></button>
+        <button class="nav-item" type="button" data-view="tasks"><span aria-hidden="true">✓</span><span>标注台</span></button>
+        <button class="nav-item" type="button" data-view="qc"><span aria-hidden="true">◎</span><span>质检台</span></button>
+        <button class="nav-item" type="button" data-view="acceptance"><span aria-hidden="true">◇</span><span>验收台</span></button>
+        <button class="nav-item" type="button" data-view="records"><span aria-hidden="true">≡</span><span>全部任务</span></button>
+      </nav>
+      <div class="sidebar-footer"><strong>共享作业工作台</strong><span>通航提交 case，这里登记进度、审核与结果。</span></div>
+    </aside>
+    <main class="main">
+      <nav class="r2v-work-mode" aria-label="作业模式"><a class="r2v-work-mode-link" href="/" target="_blank" rel="noopener noreferrer">当前作业模式 <small>新窗口</small></a><span class="r2v-work-mode-current" aria-current="page">新作业模式</span></nav>
+      <header class="topbar">
+        <div class="title-mode-group"><div><p class="eyebrow">GROUP WORKFLOW</p><h1 id="pageTitle">小组总览</h1></div><div id="modeSwitcher" class="mode-switcher" aria-label="切换作业模块"><button type="button" data-mode="single" aria-pressed="true">单镜头</button><button type="button" data-mode="multi" aria-pressed="false">多镜头</button></div></div>
+        <div class="topbar-controls">
+          <div class="scope-date-filter" role="group" aria-label="统计日期区间">
+            <div class="scope-date-heading"><span>统计日期</span><div class="scope-date-presets" role="group" aria-label="快捷日期区间"><button type="button" data-date-preset="today" aria-pressed="true">今日</button><button type="button" data-date-preset="yesterday" aria-pressed="false">昨日</button><button type="button" data-date-preset="7days" aria-pressed="false">近7天</button><button type="button" data-date-preset="30days" aria-pressed="false">近30天</button><button type="button" data-date-preset="all" aria-pressed="false">全部</button></div></div>
+            <div class="scope-date-inputs"><label class="scope-date-input" for="scopeDateFrom"><span>起始日期</span><input id="scopeDateFrom" type="date" value="2026-09-10"></label><span class="scope-date-separator" aria-hidden="true">至</span><label class="scope-date-input" for="scopeDateTo"><span>结束日期</span><input id="scopeDateTo" type="date" value="2026-09-10"></label></div>
+            <p id="scopeDateError" class="scope-date-error hidden" role="alert"></p>
+          </div>
+          <label class="field compact"><span>查看小组</span><select id="scopeGroup"><option value="all">全部小组</option></select></label>
+          <div class="field compact identity-field"><span>当前作业身份</span><div class="identity-control"><strong id="currentUserLabel">未登记</strong><button id="changeIdentity" class="btn ghost small" type="button">切换</button></div></div>
+        </div>
+      </header>
+      <div class="shared-banner"><div class="shared-banner-copy" role="status" aria-live="polite"><strong id="sharedSyncStatus">正在连接云端</strong><span id="sharedNewUpdatesLabel" class="hidden">有新记录，可刷新查看</span></div><button id="sharedRefreshBtn" class="btn small" type="button">刷新数据</button></div>
+      <section id="overviewView" class="view" aria-labelledby="overviewHeading">
+        <section class="overview-summary" aria-labelledby="overviewHeading">
+          <div class="overview-summary-heading">
+            <div><h2 id="overviewHeading">累计进度</h2><p id="allocationSummary" class="allocation-summary" aria-live="polite">截至当前 · 全部分配日期</p></div>
+            <div class="actions overview-export-actions">
+              <details class="export-menu"><summary>导出本模块</summary><div class="export-menu-list">
+                <button class="btn small" type="button" data-export="tasks">全部任务明细</button>
+                <button class="btn small" type="button" data-export="movies">整片影片汇总</button>
+                <button class="btn small" type="button" data-export="groups">小组汇总</button>
+                <button class="btn small" type="button" data-export="daily">每日统计</button>
+                <button class="btn small" type="button" data-export="summary">综合汇总</button>
+                <button class="btn small" type="button" data-export="events">操作流水</button>
+                <button class="btn small" type="button" data-export="packages">建包记录</button>
+              </div></details>
+              <button class="btn small" type="button" data-export="backup">完整备份（含单多）</button>
+            </div>
+          </div>
+          <div class="overview-metrics" aria-label="累计任务概况">
+            <button class="overview-metric overview-metric-total" type="button" data-action="overview-bucket" data-bucket="all"><span>累计分配 TID</span><strong id="metricTotal">—</strong><small>全部任务</small></button>
+            <button class="overview-metric overview-metric-movies" type="button" data-overview-tab="movies"><span>影片 / 包</span><strong id="metricMovies">—</strong><small>查看影片进度</small></button>
+            <button class="overview-metric overview-metric-accepted" type="button" data-action="overview-bucket" data-bucket="accepted"><span>验收通过</span><strong id="metricComplete">—</strong><small>完成比例 <b id="metricRate">—</b></small></button>
+            <button class="overview-metric overview-metric-active" type="button" data-action="overview-bucket" data-bucket="active"><span>处理中</span><strong id="metricActive">—</strong><small>尚在流转的任务</small></button>
+            <button class="overview-metric overview-metric-rejected" type="button" data-action="overview-bucket" data-bucket="rejected"><span>已拒绝</span><strong id="metricRejected">—</strong><small>质检已确认</small></button>
+          </div>
+        </section>
+        <section class="overview-followup-section" aria-labelledby="overviewFollowupsHeading">
+          <div class="overview-followup-heading"><h3 id="overviewFollowupsHeading">需跟进</h3><span>处理中任务的细分</span></div>
+          <div id="overviewFollowups" class="overview-followups"></div>
+        </section>
+        <details id="overviewStates" class="overview-disclosure"><summary>全部流转状态</summary><div id="statusBoard" class="status-board" aria-label="按环节查看全部状态"></div></details>
+        <div class="hidden" aria-hidden="true"><span id="metricQcBuild"></span><span id="metricPendingQc"></span><span id="metricUnsent"></span><span id="metricAcceptance"></span><span id="metricRework"></span><span id="metricRejectPending"></span><span id="metricQcClaim"></span><span id="metricReturnPending"></span><span id="metricQcSelf"></span><span id="metricAcceptanceClaim"></span></div>
+        <div class="overview-tabs" role="tablist" aria-label="总览明细">
+          <button id="overviewTab-groups" type="button" role="tab" data-overview-tab="groups" aria-controls="overviewPanel-groups" aria-selected="true" tabindex="0">小组进度</button>
+          <button id="overviewTab-movies" type="button" role="tab" data-overview-tab="movies" aria-controls="overviewPanel-movies" aria-selected="false" tabindex="-1">影片进度</button>
+          <button id="overviewTab-daily" type="button" role="tab" data-overview-tab="daily" aria-controls="overviewPanel-daily" aria-selected="false" tabindex="-1">每日工作量</button>
+          <button id="overviewTab-people" type="button" role="tab" data-overview-tab="people" aria-controls="overviewPanel-people" aria-selected="false" tabindex="-1">人员质量</button>
+        </div>
+        <div id="overviewDateSlot" class="overview-date-slot"></div>
+        <section id="overviewPanel-groups" class="overview-panel" data-overview-panel="groups" role="tabpanel" aria-labelledby="overviewTab-groups">
+          <div class="panel">
+            <div class="panel-heading group-daily-heading"><div><h3>小组进度</h3><p id="groupDailyScopeHint" data-overview-range-label>每日登记按统计日期，任务进度截至当前。</p></div></div>
+            <div class="table-wrap group-progress-table"><table><thead><tr><th>小组</th><th>负责人<small>统计日期</small></th><th><span id="groupDailyTotalLabel">登记总量</span><small>统计日期</small></th><th><span id="groupDailyAttendanceLabel">在班人数</span><small>统计日期</small></th><th>累计 TID<small>截至当前</small></th><th>验收通过<small>截至当前</small></th><th>处理中<small>截至当前</small></th><th>流转状态</th><th>设置</th></tr></thead><tbody id="groupProgressBody"></tbody></table></div>
+          </div>
+          <div id="groupDailyEditor" class="panel editor-panel hidden" aria-label="每日小组设置" aria-live="polite"></div>
+        </section>
+        <section id="overviewPanel-movies" class="overview-panel hidden" data-overview-panel="movies" role="tabpanel" aria-labelledby="overviewTab-movies">
+          <div class="panel movie-progress-panel">
+            <div class="panel-heading"><div><h3>整片影片进度</h3><p data-overview-range-label>按参与小组筛选，整片进度跨组汇总。</p></div></div>
+            <div class="movie-progress-toolbar">
+              <label class="field"><span>影片</span><input id="movieProgressSearch" type="search" placeholder="搜索影片"></label>
+              <label class="field"><span>影片状态</span><select id="movieProgressFilter"><option value="all" selected>全部</option><option value="active">流程中</option><option value="closed">已闭环</option></select></label>
+              <p id="movieProgressSummary" aria-live="polite"></p>
+            </div>
+            <section id="movieActiveSection" class="movie-progress-section" aria-labelledby="movieActiveHeading">
+              <div class="movie-section-heading"><h4 id="movieActiveHeading">流程中 <span id="movieActiveCount" class="movie-section-count">0</span></h4></div>
+              <div class="table-wrap movie-progress-table"><table><thead><tr><th>影片</th><th>参与小组</th><th>流转状态</th><th title="验收通过或质检确认拒绝的 TID 占总量；全部处理完才算已闭环">闭环进度</th><th>总 TID</th><th>待标注</th><th>质检环节</th><th>验收环节</th><th>返修 / 待处理</th><th>详情</th></tr></thead><tbody id="movieProgressBody"></tbody></table></div>
+            </section>
+            <details id="movieClosedSection" class="movie-closed-section">
+              <summary>已闭环 <span id="movieClosedCount" class="movie-section-count">0</span><small class="movie-closure-note">全部 TID 已验收通过或确认拒绝</small></summary>
+              <div class="table-wrap movie-progress-table"><table><thead><tr><th>影片</th><th>参与小组</th><th>流转状态</th><th title="验收通过或质检确认拒绝的 TID 占总量；全部处理完才算已闭环">闭环进度</th><th>总 TID</th><th>待标注</th><th>质检环节</th><th>验收环节</th><th>返修 / 待处理</th><th>详情</th></tr></thead><tbody id="movieClosedBody"></tbody></table></div>
+            </details>
+          </div>
+          <details id="overviewRejections" class="overview-disclosure"><summary>拒绝明细（按原批次）</summary><p class="overview-detail-note">保留原批次影片名、所属小组与拒绝明细。</p><div class="table-wrap rejection-table"><table><thead><tr><th>影片 / 包</th><th>小组</th><th>标注拒绝待确认</th><th>质检确认拒绝</th><th>查看</th></tr></thead><tbody id="rejectionSummaryBody"></tbody></table></div></details>
+        </section>
+        <section id="overviewPanel-daily" class="overview-panel hidden" data-overview-panel="daily" role="tabpanel" aria-labelledby="overviewTab-daily">
+          <div class="panel">
+            <div class="panel-heading"><div><h3>每日工作量</h3><p data-overview-range-label>按统计日期逐日查看工作记录。</p></div></div>
+            <div id="overviewDailySummary" class="overview-daily-summary" aria-live="polite"></div>
+            <div class="table-wrap"><table><thead><tr><th>日期</th><th>小组</th><th>新增分配 TID</th><th>首次标注完成</th><th>标注返修次数</th><th>建质检包</th><th>建验收包</th><th>质检通过次数</th><th>质检打回次数</th><th>验收通过 TID</th><th>验收打回次数</th><th>确认拒绝 TID</th></tr></thead><tbody id="dailyStatsBody"></tbody></table></div>
+          </div>
+        </section>
+        <section id="overviewPanel-people" class="overview-panel hidden" data-overview-panel="people" role="tabpanel" aria-labelledby="overviewTab-people">
+          <div class="panel"><div class="panel-heading"><div><h3>人员产出与质量</h3><p data-overview-range-label>按统计日期汇总，首次质检与返修分开统计。</p></div></div><div class="table-wrap"><table><thead><tr><th>人员</th><th>小组</th><th>首次提交</th><th>返修提交</th><th>验收通过</th><th>首次质检</th><th>首检通过</th><th>P0</th><th>P1</th><th>P2</th><th>首检准确率</th></tr></thead><tbody id="personStatsBody"></tbody></table></div></div>
+        </section>
+      </section>
+
+      <section id="dispatchView" class="view hidden" aria-labelledby="dispatchHeading">
+        <div class="section-heading"><div><h2 id="dispatchHeading">导入影片任务</h2><p>先填写影片名，再添加本次 TID。预览核对后确认导入。</p></div></div>
+        <div class="panel">
+          <form id="dispatchForm" class="panel-body import-form">
+            <div class="form-grid compact">
+              <label class="field"><span>分配日期</span><input name="date" type="date" required></label>
+              <label class="field"><span>所属小组</span><select name="group" required></select></label>
+              <div class="field"><span>作业类型</span><input name="mode" type="hidden" value="single"><div id="dispatchModeLabel" class="dispatch-mode-fixed" aria-live="polite">单镜头</div></div>
+              <label class="field full dispatch-movie-field"><span>影片名</span><input name="movie" type="text" required maxlength="160" placeholder="填写本次任务所属影片"></label>
+              <label class="field full" for="dispatchText"><span>本次导入的 TID</span><textarea name="tids" id="dispatchText" rows="7" spellcheck="false" placeholder="TID001&#10;TID002" aria-describedby="dispatchHelp"></textarea><small id="dispatchHelp">每次导入一部影片，TID 区域只填写编号。</small></label>
+            </div>
+            <div class="import-actions"><div class="actions"><button id="dispatchPreviewBtn" class="btn" type="button">预览与检查</button><button id="dispatchCommitBtn" class="btn primary" type="submit" disabled>确认导入</button></div></div>
+            <div id="dispatchPreview" class="preview-box" aria-live="polite"><span>预览后将显示可导入、重复及失败的条数与原因。</span></div>
+          </form>
+        </div>
+        <div class="panel"><div class="panel-heading"><div><h3>导入记录</h3><p id="batchRecordCount">查看每次导入及修改记录</p></div><div class="row-actions"><label class="field"><span>记录状态</span><select id="batchRecordFilter"><option value="all">全部记录</option><option value="active">未删除</option><option value="deleted">已删除</option></select></label><button class="btn small" type="button" data-export="imports">导出导入记录</button></div></div><div class="table-wrap"><table><thead><tr><th>影片 / 包</th><th>分配日期</th><th>小组</th><th>任务数</th><th>导入人</th><th>导入时间</th><th>记录状态</th><th>操作</th></tr></thead><tbody id="batchBody"></tbody></table></div></div>
+        <aside id="batchDetail" class="panel hidden" aria-live="polite"></aside>
+        <aside id="batchEditor" class="panel editor-panel hidden" aria-live="polite"></aside>
+      </section>
+      <section id="tasksView" class="view hidden" aria-labelledby="tasksHeading">
+        <div class="section-heading"><div><h2 id="tasksHeading">标注台</h2><p>在通航完成标注后，批量登记完成；需要返修或申请拒绝的任务在下方处理。</p></div></div>
+        <div class="panel bulk-entry-panel">
+          <form id="annotationBulkForm" class="bulk-entry-form">
+            <label class="field" for="annotationBulkTids"><span>本次完成的 TID</span><textarea id="annotationBulkTids" name="tids" rows="3" spellcheck="false" placeholder="粘贴本次已在通航完成的 TID，每行一条；也可在下方勾选" aria-describedby="annotationBulkHelp"></textarea><small id="annotationBulkHelp">未登记任务可直接登记到本人并完成；不覆盖他人任务。</small></label>
+            <div class="bulk-entry-actions"><button id="annotationBulkComplete" class="btn primary" type="button">批量登记完成</button><div id="annotationBulkResult" class="inline-result" aria-live="polite"></div></div>
+          </form>
+        </div>
+        <div class="panel search-panel"><form id="taskSearchForm" class="toolbar search-toolbar"><label class="field grow"><span>登记任务</span><input id="taskSearchInput" placeholder="输入完整 TID" required aria-describedby="taskRegisterHelp"><small id="taskRegisterHelp">输入完整 TID，登记到本人名下。登记不代表完成。</small></label><button class="btn" type="submit">登记任务</button></form><div id="taskSearchResult" class="search-result" aria-live="polite"></div></div>
+        <div class="panel">
+          <div class="panel-heading responsive-heading"><div><h3>我负责的任务</h3><p>勾选可批量登记完成；打回与拒绝确认结果也在这里查看。</p></div><label class="field compact"><span>状态</span><select id="myTaskFilter"><option value="all">全部状态</option></select></label></div>
+          <div class="table-wrap"><table><thead><tr><th class="selection-cell"><input id="annotationSelectAll" type="checkbox" aria-label="全选当前可登记完成的任务"></th><th>TID</th><th>影片 / 包</th><th>小组</th><th>类型</th><th>当前轮次</th><th>状态</th><th>最后更新</th><th>操作</th></tr></thead><tbody id="myTasksBody"></tbody></table></div>
+        </div>
+      </section>
+      <section id="qcView" class="view hidden" aria-labelledby="qcHeading">
+        <div class="section-heading"><div><h2 id="qcHeading">质检台</h2><p>登记通航建包与领取，再批量质检；标注拒绝和验收打回单独处理。</p></div></div>
+        <div class="panel package-panel">
+          <div class="panel-heading"><div><h3>登记建包与领取</h3><p>只登记已在通航完成的动作。同一影片可按 TID 分批建包。</p></div></div>
+          <form id="packageForm" class="package-form">
+            <div class="form-grid">
+              <label class="field"><span>建包去向</span><select name="stage"><option value="qc">建质检包</option><option value="acceptance">建验收包</option></select></label>
+              <label class="field"><span>通航包名 / 编号（可选）</span><input name="packageName" type="text" maxlength="200" placeholder="用于核对通航中的包"></label>
+              <label class="field full" for="packageTids"><span>本次建包的 TID</span><textarea id="packageTids" name="tids" rows="3" spellcheck="false" placeholder="粘贴本次已建包的 TID，每行一条"></textarea></label>
+            </div>
+            <div class="bulk-entry-actions"><div class="actions"><button id="packageBuildAndClaim" class="btn primary" type="button">已建包并领取</button></div><div id="packageResult" class="inline-result" aria-live="polite"></div></div>
+          </form>
+          <div class="table-wrap package-table"><table><thead><tr><th>批次</th><th>影片 / 包</th><th>去向</th><th>TID 数</th><th>建包人</th><th>领取人</th><th>状态</th><th>操作</th></tr></thead><tbody id="packageBody"></tbody></table></div>
+        </div>
+        <div class="split-layout qc-layout">
+          <div class="panel queue-panel">
+            <div class="panel-heading responsive-heading"><div><h3>质检待办</h3><p>勾选任务批量处理，也可打开单条记录。</p></div><label class="field compact"><span>当前状态</span><select id="qcTaskFilter"><option value="all">全部待办</option></select></label></div>
+            <details class="tid-picker" id="qcTidPicker"><summary>按 TID 选择质检任务</summary><form id="qcMatchForm"><label class="field" for="qcMatchTids"><span>本次质检的 TID</span><textarea id="qcMatchTids" rows="3" placeholder="每行一个 TID，影片自动匹配" spellcheck="false"></textarea></label><div class="import-actions"><button id="qcMatchBtn" class="btn" type="button">校验并勾选</button></div><div id="qcMatchResult" class="inline-result" aria-live="polite"></div></form></details>
+            <div class="bulk-toolbar"><span>处理勾选的任务</span><div class="actions"><button id="qcBulkPass" class="btn primary small" type="button">批量质检通过</button><button id="qcBulkFail" class="btn small" type="button">批量打回</button></div></div>
+            <div id="qcBulkWorkbench" class="bulk-workbench" aria-live="polite"></div>
+            <div class="table-wrap"><table><thead><tr><th class="selection-cell"><input id="qcSelectAll" type="checkbox" aria-label="全选当前可批量质检的任务"></th><th>TID</th><th>标注人</th><th>影片 / 包</th><th>当前状态</th><th>提交时间</th><th>操作</th></tr></thead><tbody id="qcQueueBody"></tbody></table></div>
+          </div>
+          <aside id="qcWorkbench" class="panel workbench" aria-live="polite"><div class="empty"><strong>请选择一条任务</strong><span>查看单条记录，处理质检、拒绝申请或验收打回。</span></div></aside>
+        </div>
+        <details id="reworkAssignmentPanel" class="panel rework-assignment-panel">
+          <summary><span class="rework-assignment-heading"><strong>返修分配</strong><small>本组待返修 <b id="reworkAssignableCount">0</b> 条</small></span></summary>
+          <form id="reworkAssignmentForm">
+            <p id="reworkAssignmentHelp" class="rework-assignment-help">勾选本组待返修任务，交给接手人处理。原标注与质检记录保留。</p>
+            <div class="table-wrap rework-assignment-table" role="region" aria-label="本组可分配的返修任务" tabindex="0"><table><thead><tr><th class="selection-cell"><input id="reworkAssignmentSelectAll" type="checkbox" aria-label="全选本组可分配的返修任务"></th><th>TID</th><th>影片 / 包</th><th>当前标注人</th><th>当前状态</th><th>最近分配</th></tr></thead><tbody id="reworkAssignmentBody"></tbody></table></div>
+            <div class="rework-assignment-controls">
+              <p class="rework-selection-count" aria-live="polite">已选 <strong id="reworkAssignmentSelectedCount">0</strong> 条</p>
+              <div class="rework-assignment-fields">
+                <label class="field" for="reworkAssignee"><span>中文接手人</span><input id="reworkAssignee" name="assignee" type="text" required maxlength="20" autocomplete="off" placeholder="填写接手人的中文名" aria-describedby="reworkAssignmentHelp"></label>
+                <label class="field" for="reworkReason"><span>分配原因</span><input id="reworkReason" name="reason" type="text" required maxlength="500" value="请假代修"></label>
+                <button id="reworkAssignmentSubmit" class="btn primary" type="submit" disabled>确认分配</button>
+              </div>
+              <div id="reworkAssignmentResult" class="inline-result" aria-live="polite"></div>
+            </div>
+          </form>
+        </details>
+      </section>
+      <section id="acceptanceView" class="view hidden" aria-labelledby="acceptanceHeading">
+        <div class="section-heading"><div><h2 id="acceptanceHeading">验收台</h2><p>组长建包并领取后，粘贴 TID 或勾选下方任务登记验收结果。</p></div></div>
+        <details id="acceptanceImportDetails" class="panel import-details" open>
+          <summary><span><strong>批量登记验收</strong><small>贴 TID，校验后勾选结果</small></span></summary>
+          <form id="acceptanceImportForm" class="panel-body import-form">
+            <div class="import-template-row"><p>影片自动匹配，无需重复填写。</p></div>
+            <label class="field" for="acceptanceText"><span>本次验收的 TID</span><textarea id="acceptanceText" rows="4" spellcheck="false" placeholder="TID001&#10;TID002&#10;每行一个 TID" aria-describedby="acceptanceHelp"></textarea><small id="acceptanceHelp">只粘贴一列 TID；未导入、重复或不在待验收状态的任务会提示。</small></label>
+            <div class="import-actions"><button id="acceptancePreviewBtn" class="btn" type="button">校验并匹配</button></div>
+            <div id="acceptancePreview" class="preview-box" aria-live="polite">只需 TID，校验后自动显示影片和当前状态。</div>
+            <fieldset id="acceptanceChoice" class="batch-status-choice"><legend>所选 TID 的验收状态</legend><div class="decision-options"><label><input type="radio" name="acceptanceResult" value="acceptance_pass"> 验收通过</label><label><input type="radio" name="acceptanceResult" value="acceptance_fail"> 验收打回</label></div></fieldset>
+            <label class="field" for="acceptanceChoiceNote"><span>说明（打回必填）</span><textarea id="acceptanceChoiceNote" rows="2" maxlength="2000" placeholder="填写本批任务的问题或补充说明"></textarea></label>
+            <div class="bulk-entry-actions"><span id="acceptanceChoiceSummary" aria-live="polite">请先校验 TID</span><button id="acceptanceCommitBtn" class="btn primary" type="button" disabled>保存所选 0 条</button></div>
+            <div id="acceptanceImportFeedback" class="inline-result" aria-live="polite"></div>
+          </form>
+        </details>
+        <div class="split-layout acceptance-layout">
+          <div class="panel queue-panel">
+            <div class="panel-heading"><div><h3>验收待办</h3><p>组长已完成建包与领取，验收人员在这里登记结果。</p></div></div>
+            <div class="bulk-toolbar"><span>处理勾选的任务</span><div class="actions"><button id="acceptanceBulkPass" class="btn primary small" type="button">批量验收通过</button><button id="acceptanceBulkFail" class="btn small" type="button">批量打回</button></div></div>
+            <div id="acceptanceBulkWorkbench" class="bulk-workbench" aria-live="polite"></div>
+            <div class="table-wrap"><table><thead><tr><th class="selection-cell"><input id="acceptanceSelectAll" type="checkbox" aria-label="全选当前可批量验收的任务"></th><th>TID</th><th>影片 / 包</th><th>标注人</th><th>当前状态</th><th>操作</th></tr></thead><tbody id="acceptanceBody"></tbody></table></div>
+          </div>
+          <aside id="acceptanceWorkbench" class="panel workbench" aria-live="polite"><div class="empty"><strong>请选择一条任务</strong><span>查看单条记录，登记验收通过或打回修改。</span></div></aside>
+        </div>
+      </section>
+      <section id="recordsView" class="view hidden" aria-labelledby="recordsHeading">
+        <div class="section-heading"><div><h2 id="recordsHeading">全部任务与流水</h2><p>按分配日期区间筛选任务，状态始终显示最新。可复制 TID、用 PIN 纠错并查看完整流水。</p></div></div>
+                <div class="export-bar" aria-label="导出本模块全部日期数据">
+          <span>导出当前单 / 多镜头模块的全部分配日期数据</span>
+          <div class="actions export-actions">
+            <details class="export-menu"><summary>导出本模块全部日期数据</summary><div class="export-menu-list">
+              <button class="btn small" type="button" data-export="tasks">全部任务明细</button>
+              <button class="btn small" type="button" data-export="movies">影片汇总</button>
+              <button class="btn small" type="button" data-export="groups">小组汇总</button>
+              <button class="btn small" type="button" data-export="daily">每日统计</button>
+              <button class="btn small" type="button" data-export="summary">综合汇总</button>
+              <button class="btn small" type="button" data-export="events">操作流水</button>
+              <button class="btn small" type="button" data-export="packages">建包记录</button>
+            </div></details>
+            <button class="btn small" type="button" data-export="backup">完整备份（含单多）</button>
+          </div>
+        </div>
+        <div class="panel"><div class="panel-heading records-toolbar"><label class="field grow"><span>搜索</span><input id="recordSearch" placeholder="搜索 TID、影片、标注人或质检人"></label><label class="field compact"><span>影片 / 包</span><select id="recordMovie"><option value="all">全部影片</option></select></label><label class="field compact"><span>当前状态</span><select id="recordStatus"><option value="all">全部状态</option></select></label><label class="field compact"><span>质检轮次</span><select id="recordQcRound"><option value="all">全部轮次</option><option value="1">第 1 轮</option><option value="2">第 2 轮</option><option value="3plus">第 3 轮及以上</option></select></label><label class="field compact"><span>分配日期范围</span><select id="recordDateMode"><option value="all" selected>全部分配日期</option><option value="range">自定义分配日期</option><option value="scope">上方日期区间</option></select></label><label class="field compact"><span>分配开始</span><input id="recordDateFrom" type="date"></label><label class="field compact"><span>分配结束</span><input id="recordDateTo" type="date"></label></div><div class="records-status-section"><p id="recordSummary" class="record-summary" aria-live="polite"></p><div id="recordStatusBoard" class="record-status-board" aria-label="按最新任务状态筛选"></div></div><div class="table-wrap records-table"><table><thead><tr><th>TID</th><th>影片 / 包</th><th>小组</th><th>类型</th><th>标注人</th><th class="records-qc-operator">组长 / 质检操作人</th><th>轮次</th><th>当前状态</th><th>首次质检</th><th>最后更新</th><th>操作</th></tr></thead><tbody id="recordBody"></tbody></table></div></div>
+        <aside id="taskEditor" class="panel editor-panel hidden" aria-live="polite"></aside>
+        <aside id="timelinePanel" class="panel timeline-panel" aria-live="polite"><div class="empty"><strong>选择任务查看完整流水</strong><span>历史轮次不会被后续返修覆盖。</span></div></aside>
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <script src="data-io.js?v=20260911-prod4" defer></script>
+  <script src="shared-store.js?v=20260911-prod4" defer></script>
+  <script src="workflow.js?v=20260911-prod4" defer></script>
+  <script src="reports.js?v=20260911-prod4" defer></script>
+  <script src="app.js?v=20260911-prod4" defer></script>
+</body>
+</html>

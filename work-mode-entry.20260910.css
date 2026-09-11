@@ -1,0 +1,58 @@
+.r2v-work-mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 20px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.r2v-work-mode-current,
+.r2v-work-mode-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 13px;
+  border: 1px solid oklch(86% .015 235);
+  border-radius: 8px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.r2v-work-mode-current {
+  color: oklch(36% .11 245);
+  border-color: oklch(82% .055 245);
+  background: oklch(94% .035 245);
+}
+
+.r2v-work-mode-link {
+  color: oklch(43% .08 245);
+  background: oklch(99% .004 235);
+}
+
+.r2v-work-mode-link small {
+  color: oklch(51% .025 245);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.r2v-work-mode-link:hover {
+  color: oklch(32% .12 245);
+  border-color: oklch(63% .1 245);
+  background: oklch(97% .015 245);
+}
+
+.r2v-work-mode-link:focus-visible {
+  outline: 3px solid oklch(68% .12 245 / .4);
+  outline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+  .r2v-work-mode { gap: 7px; margin-bottom: 16px; font-size: 12px; }
+  .r2v-work-mode-current,
+  .r2v-work-mode-link { min-height: 42px; padding: 8px 10px; gap: 6px; }
+}

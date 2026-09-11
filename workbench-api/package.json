@@ -1,0 +1,10 @@
+{
+  "name": "r2v-group-workbench-api",
+  "version": "1.0.0",
+  "private": true,
+  "engines": { "node": ">=22.23.2" },
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node verify-api.cjs && node verify-boundaries.cjs"
+  }
+}
