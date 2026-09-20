@@ -126,7 +126,22 @@
     "databaseRead": false,
     "databaseWritten": false,
     "apiRequestsSent": false,
-    "servicesStartedOrStopped": false
+    "servicesStartedOrStopped": false,
+    "postDeploymentUi": {
+      "checkedAt": "2026-09-20T08:53:46.785Z",
+      "efficiencyColumnsVisible": true,
+      "personalDailyRowsVisible": true,
+      "sharedConnectionConfirmed": true,
+      "consoleErrors": 0,
+      "productionTaskWrites": 0
+    },
+    "heldOldPage": {
+      "exactProd5aSource": true,
+      "localFixtureOnly": true,
+      "draftPreservedAfterPublish": true,
+      "apiAndSessionProtocolUnchanged": true
+    },
+    "oldPageSaveTestLimit": "Rejected because synthetic fixture used non-UUID record IDs; not a production error. No claim of save success is made."
   },
   "knownPreexistingFailures": [
     {
