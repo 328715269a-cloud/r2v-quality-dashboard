@@ -2,10 +2,10 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),Module=require('node:module'),crypto=require('node:crypto');
 const repo=path.resolve(__dirname,'..');
 // Reuse the established report regression against the formal module; the only
-// changed expectation is the newly added import-audit export.
+// changed expectations are the additive import-audit and personal daily exports.
 const legacy=path.join(repo,'scripts/verify-group-workbench-reports.cjs'),m=new Module(legacy,module);
 m.filename=legacy;m.paths=module.paths;
-m._compile(fs.readFileSync(legacy,'utf8').replaceAll('../group-workbench-beta/','../group-workbench/').replace("['tasks','events','packages','movies','groups','daily']","['imports','tasks','events','packages','movies','groups','daily']"),legacy);
+m._compile(fs.readFileSync(legacy,'utf8').replaceAll('../group-workbench-beta/','../group-workbench/').replace("['tasks','events','packages','movies','groups','daily']","['imports','tasks','events','packages','movies','groups','daily','personDaily']"),legacy);
 const Flow=require(path.join(repo,'group-workbench/workflow.js')),Reports=require(path.join(repo,'group-workbench/reports.js')),IO=require(path.join(repo,'group-workbench/data-io.js'));
 const tasks=[['old','REUSE','wrong','single','g01','b1'],['new','REUSE','correct','single','g01','b2'],['other','OTHER','多镜影片','multi','g06','b3']].map(([id,tid,movie,mode,groupId,batchId])=>({id,tid,movie,mode,groupId,batchId,date:'2026-09-11',createdAt:'2026-09-11T01:00:00Z',createdBy:'admin'}));
 const events=tasks.map(task=>({id:'dispatch-'+task.id,taskId:task.id,type:'dispatch',actor:'admin',at:task.createdAt}));
@@ -23,5 +23,5 @@ assert.equal(report.events.rows.length,3);assert.equal(report.events.rows.find(r
 assert.equal(IO.parseTable(IO.csv(report.imports.columns,report.imports.rows)).records.length,3);
 assert.equal(JSON.stringify(state),original);assert.equal(Flow.counts(auditTasks).total,2);
 const sourceHashes=Object.fromEntries(['app.js','index.html','styles.css','reports.js','workflow.js','shared-store.js','data-io.js'].map(file=>['group-workbench/'+file,crypto.createHash('sha256').update(fs.readFileSync(path.join(repo,'group-workbench',file))).digest('hex')]));
-fs.writeFileSync(path.join(__dirname,'reports-validation.json'),JSON.stringify({ok:true,legacyRegression:'passed with additional imports report',deletionAuditAssertions:22,sourceHashes},null,2));
+fs.writeFileSync(path.join(__dirname,'reports-validation.json'),JSON.stringify({ok:true,legacyRegression:'passed with additional imports and personDaily reports',deletionAuditAssertions:22,sourceHashes},null,2));
 console.log(JSON.stringify({ok:true,deletionAuditAssertions:22}));

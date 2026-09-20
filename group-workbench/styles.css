@@ -2590,9 +2590,13 @@ input[type="checkbox"] {
   background: #eef3f7;
 }
 
-.group-progress-table td:nth-child(4),
-.group-progress-table td:nth-child(5),
-.group-progress-table td:nth-child(6) {
+.group-progress-table .group-headcount,
+.group-progress-table .group-completed,
+.group-progress-table .group-efficiency,
+.group-progress-table .group-cumulative,
+.group-progress-table .group-accepted,
+.group-progress-table .group-active,
+.person-daily-table td {
   font-variant-numeric: tabular-nums;
 }
 
@@ -3444,7 +3448,7 @@ body[data-active-view="overview"] .demo-dot { background: oklch(62% 0.019 255); 
 #overviewView .panel-heading p { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 #overviewView .table-wrap th { color: oklch(48% 0.022 255); background: oklch(96.5% 0.005 255); }
 #overviewView .table-wrap tbody tr:hover td { background: oklch(98% 0.003 255); }
-#overviewView .group-progress-table table { min-width: 1080px; }
+#overviewView .group-progress-table table { min-width: 1280px; }
 
 #overviewView .group-progress-table th > small {
   display: block;
@@ -3454,11 +3458,16 @@ body[data-active-view="overview"] .demo-dot { background: oklch(62% 0.019 255); 
   font-weight: 400;
 }
 
-#overviewView .group-progress-table th:nth-child(n + 2):nth-child(-n + 4) { background: oklch(95% 0.006 255); }
-#overviewView .group-progress-table th:nth-child(4),
-#overviewView .group-progress-table td:nth-child(4) { border-right: 1px solid var(--line); }
-#overviewView .group-progress-table td:nth-child(6) { color: var(--tone-success); font-weight: 650; }
-#overviewView .group-progress-table td:nth-child(7) { color: var(--tone-warning); font-weight: 650; }
+#overviewView .group-progress-table .group-period-heading { background: oklch(95% 0.006 255); }
+#overviewView .group-progress-table .group-efficiency-heading,
+#overviewView .group-progress-table .group-efficiency { border-right: 1px solid var(--line); }
+#overviewView .group-progress-table .group-accepted { color: var(--tone-success); font-weight: 650; }
+#overviewView .group-progress-table .group-active { color: var(--tone-warning); font-weight: 650; }
+.group-efficiency { min-width: 128px; }
+.group-completed strong,
+.group-efficiency strong { color: var(--primary-dark); font-size: 15px; font-weight: 650; }
+.overview-detail-note.group-efficiency-note { margin: 0; padding: 12px 16px; border-top: 1px solid var(--line); }
+.person-daily-table th > small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; font-weight: 400; }
 
 .group-state-details { min-width: 104px; }
 .group-state-details > summary { min-height: 28px; padding: 4px 0; color: var(--primary-dark); font-size: 12px; cursor: pointer; white-space: nowrap; }

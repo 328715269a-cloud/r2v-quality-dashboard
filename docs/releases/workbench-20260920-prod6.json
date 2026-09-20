@@ -1,0 +1,140 @@
+{
+  "version": "20260920-prod6",
+  "status": "deployed",
+  "publicUrl": "https://quality.shangyidada.site/group-workbench/",
+  "deployedAt": "2026-09-20T08:52:06.327067+00:00",
+  "verifiedAt": "2026-09-20T08:52:07.606Z",
+  "scope": "Static frontend and reporting only; API, database, workflow, Nginx and services unchanged.",
+  "staticAssets": {
+    "styles.20260920-prod6.css": {
+      "sha256": "25e0fecf44765ea39f952a7e0e4c254de17d8e4b0fed67150b30139fd7cf97db",
+      "bytes": 88024
+    },
+    "app.20260920-prod6.js": {
+      "sha256": "26a03f9fb7ca51307661723f253122d82d5ed4a723b1b93e9d7260432bc4118b",
+      "bytes": 159825
+    },
+    "reports.20260920-prod6.js": {
+      "sha256": "028e2c74de484e20af73774ef32d2fdaba34769bbe6bf75ba04256b6537b246a",
+      "bytes": 53799
+    },
+    "data-io.20260920-prod6.js": {
+      "sha256": "cb1db444edf83733c356c0187460ee208ba579ca7500852f87376a8bea640338",
+      "bytes": 13665
+    },
+    "shared-store.20260920-prod6.js": {
+      "sha256": "0925b37b9280cc62da45cdf9cdbb1c7bf6652f5d4b8af13d24d1b23deed373b2",
+      "bytes": 8285
+    },
+    "workflow.20260920-prod6.js": {
+      "sha256": "7add069b9f81fd517e9615fb0585731525d2d6fafb0cb5b4a79e9d214451b14b",
+      "bytes": 18660
+    },
+    "index.html": {
+      "sha256": "be628ac544c964f8f8212e0e86ae7a8cf22b1e928b3198af8919e2c9e4bfe9cd",
+      "bytes": 38934
+    }
+  },
+  "sourceHashes": {
+    "group-workbench/index.html": "1920bee0ed42cb536d23570d3f2fbf011a7b26d694379faffca00ce85f10621e",
+    "group-workbench/styles.css": "25e0fecf44765ea39f952a7e0e4c254de17d8e4b0fed67150b30139fd7cf97db",
+    "group-workbench/app.js": "26a03f9fb7ca51307661723f253122d82d5ed4a723b1b93e9d7260432bc4118b",
+    "group-workbench/reports.js": "028e2c74de484e20af73774ef32d2fdaba34769bbe6bf75ba04256b6537b246a",
+    "group-workbench/data-io.js": "9333273286bbc85bd8fb14bf53a0f179dfadae7a3694a379d52676627e0c52f0",
+    "group-workbench/shared-store.js": "905e18c48a0d15b191a69f4e83111e02052b7e923d500bb55b718a105683dbb2",
+    "group-workbench/workflow.js": "7d7cc2e6b0bca0544e1c130a1427197ba1931c8bc0a4906733d594388c78471a"
+  },
+  "preservedProtocolAssets": {
+    "data-io.js": {
+      "sourceSha256": "9333273286bbc85bd8fb14bf53a0f179dfadae7a3694a379d52676627e0c52f0",
+      "packagedSha256": "cb1db444edf83733c356c0187460ee208ba579ca7500852f87376a8bea640338",
+      "onlyWindowsLineEndingsDiffer": true
+    },
+    "shared-store.js": {
+      "sourceSha256": "905e18c48a0d15b191a69f4e83111e02052b7e923d500bb55b718a105683dbb2",
+      "packagedSha256": "0925b37b9280cc62da45cdf9cdbb1c7bf6652f5d4b8af13d24d1b23deed373b2",
+      "onlyWindowsLineEndingsDiffer": true
+    },
+    "workflow.js": {
+      "sourceSha256": "7d7cc2e6b0bca0544e1c130a1427197ba1931c8bc0a4906733d594388c78471a",
+      "packagedSha256": "7add069b9f81fd517e9615fb0585731525d2d6fafb0cb5b4a79e9d214451b14b",
+      "onlyWindowsLineEndingsDiffer": true
+    }
+  },
+  "verification": {
+    "checks": {
+      "groupDailyEfficiency": true,
+      "personalDailyOutput": true,
+      "dateRangeAndRoster": true,
+      "workflowUnchanged": true,
+      "isolatedUi": true
+    },
+    "statistics": {
+      "passed": true,
+      "checkCount": 14,
+      "checks": [
+        "daily TID deduplication",
+        "weighted daily attendance incl 0.5",
+        "manual total excluded",
+        "missing manual total irrelevant",
+        "zero-headcount completion invalidates whole range",
+        "actual per-person submit ownership",
+        "real transfer and legacy alias distinction",
+        "stale conflicting records excluded",
+        "claim-only zero output",
+        "China local-day boundary",
+        "mode/group/task boundaries",
+        "new and legacy export semantics preserved",
+        "all export columns unique",
+        "immutable source records"
+      ]
+    },
+    "isolatedUi": {
+      "syntheticDataOnly": true,
+      "checks": [
+        "daily 2 completed / 1.5 attendance = 1.33",
+        "two days 3 / 3.5 = 0.86; not average of rates",
+        "manual total 999 ignored",
+        "same task initial + same-day repair counted once",
+        "personal claim-only output zero",
+        "group scope locked and only selected group rows visible",
+        "no attendance and no output displays dash",
+        "completed with zero attendance displays 人数待核对",
+        "invalid date interval disables daily figures without hiding cumulative progress",
+        "current-range personal CSV reports 3 rows",
+        "daily acceptance columns preserved",
+        "wide table scrollWidth 1280 clientWidth 1028 with overflow auto",
+        "no console errors"
+      ]
+    },
+    "directAcceptanceReports": {
+      "passed": true,
+      "syntheticEvents": 37
+    },
+    "localDevServer": {
+      "passed": true,
+      "checks": 9
+    },
+    "publicFilesMatch": 12,
+    "protection": {
+      "currentModeAndDemosUnchanged": true,
+      "existingFormalAssetsUnchanged": true,
+      "existingServicesUnchanged": true,
+      "apiCodeUnchanged": true,
+      "nginxConfigAndMasterUnchanged": true
+    },
+    "databaseRead": false,
+    "databaseWritten": false,
+    "apiRequestsSent": false,
+    "servicesStartedOrStopped": false
+  },
+  "knownPreexistingFailures": [
+    {
+      "test": "scripts/verify-group-workbench-reports.cjs:332",
+      "baselineCommit": "d222657535ecb2c9cedc5524950bdf6d1ea7c4f5",
+      "description": "Legacy qcOperator assertion for acceptance_pass fails identically on baseline and this release. The qcOperator logic is unchanged; this is not counted as a passed test."
+    }
+  ],
+  "packaging": "Replace the six unversioned ?v=20260920-prod6 resource references with immutable .20260920-prod6 names. Unchanged protocol/parser/workflow files retain captured live bytes after checking that Windows CRLF/LF is their only difference.",
+  "note": "No production secrets, sessions, real tasks, databases or internal infrastructure configuration are included."
+}

@@ -153,6 +153,8 @@
     const groupSettings = new Map(groups.map(group => [group.id, settings.filter(event => event.groupId === group.id)]));
     const dates = new Map(groups.map(group => [group.id, new Set()]));
     const aliases = new Map(groups.map(group => [group.id, new Map()]));
+    const completions = new Map(groups.map(group => [group.id, new Map()]));
+    const seenSubmissions = new Set();
     const activity = [];
     const dateOf = value => localDateOf(value, input.localDate);
     function rootName(groupId, name) {
@@ -170,7 +172,19 @@
       if (!task || event.type === 'group_daily_edit') return;
       const date = dateOf(event.at);
       if (date) dates.get(task.groupId).add(date);
-      if (!date || isReworkAssignment(event) || !['claim', 'submit', 'annotator_reject'].includes(event.type) || (event.actorRole && event.actorRole !== 'annotation')) return;
+      if (isReworkAssignment(event) || !['claim', 'submit', 'annotator_reject'].includes(event.type) || (event.actorRole && event.actorRole !== 'annotation')) return;
+      let submissionKind = '';
+      if (event.type === 'submit') {
+        submissionKind = !seenSubmissions.has(task.id) && (!event.submissionKind || event.submissionKind === 'initial') ? 'initial' : 'rework';
+        seenSubmissions.add(task.id);
+        if (date) {
+          const byDate = completions.get(task.groupId);
+          if (!byDate.has(date)) byDate.set(date, { completed: new Set(), initial: new Set(), rework: 0 });
+          const row = byDate.get(date); row.completed.add(task.id);
+          if (submissionKind === 'initial') row.initial.add(task.id); else row.rework += 1;
+        }
+      }
+      if (!date) return;
       const actor = text(event.actor).trim();
       if (!actor) return;
       const alias = identityAliasPair(event, transfers);
@@ -179,14 +193,35 @@
         const next = rootName(task.groupId, alias[1]);
         if (previous && previous !== next) aliases.get(task.groupId).set(previous, next);
       }
-      activity.push({ groupId: task.groupId, date, actor });
+      activity.push({ groupId: task.groupId, date, actor, task, event, submissionKind });
     });
     const members = new Map(groups.map(group => [group.id, new Map()]));
+    const people = new Map();
     activity.forEach(item => {
       const byDate = members.get(item.groupId);
       if (!byDate.has(item.date)) byDate.set(item.date, new Set());
-      byDate.get(item.date).add(rootName(item.groupId, item.actor));
+      const name = rootName(item.groupId, item.actor);
+      byDate.get(item.date).add(name);
+      const key = json([item.groupId, item.date, name]);
+      if (!people.has(key)) people.set(key, { groupId: item.groupId, mode: item.task.mode, date: item.date, name, completed: new Set(), initial: new Set(), rework: 0, submissionActions: 0, eventIds: [], rawNames: new Set(), submittedTimes: [] });
+      const row = people.get(key); row.rawNames.add(item.actor);
+      if (item.event.type === 'submit') {
+        row.completed.add(item.task.id); row.submissionActions += 1;
+        if (item.submissionKind === 'initial') row.initial.add(item.task.id); else row.rework += 1;
+        if (item.event.id) row.eventIds.push(item.event.id);
+        row.submittedTimes.push(text(item.event.at));
+      }
     });
+    const peopleRows = Array.from(people.values()).map(row => {
+      const times = row.submittedTimes.slice().sort((a,b) => Date.parse(a) - Date.parse(b));
+      const taskIds = Array.from(row.completed);
+      return {
+        groupId: row.groupId, mode: row.mode, date: row.date, name: row.name,
+        completedTIDs: row.completed.size, initialSubmissionTIDs: row.initial.size, reworkSubmissionActions: row.rework,
+        submissionActions: row.submissionActions, taskIds, tids: taskIds.map(id => text(taskMap.get(id)?.tid)),
+        eventIds: row.eventIds, rawNames: Array.from(row.rawNames), firstSubmittedAt: times[0] || '', lastSubmittedAt: times.at(-1) || ''
+      };
+    }).sort((a,b) => a.date.localeCompare(b.date) || a.groupId.localeCompare(b.groupId) || a.name.localeCompare(b.name, 'zh-CN'));
     function applicableLeader(group, date) {
       const candidates = groupSettings.get(group.id).filter(event => (!date || event.date <= date) && text(event.after?.leader).trim());
       candidates.sort((a, b) => a.date.localeCompare(b.date));
@@ -199,12 +234,18 @@
       const override = latest?.after?.headcount;
       const manual = typeof override === 'number' && Number.isFinite(override) && override >= 0 && Number.isInteger(override * 2);
       const total = latest?.after?.total;
+      const done = completions.get(group.id).get(date), headcount = manual ? override : names.length;
+      const completedTIDs = done?.completed.size || 0;
+      const efficiencyIssue = completedTIDs > 0 && headcount === 0 ? 'completed_without_headcount' : headcount === 0 ? 'no_person_days' : '';
       return {
         groupId: group.id, date, leader: applicableLeader(group, date),
         total: Number.isSafeInteger(total) && total >= 0 ? total : null,
-        autoHeadcount: names.length, headcount: manual ? override : names.length,
+        autoHeadcount: names.length, headcount,
         headcountSource: manual ? 'manual' : 'auto', members: names, latestEditId: latest?.id || '',
-        history: JSON.parse(json(history)), isAggregate: false
+        history: JSON.parse(json(history)), isAggregate: false,
+        completedTIDs, initialSubmissionTIDs: done?.initial.size || 0, reworkSubmissionActions: done?.rework || 0,
+        personDayEfficiency: headcount > 0 ? completedTIDs / headcount : null,
+        efficiencyIssue, efficiencyIssueDates: efficiencyIssue === 'completed_without_headcount' ? [date] : []
       };
     }
     function aggregate(group, dateFrom = '', dateTo = '') {
@@ -213,19 +254,27 @@
       const history = groupSettings.get(group.id).filter(event => includes(event.date));
       const withTotal = daily.filter(item => item.total !== null);
       const latest = history.slice().sort((a, b) => a.date.localeCompare(b.date)).at(-1);
+      const headcount = daily.reduce((sum, item) => sum + item.headcount, 0);
+      const completedTIDs = daily.reduce((sum, item) => sum + item.completedTIDs, 0);
+      const efficiencyIssueDates = daily.flatMap(item => item.efficiencyIssueDates);
+      const efficiencyIssue = efficiencyIssueDates.length ? 'completed_without_headcount' : headcount === 0 ? 'no_person_days' : '';
       return {
         groupId: group.id, date: '', leader: applicableLeader(group, dateTo),
         total: withTotal.length ? withTotal.reduce((sum, item) => sum + item.total, 0) : null,
         autoHeadcount: daily.reduce((sum, item) => sum + item.autoHeadcount, 0),
-        headcount: daily.reduce((sum, item) => sum + item.headcount, 0),
+        headcount,
         headcountSource: daily.some(item => item.headcountSource === 'manual') ? 'manual' : 'auto',
         members: unique(daily.flatMap(item => item.members)).sort((a, b) => a.localeCompare(b, 'zh-CN')),
-        latestEditId: latest?.id || '', history: JSON.parse(json(history)), isAggregate: true
+        latestEditId: latest?.id || '', history: JSON.parse(json(history)), isAggregate: true,
+        completedTIDs, initialSubmissionTIDs: daily.reduce((sum, item) => sum + item.initialSubmissionTIDs, 0),
+        reworkSubmissionActions: daily.reduce((sum, item) => sum + item.reworkSubmissionActions, 0),
+        personDayEfficiency: !efficiencyIssue && headcount > 0 ? completedTIDs / headcount : null,
+        efficiencyIssue, efficiencyIssueDates
       };
     }
     function row(group, date) { return date ? day(group, date) : aggregate(group); }
     return {
-      groups, settings, dates,
+      groups, settings, dates, peopleRows,
       rows: date => groups.map(group => row(group, date)),
       row: (groupId, date) => row(groupMap.get(groupId), date),
       rangeRows: (dateFrom, dateTo) => groups.map(group => dateFrom && dateFrom === dateTo ? day(group, dateFrom) : aggregate(group, dateFrom, dateTo))
@@ -251,6 +300,14 @@
     const dateFrom = rangeDate(input.dateFrom), dateTo = rangeDate(input.dateTo);
     if (dateFrom && dateTo && dateFrom > dateTo) throw new RangeError('开始日期不能晚于结束日期。');
     return groupDailyModel(input).rangeRows(dateFrom, dateTo);
+  }
+
+  function personDaily(input = {}) {
+    const ranged = Object.hasOwn(input, 'dateFrom') || Object.hasOwn(input, 'dateTo');
+    const dateFrom = rangeDate(ranged ? input.dateFrom : input.date), dateTo = rangeDate(ranged ? input.dateTo : input.date);
+    if (dateFrom && dateTo && dateFrom > dateTo) throw new RangeError('开始日期不能晚于结束日期。');
+    return groupDailyModel(input).peopleRows.filter(row => (!dateFrom || row.date >= dateFrom) && (!dateTo || row.date <= dateTo)
+      && (!input.groupId || input.groupId === 'all' || row.groupId === input.groupId));
   }
 
   function build(input) {
@@ -456,14 +513,22 @@
       };
     });
     function settingFields(row) {
-      return { leader: row.leader, total: row.total, autoHeadcount: row.autoHeadcount, headcount: row.headcount, headcountSource: row.headcountSource, membersJSON: json(row.members), latestEditId: row.latestEditId, settingsHistoryJSON: json(row.history), isAggregate: row.isAggregate };
+      return {
+        leader: row.leader, total: row.total, autoHeadcount: row.autoHeadcount, headcount: row.headcount,
+        headcountSource: row.headcountSource, membersJSON: json(row.members), latestEditId: row.latestEditId,
+        settingsHistoryJSON: json(row.history), isAggregate: row.isAggregate,
+        annotationCompletedTIDs: row.completedTIDs, initialSubmissionTIDs: row.initialSubmissionTIDs,
+        reworkSubmissionActions: row.reworkSubmissionActions, personDayEfficiency: row.personDayEfficiency,
+        efficiencyIssue: row.efficiencyIssue, efficiencyIssueDatesJSON: json(row.efficiencyIssueDates)
+      };
     }
     const groupRows = groupModel.groups.map(group => ({
       ...aggregate(tasks.filter(task => task.groupId === group.id), { groupId: group.id, group: groupName(group.id) }),
       mode: modeLabel(group.defaultMode || group.mode || input.mode), ...settingFields(groupModel.row(group.id, ''))
     }));
     const settingColumns = columns([
-      ['leader','负责人'],['total','组长登记总量'],['autoHeadcount','自动作业人数（日人次）'],['headcount','采用作业人数（日人次）'],['headcountSource','人数来源（auto/manual）'],['membersJSON','自动作业人员JSON'],['latestEditId','最近小组记录ID'],['settingsHistoryJSON','完整小组修改历史JSON'],['isAggregate','是否跨日期累计']
+      ['leader','负责人'],['total','组长登记总量'],['autoHeadcount','自动作业人数（日人次）'],['headcount','采用作业人数（日人次）'],['headcountSource','人数来源（auto/manual）'],['membersJSON','自动作业人员JSON'],['latestEditId','最近小组记录ID'],['settingsHistoryJSON','完整小组修改历史JSON'],['isAggregate','是否跨日期累计'],
+      ['annotationCompletedTIDs','实际提交完成TID（日内去重）'],['initialSubmissionTIDs','首次提交完成TID'],['reworkSubmissionActions','返修提交次数'],['personDayEfficiency','日人均完成TID（条/人天）'],['efficiencyIssue','效率核对状态'],['efficiencyIssueDatesJSON','完成但人数为零的日期JSON']
     ]);
     const summaryColumns = columns([
       ['mode','作业类型'],['totalTIDs','累计分配TID数量'],['movieCount','累计影片数量'],['groupCount','参与小组数'],['groups','参与小组'],['moviesJSON','影片明细JSON'],['firstAllocationDate','最早分配业务日期'],['lastAllocationDate','最近分配业务日期'],['acceptedTIDs','验收通过TID数量'],['rejectedTIDs','最终拒绝TID数量'],['closedTIDs','已闭环TID数量'],['completionRate','验收通过率'],['closureRate','闭环率（通过+拒绝）']
@@ -541,6 +606,18 @@
       ['qcPassActions','质检通过操作次数'],['qcFailActions','质检打回操作次数'],['qcRejectedTIDs','质检拒绝TID数量'],['completedTIDs','首次验收通过TID数量'],['acceptanceRejectedTIDs','验收拒绝TID数量'],['rejectedTIDs','最终拒绝TID数量'],['acceptanceFailActions','验收不通过操作次数'],['qcSelfRepairActions','质检自行返修完成次数'],
       ['qcPackageCount','新建质检包数'],['acceptancePackageCount','历史新建验收包数'],['activeTIDs','有操作TID数量'],['assignmentActions','代修分配任务次数'],['importedTaskIdsJSON','新增分配任务ID JSON'],['initialTaskIdsJSON','首次标注完成任务ID JSON'],['completedTaskIdsJSON','首次验收通过任务ID JSON'],['rejectedTaskIdsJSON','最终拒绝任务ID JSON']
     ]);
+    const personRows = groupModel.peopleRows.map(row => ({
+      groupId: row.groupId, group: groupName(row.groupId), mode: modeLabel(row.mode), date: row.date, name: row.name,
+      completedTIDs: row.completedTIDs, initialSubmissionTIDs: row.initialSubmissionTIDs,
+      reworkSubmissionActions: row.reworkSubmissionActions, submissionActions: row.submissionActions,
+      taskIdsJSON: json(row.taskIds), tidsJSON: json(row.tids), eventIdsJSON: json(row.eventIds), rawNamesJSON: json(row.rawNames),
+      firstSubmittedAt: row.firstSubmittedAt, lastSubmittedAt: row.lastSubmittedAt
+    }));
+    const personColumns = columns([
+      ['date','实际作业日期'],['groupId','小组ID'],['group','小组'],['mode','作业类型'],['name','标注人'],
+      ['completedTIDs','当日实际提交完成TID（按人去重）'],['initialSubmissionTIDs','首次提交完成TID'],['reworkSubmissionActions','返修提交次数'],['submissionActions','全部提交次数'],
+      ['taskIdsJSON','内部任务ID明细JSON'],['tidsJSON','当前TID明细JSON'],['eventIdsJSON','有效提交事件ID JSON'],['rawNamesJSON','原始操作人名称JSON'],['firstSubmittedAt','当日首次提交时间'],['lastSubmittedAt','当日最后提交时间']
+    ]);
     return {
       imports: { columns: importColumns, rows: importRows },
       tasks: { columns: taskColumns, rows: taskRows }, events: { columns: eventColumns, rows: eventRows }, packages: { columns: packageColumns, rows: packageRows },
@@ -551,9 +628,10 @@
         ])), rows: movieRows
       },
       groups: { columns: columns([['groupId','小组ID'],['group','小组']]).concat(summaryColumns, settingColumns), rows: groupRows },
-      daily: { columns: dailyColumns.concat(settingColumns), rows: dailyRows }
+      daily: { columns: dailyColumns.concat(settingColumns), rows: dailyRows },
+      personDaily: { columns: personColumns, rows: personRows }
     };
   }
 
-  return Object.freeze({ build, groupDaily, qcOperator, movieTitle, movieProgress, annotationContributors });
+  return Object.freeze({ build, groupDaily, personDaily, qcOperator, movieTitle, movieProgress, annotationContributors });
 }));

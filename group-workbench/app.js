@@ -349,12 +349,12 @@
       if(active&&focus)button.focus();
     });
     qsa('[data-overview-panel]').forEach(panel=>panel.classList.toggle('hidden',panel.dataset.overviewPanel!==value));
-    const scopes={groups:`每日登记：${scopeRangeLabel()} · 累计任务截至当前`,movies:selectedGroup()==='all'?'整部影片 · 全部日期、全部参与小组的最新进度':`${groupLabel(selectedGroup())}参与的影片 · 进度汇总全部参与小组`,daily:`实际作业日期：${scopeRangeLabel()}`,people:`实际作业日期：${scopeRangeLabel()}`};
+    const scopes={groups:`实际作业与登记：${scopeRangeLabel()} · 累计任务截至当前`,movies:selectedGroup()==='all'?'整部影片 · 全部日期、全部参与小组的最新进度':`${groupLabel(selectedGroup())}参与的影片 · 进度汇总全部参与小组`,daily:`实际作业日期：${scopeRangeLabel()}`,people:`实际作业日期：${scopeRangeLabel()}`};
     qsa('[data-overview-range-label]').forEach(label=>{if(label.id==='groupDailyScopeHint')return;const tab=label.closest('[data-overview-panel]')?.dataset.overviewPanel;label.textContent=scopes[tab]||scopes[value];});
     $('overviewDateSlot').dataset.tab=value;
     let note=$('overviewDateNote');
     if(!note){note=document.createElement('p');note.id='overviewDateNote';note.className='overview-date-note';$('overviewDateSlot').append(note);}
-    note.textContent=value==='groups'?'日期用于总量、人数与负责人登记；任务进度截至当前。':value==='movies'?'整片进度不受此日期区间限制。':'按实际操作日期统计，包含起止两天。';
+    note.textContent=value==='groups'?'实际完成、效率与每日登记按所选日期；累计任务进度截至当前。':value==='movies'?'整片进度不受此日期区间限制。':'按实际操作日期统计，包含起止两天。';
   }
   function overviewStateTone(status) {
     if(status==='accepted')return 'success';
@@ -379,13 +379,29 @@
     const scope=date===undefined?selectedRange():{date};
     return window.WorkbenchReports.groupDaily({state:source,tasks:allTasks(source),groups:GROUPS,...scope,mode:activeMode,localDate:value=>{const parsed=new Date(value);return Number.isNaN(parsed.getTime())?'':localDateString(parsed);}});
   }
+  function efficiencyText(row) {
+    if(row.efficiencyIssue==='completed_without_headcount')return '人数待核对';
+    return Number.isFinite(row.personDayEfficiency)?row.personDayEfficiency.toLocaleString('zh-CN',{maximumFractionDigits:2}):'—';
+  }
+  function efficiencyHint(row) {
+    if(row.efficiencyIssue==='completed_without_headcount')return '有完成记录的日期在班人数为 0，请核对每日人数后再计算。';
+    if(row.efficiencyIssue==='no_person_days')return '所选日期暂无在班人数。';
+    return '实际完成总数 ÷ 在班总人天；不使用手填总量。';
+  }
+  function renderPersonDaily() {
+    setText('personDailyScopeHint',validScopeRange()?`${scopeRangeLabel()} · ${selectedGroup()==='all'?'全部小组':groupLabel(selectedGroup())}`:'请修正日期区间');
+    if(!$('personDailyDetails').open)return;
+    if(!validScopeRange()){$('personDailyBody').innerHTML=emptyRow(6,'请修正日期区间');return;}
+    const rows=window.WorkbenchReports.personDaily({state,tasks:allTasks(),groups:GROUPS.filter(group=>canViewGroup(group.id)),...selectedRange(),...(selectedGroup()==='all'?{}:{groupId:selectedGroup()}),mode:activeMode,localDate:value=>{const parsed=new Date(value);return Number.isNaN(parsed.getTime())?'':localDateString(parsed);}}).filter(row=>selectedGroup()==='all'||row.groupId===selectedGroup());
+    $('personDailyBody').innerHTML=rows.map(row=>`<tr><td>${escapeHtml(row.date)}</td><td>${escapeHtml(groupLabel(row.groupId))}</td><td>${escapeHtml(row.name)}</td><td>${row.completedTIDs??0}</td><td>${row.initialSubmissionTIDs??0}</td><td>${row.reworkSubmissionActions??0}</td></tr>`).join('')||emptyRow(6,'当前日期区间与小组暂无提交完成记录。');
+  }
   function renderGroupProgress(tasks) {
     const validRange=validScopeRange();
     const rows=(validRange?groupDailyRows():GROUPS.filter(group=>group.defaultMode===activeMode).map(group=>({groupId:group.id,leader:'',total:null,headcount:null,members:[]}))).filter(row=>selectedGroup()==='all'||row.groupId===selectedGroup());
     const expanded=new Set(qsa('#groupProgressBody details[open]').map(details=>details.closest('tr').dataset.groupId));
     setText('groupDailyTotalLabel',singleScopeDate()?'当日总量（手填）':'区间总量（手填）');
-    setText('groupDailyAttendanceLabel',singleScopeDate()?'在班人数':'区间在班人次');
-    setText('groupDailyScopeHint',validRange?`登记日期 ${scopeRangeLabel()}${singleScopeDate()?'':' · 总量与人次按日累加'}`:'请修正日期区间；累计任务进度仍为最新状态。');
+    setText('groupDailyAttendanceLabel',singleScopeDate()?'在班人数':'区间在班人天');
+    setText('groupDailyScopeHint',validRange?`统计日期 ${scopeRangeLabel()} · 实际完成与人数按日${singleScopeDate()?'统计':'累加'}，任务进度截至当前`:'请修正日期区间；累计任务进度仍为最新状态。');
     $('groupProgressBody').innerHTML=rows.map(row=>{
       const group=groupById(row.groupId),editable=validRange&&canEditGroupDaily(row.groupId),c=counts(tasks.filter(task=>task.groupId===group.id));
       const members=row.members.length?`有标注记录：${row.members.join('、')}`:'所选日期暂无标注记录';
@@ -394,8 +410,9 @@
       const activeCount=c.total-c.accepted-c.rejected;
       const countLink=(key,value,tone)=>`<button type="button" class="group-count" data-action="overview-bucket" data-bucket="${key}" data-group-id="${escapeHtml(group.id)}" data-tone="${tone}">${value}</button>`;
       const details=`<details class="group-state-details"${expanded.has(group.id)?' open':''}><summary>查看状态</summary><div class="group-state-list">${states.map(key=>overviewStateLink(key,c,group.id)).join('')}</div></details>`;
-      return `<tr data-group-id="${escapeHtml(group.id)}"><td><button type="button" class="btn ghost small" data-action="group-details" data-group-id="${escapeHtml(group.id)}">${escapeHtml(group.name)}</button></td><td class="group-leader">${field('leader',validRange?row.leader||'待填写':'—','负责人')}</td><td class="group-daily-total">${field('total',validRange?(row.total===null?'未填写':row.total):'—','每日总量')}</td><td class="group-headcount" title="${escapeHtml(members)}"><strong>${validRange?row.headcount:'—'}</strong>${validRange?`<small>${row.isAggregate?'按日累计':row.headcountSource==='manual'?'手动调整':'自动识别'}${!row.isAggregate&&row.headcountSource==='manual'?` · 自动 ${row.autoHeadcount}`:''}</small>`:''}</td><td class="group-cumulative">${countLink('all',c.total,'info')}</td><td class="group-accepted">${countLink('closed',c.accepted+c.rejected,'success')}</td><td class="group-active">${countLink('active',activeCount,'info')}</td><td>${details}</td><td>${editable?`<button type="button" class="btn small" data-action="edit-group-day" data-group-id="${escapeHtml(group.id)}">填写 / 修改</button>`:'—'}</td></tr>`;
+      return `<tr data-group-id="${escapeHtml(group.id)}"><td><button type="button" class="btn ghost small" data-action="group-details" data-group-id="${escapeHtml(group.id)}">${escapeHtml(group.name)}</button></td><td class="group-leader">${field('leader',validRange?row.leader||'待填写':'—','负责人')}</td><td class="group-daily-total">${field('total',validRange?(row.total===null?'未填写':row.total):'—','每日总量')}</td><td class="group-headcount" title="${escapeHtml(members)}"><strong>${validRange?(row.headcount??'—'):'—'}</strong>${validRange?`<small>${row.isAggregate?'按日累计':row.headcountSource==='manual'?'手动调整':'自动识别'}${!row.isAggregate&&row.headcountSource==='manual'?` · 自动 ${row.autoHeadcount}`:''}</small>`:''}</td><td class="group-completed"><strong>${validRange?(row.completedTIDs??0):'—'}</strong></td><td class="group-efficiency" title="${escapeHtml(validRange?efficiencyHint(row):'请修正日期区间')}"><strong>${validRange?efficiencyText(row):'—'}</strong></td><td class="group-cumulative">${countLink('all',c.total,'info')}</td><td class="group-accepted">${countLink('closed',c.accepted+c.rejected,'success')}</td><td class="group-active">${countLink('active',activeCount,'info')}</td><td>${details}</td><td>${editable?`<button type="button" class="btn small" data-action="edit-group-day" data-group-id="${escapeHtml(group.id)}">填写 / 修改</button>`:'—'}</td></tr>`;
     }).join('');
+    renderPersonDaily();
   }
   function showGroupDailyEditor(groupId,focusField='leader',editDate) {
     const group=groupById(groupId);requireGroupEditor(groupId,group?.defaultMode);
@@ -922,14 +939,18 @@
     if(await mutate(source=>{requireManager();requirePin(pin);const task=findTask(source,form.dataset.taskId);if(task.mode!==activeMode)throw new Error('请切换回任务所属业务模块后再保存，草稿已保留。');assertFresh(task,form.dataset.expected);if(tid===task.tid)throw new Error('TID 没有变化。');const edit={id:task.id,before:{tid:task.tid,movie:task.movie},after:{tid,movie:task.movie}};validateEdits(source,[edit]);return{events:[newEvent(source,task,'metadata_edit',{before:edit.before,after:edit.after,note})]};},'TID 已修正，完整历史记录已保留。',{pin,form})){$('taskEditor').classList.add('hidden');$('taskEditor').innerHTML='';selectedTimelineTaskId=form.dataset.taskId;renderRecords();}
   }
   function download(name,content,type) {const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}
-  async function exportData(kind) {
+  async function exportData(kind,range='all') {
     try {
+      const rangeKey=scopeRangeKey(),groupId=selectedGroup(),mode=activeMode;
+      if(range==='scope'&&!validScopeRange())throw new Error('请修正日期区间后再导出。');
       if(kind==='backup'){if(profile?.role!=='admin')throw new Error('完整备份仅管理员可下载。普通作业身份只能查看和导出所属范围的数据。');const backup=await store.backup();if(backup.state)backup.latestTasks=backup.state.tasks.map(task=>({...task,...window.WorkbenchFlow.project(task,backup.state.events)}));download(`作业流程完整备份-单多全部-${todayString()}.json`,JSON.stringify(backup,null,2),'application/json;charset=utf-8');showToast('完整备份已下载，包含单、多镜头全部原始数据和最新任务状态。');return;}
       await store.refresh();if(!refreshState())return;const reports=scopedReports();let report=reports[kind];
+      if(range==='scope'&&(rangeKey!==scopeRangeKey()||groupId!==selectedGroup()||mode!==activeMode))throw new Error('日期或小组范围已变化，请按当前范围重新导出。');
       if(kind==='summary'){const columns=new Map([...reports.groups.columns,...reports.movies.columns].map(column=>[column.key,column]));report={columns:[{key:'scope',label:'汇总层级'},...columns.values()],rows:[...reports.groups.rows.map(row=>({...row,scope:'小组'})),...reports.movies.rows.map(row=>({...row,scope:'影片'}))]};}
       if(!report)throw new Error('未找到此导出类型。');
-      const names={imports:'导入记录',tasks:'任务明细',events:'操作流水',packages:'建包记录',movies:'影片汇总',groups:'小组汇总',daily:'每日统计',summary:'小组影片综合汇总'};
-      download(`${modeLabel(activeMode)}-${names[kind]}-全部日期-${todayString()}.csv`,IO.csv(report.columns,report.rows),'text/csv;charset=utf-8');showToast(`已导出${modeLabel(activeMode)}全部日期的${names[kind]}，不受当前筛选限制。`);
+      if(range==='scope')report={...report,rows:report.rows.filter(row=>inDateRange(String(row.date)))};
+      const names={imports:'导入记录',tasks:'任务明细',events:'操作流水',packages:'建包记录',movies:'影片汇总',groups:'小组汇总',daily:'每日统计',personDaily:'个人每日明细',summary:'小组影片综合汇总'},dateLabel=range==='scope'?scopeRangeLabel():'全部日期';
+      download(`${modeLabel(activeMode)}-${names[kind]}-${dateLabel}-${todayString()}.csv`,IO.csv(report.columns,report.rows),'text/csv;charset=utf-8');showToast(range==='scope'?`已导出当前范围的${names[kind]}，共 ${report.rows.length} 条。`:`已导出${modeLabel(activeMode)}全部日期的${names[kind]}，不受当前日期筛选限制。`);
     }catch(error){showToast(error.message||'导出失败。','error');}
   }
   function summaryExportRow(level,date,group,movie,c) {
@@ -1138,12 +1159,13 @@
 
   function renderDailyReport() {
     if(!validScopeRange()){$('overviewDailySummary').innerHTML=`<span>请修正日期区间</span>${['metricDailyNew','metricDailyAnnotation','metricDailyQc','metricDailyAccepted'].map(id=>`<strong id="${id}">—</strong>`).join('')}`;$('dailyStatsBody').innerHTML=emptyRow($('dailyStatsBody').closest('table').querySelectorAll('th').length,'请修正日期区间');return;}
-    const labels={date:'日期',importedTIDs:'新增 TID',initialAnnotationTIDs:'首次标完（条）',annotationReworkActions:'标注返修（次）',qcPassActions:'质检通过（次）',qcFailActions:'质检打回（次）',qcRejectedTIDs:'质检拒绝（条）',completedTIDs:'首次验收通过（条）',acceptanceRejectedTIDs:'验收拒绝（条）',rejectedTIDs:'最终拒绝（条）',acceptanceFailActions:'验收不通过（次）',qcSelfRepairActions:'质检自行返修（次）',qcPackageCount:'建质检包（个）',acceptancePackageCount:'历史验收包（个）',activeTIDs:'有操作 TID',total:'登记总量',autoHeadcount:'自动人数',headcount:'采用人数',headcountSource:'人数口径'};
-    const report=scopedReports().daily,rows=report.rows.filter(row=>inDateRange(String(row.date))&&(selectedGroup()==='all'||row.groupId===selectedGroup())),columns=report.columns.filter(column=>!['groupId','mode','latestEditId','isAggregate'].includes(column.key)&&!/JSON|TID明细|任务编号/.test(column.label)).map(column=>({...column,title:column.label,label:labels[column.key]||column.label}));
+    const labels={date:'日期',importedTIDs:'新增 TID',initialAnnotationTIDs:'首次标完（条）',annotationReworkActions:'标注返修（次）',qcPassActions:'质检通过（次）',qcFailActions:'质检打回（次）',qcRejectedTIDs:'质检拒绝（条）',completedTIDs:'首次验收通过（条）',annotationCompletedTIDs:'实际完成（条）',initialSubmissionTIDs:'首次完成（条）',reworkSubmissionActions:'返修提交（次）',personDayEfficiency:'人均日效率（条/人/天）',efficiencyIssue:'效率核对',acceptanceRejectedTIDs:'验收拒绝（条）',rejectedTIDs:'最终拒绝（条）',acceptanceFailActions:'验收不通过（次）',qcSelfRepairActions:'质检自行返修（次）',qcPackageCount:'建质检包（个）',acceptancePackageCount:'历史验收包（个）',activeTIDs:'有操作 TID',total:'登记总量',autoHeadcount:'自动人数',headcount:'采用人数',headcountSource:'人数口径'};
+    const report=scopedReports().daily,rows=report.rows.filter(row=>inDateRange(String(row.date))&&(selectedGroup()==='all'||row.groupId===selectedGroup())),columns=report.columns.filter(column=>!['groupId','mode','latestEditId','isAggregate','initialSubmissionTIDs','reworkSubmissionActions','efficiencyIssue','efficiencyIssueDatesJSON'].includes(column.key)&&!/JSON|TID明细|任务编号/.test(column.label)).map(column=>({...column,title:column.label,label:labels[column.key]||column.label}));
     const sum=(...keys)=>rows.reduce((total,row)=>total+keys.reduce((value,key)=>value+Number(row[key]||0),0),0);
     $('overviewDailySummary').innerHTML=`<span class="daily-summary-date">${escapeHtml(scopeRangeLabel())} · 作业记录</span><span>${singleScopeDate()?'当日':'区间'}新增分配 <strong id="metricDailyNew">${sum('importedTIDs')}</strong> 条</span><span>标注提交 <strong id="metricDailyAnnotation">${sum('initialAnnotationTIDs','annotationReworkActions')}</strong> 次</span><span>质检处理 <strong id="metricDailyQc">${sum('qcPassActions','qcFailActions','qcRejectedTIDs')}</strong> 次</span><span>验收通过 <strong id="metricDailyAccepted">${sum('completedTIDs')}</strong> 条</span><span>最终拒绝 <strong>${sum('rejectedTIDs')}</strong> 条</span>`;
     const body=$('dailyStatsBody');body.closest('table').querySelector('thead').innerHTML=`<tr>${columns.map(column=>`<th title="${escapeHtml(column.title)}">${escapeHtml(column.label)}</th>`).join('')}</tr>`;
-    body.innerHTML=rows.map(row=>`<tr>${columns.map(column=>`<td>${escapeHtml(column.key==='headcountSource'?(row.headcountSource==='manual'?'手动调整':'自动识别'):column.key==='total'&&row.total===null?'未填写':row[column.key]??'')}</td>`).join('')}</tr>`).join('')||emptyRow(columns.length,'当前日期区间与小组没有作业记录。');
+    const value=(row,key)=>key==='personDayEfficiency'?efficiencyText(row):key==='efficiencyIssue'?(row.efficiencyIssue==='completed_without_headcount'?'人数待核对':row.efficiencyIssue==='no_person_days'?'暂无在班人数':'—'):key==='headcountSource'?(row.headcountSource==='manual'?'手动调整':'自动识别'):key==='total'&&row.total===null?'未填写':row[key]??'—';
+    body.innerHTML=rows.map(row=>`<tr>${columns.map(column=>`<td>${escapeHtml(value(row,column.key))}</td>`).join('')}</tr>`).join('')||emptyRow(columns.length,'当前日期区间与小组没有作业记录。');
   }
 
   function recordBaseTasks() {
@@ -1163,6 +1185,7 @@
   }
 
   function bindOverviewEvents() {
+    $('personDailyDetails').addEventListener('toggle',()=>{if($('personDailyDetails').open)renderPersonDaily();});
     $('movieProgressSearch').addEventListener('input',()=>{if(refreshState())renderMovieProgress();});
     $('movieProgressFilter').addEventListener('change',()=>{if(refreshState())renderMovieProgress(true);});
     document.addEventListener('click',event=>{
@@ -1214,7 +1237,7 @@
     document.addEventListener('click',async event=>{
       const button=event.target.closest('[data-action],[data-export]');if(!button)return;
       try {
-        if(button.dataset.export){exportData(button.dataset.export);return;}
+        if(button.dataset.export){exportData(button.dataset.export,button.dataset.exportRange||'all');return;}
         const action=button.dataset.action,id=button.dataset.taskId;
         if(action==='copy'){await copyTid(button.dataset.tid);return;}
         if(action==='submit')await submitTask(id);

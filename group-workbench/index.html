@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="data:,">
   <title>R2V 新作业模式</title>
-  <link rel="stylesheet" href="styles.css?v=20260920-prod5a">
+  <link rel="stylesheet" href="styles.css?v=20260920-prod6">
   <link rel="stylesheet" href="/work-mode-entry.20260910.css">
 </head>
 <body>
@@ -74,6 +74,7 @@
                 <button class="btn small" type="button" data-export="movies">整片影片汇总</button>
                 <button class="btn small" type="button" data-export="groups">小组汇总</button>
                 <button class="btn small" type="button" data-export="daily">每日统计</button>
+                <button class="btn small" type="button" data-export="personDaily">个人每日明细</button>
                 <button class="btn small" type="button" data-export="summary">综合汇总</button>
                 <button class="btn small" type="button" data-export="events">操作流水</button>
                 <button class="btn small" type="button" data-export="packages">建包记录</button>
@@ -104,9 +105,16 @@
         <div id="overviewDateSlot" class="overview-date-slot"></div>
         <section id="overviewPanel-groups" class="overview-panel" data-overview-panel="groups" role="tabpanel" aria-labelledby="overviewTab-groups">
           <div class="panel">
-            <div class="panel-heading group-daily-heading"><div><h3>小组进度</h3><p id="groupDailyScopeHint" data-overview-range-label>每日登记按统计日期，任务进度截至当前。</p></div></div>
-            <div class="table-wrap group-progress-table"><table><thead><tr><th>小组</th><th>负责人<small>统计日期</small></th><th><span id="groupDailyTotalLabel">登记总量</span><small>统计日期</small></th><th><span id="groupDailyAttendanceLabel">在班人数</span><small>统计日期</small></th><th>累计 TID<small>截至当前</small></th><th>已闭环<small>通过 + 拒绝</small></th><th>处理中<small>截至当前</small></th><th>流转状态</th><th>设置</th></tr></thead><tbody id="groupProgressBody"></tbody></table></div>
+            <div class="panel-heading group-daily-heading"><div><h3>小组进度</h3><p id="groupDailyScopeHint" data-overview-range-label>实际完成与效率按统计日期，任务进度截至当前。</p></div></div>
+            <div class="table-wrap group-progress-table"><table><thead><tr><th>小组</th><th class="group-period-heading">负责人<small>统计日期</small></th><th class="group-period-heading"><span id="groupDailyTotalLabel">登记总量</span><small>统计日期</small></th><th class="group-period-heading"><span id="groupDailyAttendanceLabel">在班人数</span><small>统计日期</small></th><th class="group-period-heading">实际完成<small>当天去重 TID</small></th><th class="group-period-heading group-efficiency-heading" title="所选日期实际完成总数 ÷ 在班总人天；不使用手填总量">人均日效率<small>条 / 人 / 天</small></th><th>累计 TID<small>截至当前</small></th><th>已闭环<small>通过 + 拒绝</small></th><th>处理中<small>截至当前</small></th><th>流转状态</th><th>设置</th></tr></thead><tbody id="groupProgressBody"></tbody></table></div>
+            <p class="overview-detail-note group-efficiency-note">实际完成按系统提交记录，同一 TID 当天只计一次，跨天分别计数。人均日效率 = 所选日期实际完成 ÷ 在班总人天，手填总量不参与计算。</p>
           </div>
+          <details id="personDailyDetails" class="overview-disclosure">
+            <summary>个人每日明细</summary>
+            <div class="panel-heading"><div><p id="personDailyScopeHint">按所选日期与小组查看实际提交记录。</p></div><button class="btn small" type="button" data-export="personDaily" data-export-range="scope">导出当前区间</button></div>
+            <p class="overview-detail-note">按实际提交人逐日去重，返修次数另计。多人先后提交同一 TID 时各记个人产出，小组按当天去重。</p>
+            <div class="table-wrap person-daily-table"><table><thead><tr><th>日期</th><th>小组</th><th>人员</th><th>实际完成<small>当天去重 TID</small></th><th>首次完成<small>TID</small></th><th>返修提交<small>次数</small></th></tr></thead><tbody id="personDailyBody"></tbody></table></div>
+          </details>
           <div id="groupDailyEditor" class="panel editor-panel hidden" aria-label="每日小组设置" aria-live="polite"></div>
         </section>
         <section id="overviewPanel-movies" class="overview-panel hidden" data-overview-panel="movies" role="tabpanel" aria-labelledby="overviewTab-movies">
@@ -249,6 +257,7 @@
               <button class="btn small" type="button" data-export="movies">影片汇总</button>
               <button class="btn small" type="button" data-export="groups">小组汇总</button>
               <button class="btn small" type="button" data-export="daily">每日统计</button>
+              <button class="btn small" type="button" data-export="personDaily">个人每日明细</button>
               <button class="btn small" type="button" data-export="summary">综合汇总</button>
               <button class="btn small" type="button" data-export="events">操作流水</button>
               <button class="btn small" type="button" data-export="packages">建包记录</button>
@@ -263,10 +272,10 @@
     </main>
   </div>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
-  <script src="data-io.js?v=20260920-prod5" defer></script>
-  <script src="shared-store.js?v=20260920-prod5" defer></script>
-  <script src="workflow.js?v=20260920-prod5" defer></script>
-  <script src="reports.js?v=20260920-prod5" defer></script>
-  <script src="app.js?v=20260920-prod5" defer></script>
+  <script src="data-io.js?v=20260920-prod6" defer></script>
+  <script src="shared-store.js?v=20260920-prod6" defer></script>
+  <script src="workflow.js?v=20260920-prod6" defer></script>
+  <script src="reports.js?v=20260920-prod6" defer></script>
+  <script src="app.js?v=20260920-prod6" defer></script>
 </body>
 </html>
