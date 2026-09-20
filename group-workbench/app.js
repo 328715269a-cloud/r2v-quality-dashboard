@@ -112,7 +112,7 @@
   const groupDayDrafts = new Map();
   const reworkAssignmentDrafts = new Map();
   let acceptanceDraft = null;
-  let acceptanceBusy=false,acceptancePreviewTicket=0,qcMatchBusy=false;
+  let acceptanceBusy=false,acceptancePreviewTicket=0,qcMatchBusy=false,qcBulkReturnBusy=false;
   let selectedAcceptanceTaskId = '';
   const acceptanceSingleDrafts = new Map();
   const annotationStatuses = ['unclaimed', 'annotating', 'rework', 'acceptance_rework'];
@@ -209,7 +209,7 @@
   }
   function setSharedStatus(kind,message) {const banner=qs('.shared-banner');if(banner)banner.dataset.state=kind;setText('sharedSyncStatus',message);}
   function hasWorkDraft() {
-    if(acceptanceDraft?.rows.some(row=>row.outcome==='success')||acceptanceBusy||qcMatchBusy)return true;
+    if(acceptanceDraft?.rows.some(row=>row.outcome==='success')||acceptanceBusy||qcMatchBusy||qcBulkReturnBusy)return true;
     for(const form of dirtyForms){if(!form.isConnected)dirtyForms.delete(form);else return true;}
     return !!qs('input[name="annotationTask"]:checked,input[name="qcTask"]:checked,input[name="acceptanceTask"]:checked,input[name="reworkAssignmentTask"]:checked');
   }
@@ -1049,22 +1049,58 @@
   function checkedTasks(name) {return qsa(`input[name="${name}"]:checked`).map(input=>({id:input.value,expected:input.dataset.expected}));}
 
   async function passQcBulk() {
+    if(qcBulkReturnBusy)return;
+    if($('qcBulkDecisionForm')){showToast('请先保存或取消当前批量打回，已填写说明和勾选保留。','error');return;}
     const selected=checkedTasks('qcTask');if(!selected.length){showToast('请先勾选待质检任务。','error');return;}
     if(await mutate(source=>({events:selected.map(row=>{const task=findTask(source,row.id);assertFresh(task,row.expected);return qcDecisionEvent(source,task,'pass','批量质检通过，直接流入验收');})}),`已通过 ${selected.length} 条，并直接流入验收台。`))renderQcQueue();
   }
 
   function showBulkQcFail() {
-    const selected=checkedTasks('qcTask');if(!selected.length){showToast('请先勾选待质检任务。','error');return;}
-    const target=$('qcBulkWorkbench');target.innerHTML=`<form id="qcBulkDecisionForm" class="workbench-form"><h3>批量打回 ${selected.length} 条</h3><p>本次填写的问题说明适用于所有勾选任务。</p>${qcReviewFields(true)}<div class="row-actions"><button type="submit" class="btn primary">确认批量打回</button><button type="button" class="btn ghost" data-action="cancel-bulk-qc">取消</button></div></form>`;target.firstElementChild.__selected=selected;target.scrollIntoView({block:'nearest'});
+    if(qcBulkReturnBusy)return;
+    if($('qcBulkDecisionForm')||$('qcBulkRejectForm')){showToast('请先保存或取消当前批量处理，已填写说明和勾选保留。','error');return;}
+    try{
+      const selected=checkedTasks('qcTask');if(!selected.length)throw new Error('请先勾选待质检或验收退回的任务，本批未保存。');
+      if(!refreshState())return;
+      const tasks=qcBulkReturnTasks(state,selected),qc=tasks.filter(task=>task.status!=='acceptance_return_pending').length,acceptance=tasks.length-qc,target=$('qcBulkWorkbench');
+      const fields=qc?qcReviewFields(true):'<label class="field"><span>处理说明（适用于全部勾选任务）</span><textarea name="note" required maxlength="2000"></textarea></label>';
+      target.innerHTML=`<form id="qcBulkDecisionForm" class="workbench-form" data-scope="${escapeHtml(batchIdentityScope())}"><h3>批量转交标注返修 ${selected.length} 条</h3><p>普通待质检 ${qc} 条 · 验收退回 ${acceptance} 条。同一处理说明适用于全部勾选任务。${qc?'错误等级和标签仅用于普通待质检任务。':'验收退回直接转交标注，无需重新填写质检错误等级。'}</p>${fields}<p id="qcBulkReturnError" class="text-danger" role="alert"></p><div class="row-actions"><button type="submit" class="btn primary">确认转交标注返修</button><button type="button" class="btn ghost" data-action="cancel-bulk-qc">取消</button></div></form>`;
+      const form=target.firstElementChild;form.__selected=selected;form.__counts={qc,acceptance};form.elements.note.required=true;if(qc)form.elements.pLevel.required=true;dirtyForms.add(form);target.scrollIntoView({block:'nearest'});
+    }catch(error){showToast(error.message,'error');}
   }
 
+  function qcBulkReturnTasks(source,selected) {
+    return selected.map(row=>{
+      let task;
+      try{task=findTask(source,row.id);requireRole('qc',task);assertFresh(task,row.expected);if(!['pending_qc','pending_reqc','acceptance_return_pending'].includes(task.status))throw new Error(`当前为“${window.WorkbenchFlow.label(task)}”，不能批量转交标注返修。`);return task;}
+      catch(error){const tid=task?.tid||source.tasks.find(item=>item.id===row.id)?.tid||row.id;throw new Error(`${tid}：${error.message} 本批均未保存，说明和勾选已保留。`);}
+    });
+  }
+  function assertQcBulkReturnSelection(form) {
+    requireRole('qc');
+    const selectionKey=rows=>JSON.stringify(rows.map(row=>row.id).sort());
+    if($('qcBulkDecisionForm')!==form||form.dataset.scope!==batchIdentityScope()||selectionKey(form.__selected)!==selectionKey(checkedTasks('qcTask')))throw new Error('作业身份、模块或勾选任务已变化，本批未保存。请恢复原选择或取消后重新选择，说明已保留。');
+  }
+  async function withQcBulkReturnSave(form,action) {
+    if(qcBulkReturnBusy)return false;qcBulkReturnBusy=true;form.dataset.saving='true';
+    const controls=[...qsa('input,select,textarea,button',$('qcView')),$('scopeGroup'),$('scopeDateFrom'),$('scopeDateTo'),$('changeIdentity'),...qsa('[data-mode],[data-date-preset],nav [data-view]')],disabled=controls.map(control=>control.disabled);
+    controls.forEach(control=>control.disabled=true);
+    try{return await action();}finally{controls.forEach((control,index)=>{if(control.isConnected)control.disabled=disabled[index];});qcBulkReturnBusy=false;delete form.dataset.saving;}
+  }
   async function saveBulkQcFail(form) {
-    const selectionKey=rows=>JSON.stringify(rows.map(row=>row.id).sort());if(selectionKey(form.__selected)!==selectionKey(checkedTasks('qcTask'))){showToast('勾选任务已变化，请取消本次打回后重新选择。已填写说明保留。','error');return;}
-    const note=form.elements.note.value.trim(),pLevel=form.elements.pLevel.value,tags=qsa('input[name="tags"]:checked',form).map(input=>input.value);
-    if(await mutate(source=>({events:form.__selected.map(row=>{const task=findTask(source,row.id);assertFresh(task,row.expected);return qcDecisionEvent(source,task,'fail',note,pLevel,tags);})}),`已打回 ${form.__selected.length} 条，请标注返修。`)){$('qcBulkWorkbench').innerHTML='';renderQcQueue();}
+    if(qcBulkReturnBusy)return;
+    try{assertQcBulkReturnSelection(form);}catch(error){setText('qcBulkReturnError',error.message);showToast(error.message,'error');return;}
+    const note=form.elements.note.value.trim(),pLevel=form.elements.pLevel?.value,tags=qsa('input[name="tags"]:checked',form).map(input=>input.value);
+    setText('qcBulkReturnError','');
+    const counts=form.__counts,message=`已转交标注返修 ${form.__selected.length} 条（普通质检打回 ${counts.qc} 条，验收退回转交 ${counts.acceptance} 条）。`;
+    if(await withQcBulkReturnSave(form,()=>mutate(source=>{
+      assertQcBulkReturnSelection(form);const tasks=qcBulkReturnTasks(source,form.__selected);
+      return{events:tasks.map(task=>{try{if(task.status!=='acceptance_return_pending'&&/^\[质检拒绝\]/.test(note))throw new Error('“[质检拒绝]”是拒绝专用标记，不能用于转交标注，请直接填写返修问题。');return{...qcDecisionEvent(source,task,task.status==='acceptance_return_pending'?'acceptance_route_annotation':'fail',note,pLevel,tags),expectedUpdatedAt:task.updatedAt};}catch(error){throw new Error(`${task.tid}：${error.message} 本批均未保存，说明和勾选已保留。`);}})};
+    },message,{form,errorTarget:'qcBulkReturnError'}))){$('qcBulkWorkbench').innerHTML='';renderQcQueue();}
   }
 
   function showBulkQcReject() {
+    if(qcBulkReturnBusy)return;
+    if($('qcBulkDecisionForm')){showToast('请先保存或取消当前批量打回，已填写说明和勾选保留。','error');return;}
     const selected=checkedTasks('qcTask');if(!selected.length){showToast('请先勾选待质检任务。','error');return;}
     const target=$('qcBulkWorkbench');target.innerHTML=`<form id="qcBulkRejectForm" class="workbench-form"><h3>批量质检拒绝 ${selected.length} 条</h3><p>拒绝后任务直接废弃，不进入验收，也不计为质检打回。</p><label class="field"><span>拒绝原因（适用于全部勾选任务）</span><textarea name="note" required maxlength="2000"></textarea></label><div class="row-actions"><button type="submit" class="btn danger">确认拒绝并废弃</button><button type="button" class="btn ghost" data-action="cancel-bulk-qc">取消</button></div></form>`;target.firstElementChild.__selected=selected;target.scrollIntoView({block:'nearest'});
   }
@@ -1121,7 +1157,7 @@
     document.addEventListener('click',event=>{const button=event.target.closest('[data-action]');if(!button)return;const action=button.dataset.action;
       if(action==='claim-package')claimPackage(button.dataset.packageId);
       if(action==='prepare-package'){const task=findTask(state,button.dataset.taskId),form=$('packageForm');if(!window.WorkbenchFlow.canBuild(task,'qc'))throw new Error('当前任务无需建包，质检通过后会自动流入验收台。');form.elements.stage.value='qc';$('packageTids').value=task.tid;form.scrollIntoView({block:'nearest'});}
-      if(action==='cancel-bulk-qc')$('qcBulkWorkbench').innerHTML='';if(action==='cancel-bulk-acceptance'&&!acceptanceBusy)$('acceptanceBulkWorkbench').innerHTML='';
+      if(action==='cancel-bulk-qc'&&!qcBulkReturnBusy)$('qcBulkWorkbench').innerHTML='';if(action==='cancel-bulk-acceptance'&&!acceptanceBusy)$('acceptanceBulkWorkbench').innerHTML='';
       if(action==='state-details'){if(button.dataset.groupId)$('scopeGroup').value=button.dataset.groupId;$('recordDateMode').value='all';$('recordSearch').value='';$('recordMovie').value='all';$('recordQcRound').value=button.dataset.round||'all';$('recordStatus').value=button.dataset.status;activateView('records');}
     });
   }

@@ -1,0 +1,158 @@
+{
+  "version": "20260920-prod8",
+  "status": "deployed",
+  "publicUrl": "https://quality.shangyidada.site/group-workbench/",
+  "deployedAt": "2026-09-20T10:05:19.941914+00:00",
+  "verifiedAt": "2026-09-20T10:05:23.251028+00:00",
+  "scope": "Frontend-only fix for QC bulk return after acceptance failure. Existing acceptance_route events with route annotation and ordinary qc_fail events are submitted atomically; API, workflow, database, permissions, reports and styles are unchanged.",
+  "staticAssets": {
+    "styles.20260920-prod8.css": {
+      "sha256": "25e0fecf44765ea39f952a7e0e4c254de17d8e4b0fed67150b30139fd7cf97db",
+      "bytes": 88024
+    },
+    "app.20260920-prod8.js": {
+      "sha256": "7cab1e8c87efc75ab5b9ecf188694fa49eb0765473123d342df140d18f173b23",
+      "bytes": 164073
+    },
+    "reports.20260920-prod8.js": {
+      "sha256": "028e2c74de484e20af73774ef32d2fdaba34769bbe6bf75ba04256b6537b246a",
+      "bytes": 53799
+    },
+    "data-io.20260920-prod8.js": {
+      "sha256": "cb1db444edf83733c356c0187460ee208ba579ca7500852f87376a8bea640338",
+      "bytes": 13665
+    },
+    "shared-store.20260920-prod8.js": {
+      "sha256": "0925b37b9280cc62da45cdf9cdbb1c7bf6652f5d4b8af13d24d1b23deed373b2",
+      "bytes": 8285
+    },
+    "workflow.20260920-prod8.js": {
+      "sha256": "7add069b9f81fd517e9615fb0585731525d2d6fafb0cb5b4a79e9d214451b14b",
+      "bytes": 18660
+    },
+    "index.html": {
+      "sha256": "b7d41587b7525c735d17d36dbf4f2f94a0f3b7855c433053cd5539397109af64",
+      "bytes": 38949
+    }
+  },
+  "apiSourcePreserved": {
+    "workbench-api/server.cjs": {
+      "sha256": "17e39568a99da3fbda3967aff629a59da0905c1aea531a4fdc00c2d21183796d",
+      "bytes": 17108
+    },
+    "workbench-api/rules.cjs": {
+      "sha256": "906c11227a01df02b50a5fa032ee500b625acc606f6e3e4c165215d7c8a3e785",
+      "bytes": 21062
+    },
+    "group-workbench/workflow.js": {
+      "sha256": "7add069b9f81fd517e9615fb0585731525d2d6fafb0cb5b4a79e9d214451b14b",
+      "bytes": 18660
+    }
+  },
+  "sourceHashes": {
+    "group-workbench/index.html": "d9b769d350587e48937b63943190d26f60637d7f6b43564cb5b6ece378c71542",
+    "group-workbench/styles.css": "12c9140703274ce6d8fecccf8b39187bca2cd4817fe9302e8bc6a8711d952299",
+    "group-workbench/app.js": "7cab1e8c87efc75ab5b9ecf188694fa49eb0765473123d342df140d18f173b23",
+    "group-workbench/reports.js": "6e2a6306eb437dd9c8e9f62a0d1041ee4026fd7f5fb8124c2742ce278cc68ee3",
+    "group-workbench/data-io.js": "9333273286bbc85bd8fb14bf53a0f179dfadae7a3694a379d52676627e0c52f0",
+    "group-workbench/shared-store.js": "905e18c48a0d15b191a69f4e83111e02052b7e923d500bb55b718a105683dbb2",
+    "group-workbench/workflow.js": "7d7cc2e6b0bca0544e1c130a1427197ba1931c8bc0a4906733d594388c78471a",
+    "workbench-api/server.cjs": "d1d211a64ea90a89347ccae38c993657312575f35c096c74c87bef1a6f3dd81d",
+    "workbench-api/rules.cjs": "5c51f553ce86925c942cee13d1b15560289af5f5a03cb134e4945c8e1e1d0328"
+  },
+  "preservedSources": {
+    "styles.css": {
+      "sourceSha256": "12c9140703274ce6d8fecccf8b39187bca2cd4817fe9302e8bc6a8711d952299",
+      "packagedSha256": "25e0fecf44765ea39f952a7e0e4c254de17d8e4b0fed67150b30139fd7cf97db",
+      "onlyWindowsLineEndingsDiffer": true
+    },
+    "reports.js": {
+      "sourceSha256": "6e2a6306eb437dd9c8e9f62a0d1041ee4026fd7f5fb8124c2742ce278cc68ee3",
+      "packagedSha256": "028e2c74de484e20af73774ef32d2fdaba34769bbe6bf75ba04256b6537b246a",
+      "onlyWindowsLineEndingsDiffer": true
+    },
+    "data-io.js": {
+      "sourceSha256": "9333273286bbc85bd8fb14bf53a0f179dfadae7a3694a379d52676627e0c52f0",
+      "packagedSha256": "cb1db444edf83733c356c0187460ee208ba579ca7500852f87376a8bea640338",
+      "onlyWindowsLineEndingsDiffer": true
+    },
+    "shared-store.js": {
+      "sourceSha256": "905e18c48a0d15b191a69f4e83111e02052b7e923d500bb55b718a105683dbb2",
+      "packagedSha256": "0925b37b9280cc62da45cdf9cdbb1c7bf6652f5d4b8af13d24d1b23deed373b2",
+      "onlyWindowsLineEndingsDiffer": true
+    },
+    "workflow.js": {
+      "sourceSha256": "7d7cc2e6b0bca0544e1c130a1427197ba1931c8bc0a4906733d594388c78471a",
+      "packagedSha256": "7add069b9f81fd517e9615fb0585731525d2d6fafb0cb5b4a79e9d214451b14b",
+      "onlyWindowsLineEndingsDiffer": true
+    }
+  },
+  "testSource": {
+    "path": "scripts/verify-workbench-qc-return.cjs",
+    "sha256": "0bbed65625eba53008ae3c8c1a5a4beac7ec1b7233e29b9c70469b73f44185c5"
+  },
+  "verification": {
+    "checks": {
+      "qcReturnBatch": true,
+      "mixedBatchAndAtomicity": true,
+      "permissionsAndStaleState": true,
+      "workflowAndApiUnchanged": true,
+      "isolatedUi": true
+    },
+    "regression": {
+      "ok": true,
+      "runtime": "v24.18.0",
+      "checkCount": 8,
+      "checks": [
+        "纯验收退回批量只填说明，无P或标签；实际app生成acceptance_route(annotation)，服务端通过且投影为待标注返修、原验收意见/轮次保留",
+        "验收退回+一次/二次待质检混选，真实app分别产出分流与qc_fail；P级/标签缺失整批不保存、草稿保留；补齐后一次原子保存",
+        "普通质检混入拒绝专用marker时整批阻止，避免本意返修却变终态拒绝；纯验收分流仅保留说明、不扩大此限制",
+        "普通质检打回保持原P级/标签规则；空说明及混入已处理/未建包/自行返修/拒绝待确认等任务整批阻止",
+        "任务过期、勾选变化、姓名/组别/模块变化及异步保存期间身份切换全部阻止，说明和选择保留",
+        "真实server normalize拒绝非法错误标签时不落前面已生成的验收分流；跨组/模块和连接失败均不改变业务数据",
+        "保存忙锁挡住双击重复提交；失败/成功后释放忙锁，并恢复控件原有disabled状态",
+        "不添加新事件编码：旧合法acceptance_route/qc_fail协议保持；错误qc_fail打验收退回仍409，真实server严格任务scope与过期timestamp"
+      ]
+    },
+    "isolatedUi": {
+      "localOnly": true,
+      "oldBugReproduced": true,
+      "pureReturnBatchSaved": 2,
+      "mixedBatchSaved": 2,
+      "missingTagsEntireBatchDenied": true,
+      "staleTaskEntireBatchDenied": true,
+      "draftsAndSelectionsPreserved": true,
+      "consoleErrors": 0
+    },
+    "oldPageContinuity": {
+      "localOnly": true,
+      "originalProd7PageHeldAcrossRelease": true,
+      "originalDraftPreserved": true,
+      "ordinaryQcSaveSucceededAfterRelease": true
+    },
+    "publicUi": {
+      "readOnly": true,
+      "newBatchReturnFormVisible": true,
+      "returnOnlyNoPLevelRequired": true,
+      "productionTaskWrites": false
+    },
+    "publicFilesMatch": 12,
+    "existingContainerCount": 10,
+    "protection": {
+      "currentModeAndDemosUnchanged": true,
+      "existingFormalAssetsUnchanged": true,
+      "existingServicesUnchanged": true,
+      "apiCodeUnchanged": true,
+      "nginxConfigAndMasterUnchanged": true
+    },
+    "releaseTool": {
+      "databaseRead": false,
+      "databaseWritten": false,
+      "apiRequestsSent": false,
+      "servicesStartedOrStopped": false,
+      "secretFilesRead": false
+    }
+  },
+  "packaging": "Git HTML uses six unversioned ?v=20260920-prod8 references. Packaging changes only those references to immutable .20260920-prod8 filenames; unchanged resources retain captured production bytes after CRLF/LF-only checks.",
+  "note": "No production TIDs, real task data, tokens, PINs, database files, private environment, SSH details or internal deployment paths are included. Existing users may continue advancing business revision."
+}
