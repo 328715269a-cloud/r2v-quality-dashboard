@@ -1,0 +1,88 @@
+{
+  "version": "20260920-prod5",
+  "status": "deployed",
+  "publicUrl": "https://quality.shangyidada.site/group-workbench/",
+  "deployedAt": "2026-09-20T08:36:23.072Z",
+  "verifiedAt": "2026-09-20T08:39:24.837Z",
+  "staticAssets": {
+    "data-io.20260920-prod5.js": {
+      "sha256": "cb1db444edf83733c356c0187460ee208ba579ca7500852f87376a8bea640338",
+      "bytes": 13665
+    },
+    "shared-store.20260920-prod5.js": {
+      "sha256": "0925b37b9280cc62da45cdf9cdbb1c7bf6652f5d4b8af13d24d1b23deed373b2",
+      "bytes": 8285
+    },
+    "workflow.20260920-prod5.js": {
+      "sha256": "7add069b9f81fd517e9615fb0585731525d2d6fafb0cb5b4a79e9d214451b14b",
+      "bytes": 18660
+    },
+    "reports.20260920-prod5.js": {
+      "sha256": "55bfb440f400007d4107888b8d253f83619be1c6967ef5ba781085f1bffcebac",
+      "bytes": 47076
+    },
+    "app.20260920-prod5.js": {
+      "sha256": "20cbdd9c9df972ff943cfef9ec916f4aebc565010e626b6e9f646ccf46db2eb0",
+      "bytes": 156235
+    },
+    "index.html": {
+      "sha256": "b858b3ea64b8d99568bfebdaa061c91317697a808e494826fa133b20b091df42",
+      "bytes": 37196
+    },
+    "styles.20260920-prod5a.css": {
+      "sha256": "e799db0bb337ecae67f939658db9816c53867358ed5da00c8b23f7966f17852f",
+      "bytes": 83604
+    }
+  },
+  "apiSource": {
+    "workbench-api/server.cjs": {
+      "sha256": "17e39568a99da3fbda3967aff629a59da0905c1aea531a4fdc00c2d21183796d",
+      "bytes": 17108
+    },
+    "workbench-api/rules.cjs": {
+      "sha256": "030593890fc1472f02697719c0741a2d222a584b60aeb27afa1c2739b6e0a69b",
+      "bytes": 20574
+    },
+    "group-workbench/workflow.js": {
+      "sha256": "7add069b9f81fd517e9615fb0585731525d2d6fafb0cb5b4a79e9d214451b14b",
+      "bytes": 18660
+    }
+  },
+  "verification": {
+    "checks": {
+      "directAcceptanceRules": true,
+      "batchDecisions": true,
+      "cloudPersistence": true,
+      "legacySessionAndWrites": true,
+      "sharedWalConcurrency": true,
+      "isolatedUi": true,
+      "exportsPreserved": true,
+      "node22PinnedRuntime": true
+    },
+    "publicAssetsMatch": true,
+    "protectedCurrentModeAndDemosUnchanged": true,
+    "existingFormalAssetsUnchanged": true,
+    "existingServicesUnchanged": true,
+    "nginxMasterUnchanged": true,
+    "existingGateAndPrivateEnvUnchanged": true,
+    "productionBusinessWritesSent": false,
+    "publicFilesMatch": 13,
+    "layoutUiVerified": true,
+    "layoutExistingServicesUnchanged": true,
+    "layoutCurrentModeAndDemosUnchanged": true
+  },
+  "sourceHtml": {
+    "sha256": "33f17ddde7a9c617c47d56419dc3813d7f6183123b42865d268e18da99e86fc8",
+    "packaging": "Replace styles.css?v=20260920-prod5a with styles.20260920-prod5a.css and the five JavaScript ?v=20260920-prod5 references with matching immutable .20260920-prod5 filenames. Other bytes stay unchanged."
+  },
+  "note": "No production secrets, sessions, tasks, databases or private deployment configuration are included. Prior site modes, services, assets and sessions remain available.",
+  "layoutVersion": "20260920-prod5a",
+  "layoutDeployedAt": "2026-09-20T08:39:15.055825+00:00",
+  "preservedPriorAssets": {
+    "styles.20260920-prod5.css": {
+      "sha256": "60e6b50c228aa7b72a4f9e0358144d425588b84ff53bc14004d392cec65cfa95",
+      "bytes": 83114
+    }
+  },
+  "layoutScope": "Acceptance table full width; empty detail panel hidden; no behavior or API changes"
+}

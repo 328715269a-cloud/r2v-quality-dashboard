@@ -15,22 +15,28 @@
     pending_qc: { label: '待一次质检', tone: 'review' },
     pending_reqc: { label: '待再次质检', tone: 'review' },
     rework: { label: '待标注返修', tone: 'rework' },
-    qc_pass_unsent: { label: '质检通过·待建验收包', tone: 'review' },
-    acceptance_pack_unclaimed: { label: '验收包待认领', tone: 'review' },
+    qc_pass_unsent: { label: '质检通过·自动流入验收', tone: 'review' },
+    acceptance_pack_unclaimed: { label: '历史验收包待认领', tone: 'review' },
     pending_acceptance: { label: '待验收', tone: 'review' },
     accepted: { label: '验收通过', tone: 'done' },
     acceptance_return_pending: { label: '验收打回·待质检处理', tone: 'rework' },
     qc_self_rework: { label: '质检自行返修中', tone: 'rework' },
-    qc_self_done: { label: '质检返修完成·待建验收包', tone: 'review' },
+    qc_self_done: { label: '质检返修完成·自动流入验收', tone: 'review' },
     acceptance_rework: { label: '验收打回·待标注修改', tone: 'rework' },
     rejection_pending: { label: '标注拒绝待质检确认', tone: 'rework' },
-    rejected: { label: '拒绝（质检已确认）', tone: 'pending' }
+    rejected: { label: '已拒绝·废弃', tone: 'pending' }
   }).map(([key, value]) => [key, Object.freeze(value)])));
 
   function positiveRound(value) {
     const number = Number(value);
     return Number.isSafeInteger(number) && number > 0 ? number : 0;
   }
+
+  const QC_REJECT_MARKER = '[质检拒绝]';
+  const ACCEPTANCE_REJECT_MARKER = '[验收拒绝]';
+  function isQcReject(event) { return !!event && (event.type === 'qc_reject' || event.type === 'qc_fail' && String(event.note || '').startsWith(QC_REJECT_MARKER)); }
+  function isAcceptanceReject(event) { return !!event && (event.type === 'acceptance_reject' || event.type === 'acceptance_fail' && String(event.note || '').startsWith(ACCEPTANCE_REJECT_MARKER)); }
+  function rejectReason(event, marker) { return String(event?.note || '').startsWith(marker) ? String(event.note).slice(marker.length).trim() : String(event?.note || '').trim(); }
 
   function isReworkAssignment(event) {
     return !!event && event.type === 'claim' && event.assignmentKind === 'rework_transfer';
@@ -56,6 +62,7 @@
       rejectionReason: '', rejectionConfirmReason: '', rejectionBy: '', rejectionAt: '',
       rejectionConfirmedBy: '', rejectionConfirmedAt: '', rejectionResumeStatus: '',
       rejectionReturnReason: '', rejectionReturnedBy: '', rejectionReturnedAt: '',
+      finalRejectStage: '', finalRejectReason: '', finalRejectedBy: '', finalRejectedAt: '',
       acceptanceNote: '', acceptanceReviewedBy: '', acceptanceReviewedAt: '',
       acceptanceRoute: '', acceptanceRouteNote: '', acceptanceRoutedBy: '', acceptanceRoutedAt: '',
       qcRepairNote: '', qcRepairedBy: '', qcRepairedAt: ''
@@ -84,9 +91,9 @@
       }
       if (Number(event.workflowVersion) >= 3) return '';
       const staleRound = positiveRound(event.round) && positiveRound(event.round) !== s.round;
-      if (['qc_pass', 'qc_fail'].includes(event.type) && (!['pending_qc', 'pending_reqc'].includes(s.status) || staleRound)) return '当前质检环节或轮次已变化，旧页面的审核未计入进度。';
-      if (['acceptance_pass', 'acceptance_fail'].includes(event.type) && (s.status !== 'pending_acceptance' || staleRound)) return '当前验收环节或轮次已变化，旧页面的审核未计入进度。';
-      if (event.type === 'sent_acceptance' && s.status !== 'qc_pass_unsent') return '当前任务尚未质检通过，旧页面的送验记录未计入进度。';
+      if (['qc_pass', 'qc_fail', 'qc_reject'].includes(event.type) && (!['pending_qc', 'pending_reqc'].includes(s.status) || staleRound)) return '当前质检环节或轮次已变化，旧页面的审核未计入进度。';
+      if (['acceptance_pass', 'acceptance_fail', 'acceptance_reject'].includes(event.type) && (s.status !== 'pending_acceptance' || staleRound)) return '当前验收环节或轮次已变化，旧页面的审核未计入进度。';
+      if (event.type === 'sent_acceptance' && !['qc_pass_unsent','pending_acceptance'].includes(s.status)) return '当前任务尚未质检通过，旧页面的送验记录未计入进度。';
       return '';
     }
 
@@ -170,10 +177,17 @@
         case 'package_claimed': packageEvent(event, true); break;
         case 'qc_fail':
         case 'qc_pass':
+        case 'qc_reject':
           s.qcRound = Math.max(s.qcRound, positiveRound(event.qcRound) || positiveRound(event.packageRound) || positiveRound(event.round) || lastQcReviewRound + 1);
           lastQcReviewRound = s.qcRound;
           s.reviewedAt = event.at || '';
-          s.status = event.type === 'qc_pass' ? 'qc_pass_unsent' : 'rework';
+          if (event.type === 'qc_pass') {
+            s.status = 'pending_acceptance';
+            s.acceptanceRound = Math.max(s.acceptanceRound, lastAcceptanceReviewRound + 1);
+          } else if (isQcReject(event)) {
+            s.status = 'rejected'; s.finalRejectStage = 'qc'; s.finalRejectReason = rejectReason(event, QC_REJECT_MARKER);
+            s.finalRejectedBy = event.actor || ''; s.finalRejectedAt = event.at || '';
+          } else s.status = 'rework';
           break;
         case 'annotator_reject':
           assignee(event); s.rejectionResumeStatus = event.resumeStatus || s.status;
@@ -183,6 +197,8 @@
         case 'reject_confirm':
           s.status = 'rejected'; s.rejectionConfirmReason = event.note || '';
           s.rejectionConfirmedBy = event.actor || ''; s.rejectionConfirmedAt = event.at || '';
+          s.finalRejectStage = 'annotation_qc'; s.finalRejectReason = event.note || s.rejectionReason || '';
+          s.finalRejectedBy = event.actor || ''; s.finalRejectedAt = event.at || '';
           break;
         case 'reject_return':
           s.status = event.resumeStatus || s.rejectionResumeStatus || 'annotating';
@@ -195,11 +211,16 @@
           break;
         case 'acceptance_pass':
         case 'acceptance_fail':
+        case 'acceptance_reject':
           s.acceptanceRound = Math.max(s.acceptanceRound, positiveRound(event.acceptanceRound) || positiveRound(event.packageRound) || lastAcceptanceReviewRound + 1);
           lastAcceptanceReviewRound = s.acceptanceRound;
           s.acceptanceNote = event.note || ''; s.acceptanceReviewedBy = event.actor || '';
           s.acceptanceReviewedAt = event.at || '';
-          s.status = event.type === 'acceptance_pass' ? 'accepted' : Number(event.workflowVersion) >= 3 ? 'acceptance_return_pending' : 'acceptance_rework';
+          if (event.type === 'acceptance_pass') s.status = 'accepted';
+          else if (isAcceptanceReject(event)) {
+            s.status = 'rejected'; s.finalRejectStage = 'acceptance'; s.finalRejectReason = rejectReason(event, ACCEPTANCE_REJECT_MARKER);
+            s.finalRejectedBy = event.actor || ''; s.finalRejectedAt = event.at || '';
+          } else s.status = Number(event.workflowVersion) >= 3 ? 'acceptance_return_pending' : 'acceptance_rework';
           break;
         case 'acceptance_route':
           if (!['qc', 'annotation'].includes(event.route)) break;
@@ -208,8 +229,9 @@
           s.status = event.route === 'qc' ? 'qc_self_rework' : 'acceptance_rework';
           break;
         case 'qc_repair_done':
-          s.status = 'qc_self_done'; s.qcRepairNote = event.note || '';
+          s.status = 'pending_acceptance'; s.qcRepairNote = event.note || '';
           s.qcRepairedBy = event.actor || ''; s.qcRepairedAt = event.at || '';
+          s.acceptanceRound = Math.max(s.acceptanceRound, lastAcceptanceReviewRound + 1);
           break;
         case 'metadata_edit':
           if (event.after && event.after.tid) s.tid = event.after.tid;
@@ -218,6 +240,13 @@
         default: break;
       }
     });
+    // Earlier releases recorded an acceptance package before claiming it.
+    // Keep those records, but include every task that reached acceptance in the
+    // direct queue. No synthetic records or production data migration are needed.
+    if (!s.deleted && ['qc_pass_unsent', 'qc_self_done', 'acceptance_pack_unclaimed'].includes(s.status)) {
+      s.status = 'pending_acceptance';
+      s.acceptanceRound = Math.max(s.acceptanceRound, s.acceptancePackageRound, lastAcceptanceReviewRound + 1);
+    }
     return s;
   }
 
@@ -237,6 +266,7 @@
   function label(task) {
     if (!task) return '未知状态';
     if (task.deleted || task.status === 'deleted') return '已删除';
+    if (task.status === 'rejected') return task.finalRejectStage === 'acceptance' ? '验收拒绝·已废弃' : task.finalRejectStage === 'qc' ? '质检拒绝·已废弃' : '标注拒绝·质检确认';
     if (['pending_qc', 'pending_reqc'].includes(task.status)) {
       const round = positiveRound(task.qcRound) || (task.status === 'pending_qc' ? 1 : 2);
       return round === 1 ? '待一次质检' : round === 2 ? '待二次质检' : `待第 ${round} 次质检`;
@@ -269,9 +299,8 @@
   }
 
   function canBuild(task, stage) {
-    return !!task && !task.deleted && task.status !== 'deleted' && (stage === 'qc' ? ['annotation_done', 'annotation_rework_done'].includes(task.status)
-      : stage === 'acceptance' ? ['qc_pass_unsent', 'qc_self_done'].includes(task.status) : false);
+    return !!task && !task.deleted && task.status !== 'deleted' && stage === 'qc' && ['annotation_done', 'annotation_rework_done'].includes(task.status);
   }
 
-  return Object.freeze({ STATUS_META, project, label, counts, canBuild, isReworkAssignment, eventConflicts, effectiveEvents });
+  return Object.freeze({ STATUS_META, project, label, counts, canBuild, isReworkAssignment, isQcReject, isAcceptanceReject, eventConflicts, effectiveEvents });
 }));

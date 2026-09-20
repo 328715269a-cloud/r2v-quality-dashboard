@@ -61,9 +61,10 @@
           worker.events.push({ at: entry.at, eventId: entry.eventId, rawName: entry.rawName });
         }
       }
-      if (['qc_pass','qc_fail'].includes(event.type) && !result.firstQc) {
+      if (['qc_pass','qc_fail','qc_reject'].includes(event.type) && !result.firstQc) {
         const owner = lastSubmit || firstClaim || { name: '', rawName: '' };
-        result.firstQc = { name: owner.name, rawName: owner.rawName, at: text(event.at), eventId: text(event.id), type: event.type, pLevel: text(event.pLevel), tags: JSON.parse(json(event.tags || [])), note: text(event.note) };
+        const rejected=flow.isQcReject(event);
+        result.firstQc = { name: owner.name, rawName: owner.rawName, at: text(event.at), eventId: text(event.id), type: rejected?'qc_reject':event.type, pLevel: rejected?'':text(event.pLevel), tags: rejected?[]:JSON.parse(json(event.tags || [])), note: text(event.note) };
       }
       if (event.type === 'acceptance_pass' && !result.firstAcceptance) {
         const owner = lastSubmit || firstClaim || { name: '', rawName: '' };
@@ -117,7 +118,7 @@
 
   function qcOperator(history) {
     history = effectiveEvents(history);
-    const types = new Set(['qc_pass', 'qc_fail', 'reject_confirm', 'reject_return', 'acceptance_route', 'qc_repair_done', 'sent_acceptance']);
+    const types = new Set(['qc_pass', 'qc_fail', 'qc_reject', 'reject_confirm', 'reject_return', 'acceptance_pass', 'acceptance_reject', 'acceptance_route', 'qc_repair_done', 'sent_acceptance']);
     for (let index = (history || []).length - 1; index >= 0; index -= 1) {
       const event = history[index];
       if (!event || (Object.hasOwn(event, 'actorRole') && event.actorRole !== 'qc')) continue;
@@ -289,7 +290,7 @@
       const rawHistory = histories.get(task.id) || [], history = effectiveEvents(rawHistory);
       const omitted = conflicts.filter(conflict => conflict.taskId === task.id);
       const firstClaim = history.find(event => event.type === 'claim' && !isReworkAssignment(event));
-      const qcEvents = history.filter(event => ['qc_pass', 'qc_fail'].includes(event.type));
+      const qcEvents = history.filter(event => ['qc_pass', 'qc_fail', 'qc_reject'].includes(event.type));
       const operator = qcOperator(history);
       const contributors = annotationContributors(history), assignments = history.filter(isReworkAssignment), assignment = assignments.at(-1);
       const row = {
@@ -311,14 +312,15 @@
         for (const suffix of ['PackageId', 'PackageName', 'PackageRound', 'PackageBuilder', 'PackageBuiltAt', 'PackageClaimer', 'PackageClaimedAt']) row[`${prefix}${suffix}`] = task[`${prefix}${suffix}`] ?? '';
       }
       for (const [prefix, qc] of [['firstQc', qcEvents[0]], ['latestQc', qcEvents.at(-1)]]) {
-        row[`${prefix}Decision`] = qc ? qc.type === 'qc_pass' ? '通过' : '打回' : '';
-        row[`${prefix}PLevel`] = qc?.pLevel || '';
-        row[`${prefix}TagsJSON`] = json(qc?.tags || []);
+        const rejected=qc&&flow.isQcReject(qc);
+        row[`${prefix}Decision`] = qc ? qc.type === 'qc_pass' ? '通过' : rejected ? '拒绝' : '打回' : '';
+        row[`${prefix}PLevel`] = rejected?'':qc?.pLevel || '';
+        row[`${prefix}TagsJSON`] = json(rejected?[]:qc?.tags || []);
         row[`${prefix}Note`] = qc?.note || '';
         row[`${prefix}Actor`] = qc?.actor || '';
         row[`${prefix}At`] = qc?.at || '';
       }
-      for (const key of ['rejectionReason', 'rejectionBy', 'rejectionAt', 'rejectionConfirmReason', 'rejectionConfirmedBy', 'rejectionConfirmedAt', 'rejectionReturnReason', 'rejectionReturnedBy', 'rejectionReturnedAt', 'acceptanceNote', 'acceptanceReviewedBy', 'acceptanceReviewedAt', 'acceptanceRoute', 'acceptanceRouteNote', 'acceptanceRoutedBy', 'acceptanceRoutedAt', 'qcRepairNote', 'qcRepairedBy', 'qcRepairedAt']) row[key] = task[key] ?? '';
+      for (const key of ['rejectionReason', 'rejectionBy', 'rejectionAt', 'rejectionConfirmReason', 'rejectionConfirmedBy', 'rejectionConfirmedAt', 'rejectionReturnReason', 'rejectionReturnedBy', 'rejectionReturnedAt', 'finalRejectStage', 'finalRejectReason', 'finalRejectedBy', 'finalRejectedAt', 'acceptanceNote', 'acceptanceReviewedBy', 'acceptanceReviewedAt', 'acceptanceRoute', 'acceptanceRouteNote', 'acceptanceRoutedBy', 'acceptanceRoutedAt', 'qcRepairNote', 'qcRepairedBy', 'qcRepairedAt']) row[key] = task[key] ?? '';
       return row;
     });
     const taskColumns = columns([
@@ -335,7 +337,8 @@
       ['acceptancePackageId','验收包ID'],['acceptancePackageName','验收包名'],['acceptancePackageRound','验收包轮次'],['acceptancePackageBuilder','验收建包人'],['acceptancePackageBuiltAt','验收建包时间'],['acceptancePackageClaimer','验收包认领人'],['acceptancePackageClaimedAt','验收包认领时间'],
       ['rejectionReason','标注拒绝原因'],['rejectionBy','标注拒绝人'],['rejectionAt','标注拒绝时间'],['rejectionConfirmReason','质检确认拒绝说明'],['rejectionConfirmedBy','拒绝确认人'],['rejectionConfirmedAt','拒绝确认时间'],
       ['rejectionReturnReason','不同意拒绝说明'],['rejectionReturnedBy','不同意拒绝操作人'],['rejectionReturnedAt','不同意拒绝时间'],
-      ['acceptanceNote','最近验收说明'],['acceptanceReviewedBy','最近验收人'],['acceptanceReviewedAt','最近验收时间'],['acceptanceRoute','验收打回处理方向'],['acceptanceRouteNote','验收打回分流说明'],['acceptanceRoutedBy','分流操作人'],['acceptanceRoutedAt','分流时间'],
+      ['finalRejectStage','最终拒绝环节'],['finalRejectReason','最终拒绝原因'],['finalRejectedBy','最终拒绝操作人'],['finalRejectedAt','最终拒绝时间'],
+      ['acceptanceNote','最近验收说明'],['acceptanceReviewedBy','最近验收人'],['acceptanceReviewedAt','最近验收时间'],['acceptanceRoute','验收不通过处理方向'],['acceptanceRouteNote','验收不通过分流说明'],['acceptanceRoutedBy','分流操作人'],['acceptanceRoutedAt','分流时间'],
       ['qcRepairNote','质检自行返修说明'],['qcRepairedBy','质检自行返修人'],['qcRepairedAt','质检自行返修完成时间'],['batchId','原始导入批次'],['createdBy','导入人'],['createdAt','导入时间'],['lastUpdated','最近更新时间'],['originalTaskJSON','完整原始任务JSON'],['fullTimelineJSON','完整任务流水JSON']
     ]);
 
@@ -433,9 +436,12 @@
         groupCount: unique(subset.map(task => task.groupId)).length, groups: unique(subset.map(task => groupName(task.groupId))).join('、'),
         moviesJSON: json(unique(subset.map(task => task.movie))), firstAllocationDate: dates[0] || '', lastAllocationDate: dates.at(-1) || '',
         acceptedTIDs: subset.filter(task => task.status === 'accepted').length,
+        rejectedTIDs: subset.filter(task => task.status === 'rejected').length,
         taskIdsJSON: json(subset.map(task => task.id)), currentTIDsJSON: json(subset.map(task => text(task.tid)))
       };
+      row.closedTIDs = row.acceptedTIDs + row.rejectedTIDs;
       row.completionRate = subset.length ? `${(row.acceptedTIDs / subset.length * 100).toFixed(1)}%` : '0.0%';
+      row.closureRate = subset.length ? `${(row.closedTIDs / subset.length * 100).toFixed(1)}%` : '0.0%';
       statusKeys.forEach(key => { row[`status_${key}`] = 0; });
       subset.forEach(task => { row[`status_${task.status}`] += 1; });
       return row;
@@ -460,7 +466,7 @@
       ['leader','负责人'],['total','组长登记总量'],['autoHeadcount','自动作业人数（日人次）'],['headcount','采用作业人数（日人次）'],['headcountSource','人数来源（auto/manual）'],['membersJSON','自动作业人员JSON'],['latestEditId','最近小组记录ID'],['settingsHistoryJSON','完整小组修改历史JSON'],['isAggregate','是否跨日期累计']
     ]);
     const summaryColumns = columns([
-      ['mode','作业类型'],['totalTIDs','累计分配TID数量'],['movieCount','累计影片数量'],['groupCount','参与小组数'],['groups','参与小组'],['moviesJSON','影片明细JSON'],['firstAllocationDate','最早分配业务日期'],['lastAllocationDate','最近分配业务日期'],['acceptedTIDs','当前验收通过TID数量'],['completionRate','最终完成率']
+      ['mode','作业类型'],['totalTIDs','累计分配TID数量'],['movieCount','累计影片数量'],['groupCount','参与小组数'],['groups','参与小组'],['moviesJSON','影片明细JSON'],['firstAllocationDate','最早分配业务日期'],['lastAllocationDate','最近分配业务日期'],['acceptedTIDs','验收通过TID数量'],['rejectedTIDs','最终拒绝TID数量'],['closedTIDs','已闭环TID数量'],['completionRate','验收通过率'],['closureRate','闭环率（通过+拒绝）']
     ]).concat(statusColumns, columns([['taskIdsJSON','内部任务ID明细JSON'],['currentTIDsJSON','当前TID明细JSON']]));
 
     const dailyMap = new Map();
@@ -468,14 +474,18 @@
       const key = json([date, groupId]);
       if (!dailyMap.has(key)) dailyMap.set(key, {
         date, groupId, group: groupName(groupId), modes: new Set(), imported: new Set(), initial: new Set(), completed: new Set(), rejected: new Set(), active: new Set(),
-        annotationReworkActions: 0, qcPassActions: 0, qcFailActions: 0, acceptanceFailActions: 0, qcSelfRepairActions: 0, assignmentActions: 0, qcPackages: new Set(), acceptancePackages: new Set()
+        annotationReworkActions: 0, qcPassActions: 0, qcFailActions: 0, qcRejected: new Set(), acceptanceFailActions: 0, acceptanceRejected: new Set(), qcSelfRepairActions: 0, assignmentActions: 0, qcPackages: new Set(), acceptancePackages: new Set()
       });
       return dailyMap.get(key);
     }
     const firstByType = new Map();
     function first(type, taskId) { return firstByType.get(`${type}:${taskId}`); }
     events.forEach(event => {
+      const qcReject=flow.isQcReject(event),acceptanceReject=flow.isAcceptanceReject(event);
       if (['dispatch', 'submit', 'acceptance_pass', 'reject_confirm'].includes(event.type) && !first(event.type, event.taskId)) firstByType.set(`${event.type}:${event.taskId}`, event);
+      if (qcReject&&!first('qc_reject',event.taskId))firstByType.set(`qc_reject:${event.taskId}`,event);
+      if (acceptanceReject&&!first('acceptance_reject',event.taskId))firstByType.set(`acceptance_reject:${event.taskId}`,event);
+      if ((event.type==='reject_confirm'||qcReject||acceptanceReject) && !first('final_reject', event.taskId)) firstByType.set(`final_reject:${event.taskId}`, event);
     });
     events.forEach(event => {
       const task = taskMap.get(event.taskId);
@@ -490,11 +500,14 @@
         if (initialKind && first('submit', task.id) === event) row.initial.add(task.id);
         if (!initialKind) row.annotationReworkActions += 1;
       }
+      const qcReject=flow.isQcReject(event),acceptanceReject=flow.isAcceptanceReject(event);
       if (event.type === 'qc_pass') row.qcPassActions += 1;
-      if (event.type === 'qc_fail') row.qcFailActions += 1;
+      if (event.type === 'qc_fail'&&!qcReject) row.qcFailActions += 1;
+      if (qcReject && first('qc_reject', task.id) === event) row.qcRejected.add(task.id);
       if (event.type === 'acceptance_pass' && first('acceptance_pass', task.id) === event) row.completed.add(task.id);
-      if (event.type === 'acceptance_fail') row.acceptanceFailActions += 1;
-      if (event.type === 'reject_confirm' && first('reject_confirm', task.id) === event) row.rejected.add(task.id);
+      if (event.type === 'acceptance_fail'&&!acceptanceReject) row.acceptanceFailActions += 1;
+      if (acceptanceReject && first('acceptance_reject', task.id) === event) row.acceptanceRejected.add(task.id);
+      if ((event.type==='reject_confirm'||qcReject||acceptanceReject) && first('final_reject', task.id) === event) row.rejected.add(task.id);
       if (event.type === 'qc_repair_done') row.qcSelfRepairActions += 1;
     });
     tasks.filter(task => !first('dispatch', task.id)).forEach(task => {
@@ -518,15 +531,15 @@
     const dailyRows = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date) || text(a.groupId).localeCompare(text(b.groupId))).map(row => ({
       date: row.date, groupId: row.groupId, group: row.group, mode: Array.from(row.modes).join('、'),
       importedTIDs: row.imported.size, initialAnnotationTIDs: row.initial.size, annotationReworkActions: row.annotationReworkActions,
-      qcPassActions: row.qcPassActions, qcFailActions: row.qcFailActions, completedTIDs: row.completed.size, acceptanceFailActions: row.acceptanceFailActions,
+      qcPassActions: row.qcPassActions, qcFailActions: row.qcFailActions, qcRejectedTIDs: row.qcRejected.size, completedTIDs: row.completed.size, acceptanceFailActions: row.acceptanceFailActions, acceptanceRejectedTIDs: row.acceptanceRejected.size,
       rejectedTIDs: row.rejected.size, qcSelfRepairActions: row.qcSelfRepairActions, qcPackageCount: row.qcPackages.size, acceptancePackageCount: row.acceptancePackages.size,
       activeTIDs: row.active.size, assignmentActions: row.assignmentActions, importedTaskIdsJSON: json(Array.from(row.imported)), initialTaskIdsJSON: json(Array.from(row.initial)), completedTaskIdsJSON: json(Array.from(row.completed)), rejectedTaskIdsJSON: json(Array.from(row.rejected)),
       ...settingFields(groupModel.row(row.groupId, row.date))
     }));
     const dailyColumns = columns([
       ['date','实际操作日期'],['groupId','小组ID'],['group','小组'],['mode','作业类型'],['importedTIDs','新增分配TID数量'],['initialAnnotationTIDs','首次标注完成TID数量'],['annotationReworkActions','标注返修提交次数'],
-      ['qcPassActions','质检通过操作次数'],['qcFailActions','质检打回操作次数'],['completedTIDs','首次验收通过TID数量'],['acceptanceFailActions','验收打回操作次数'],['rejectedTIDs','首次确认拒绝TID数量'],['qcSelfRepairActions','质检自行返修完成次数'],
-      ['qcPackageCount','新建质检包数'],['acceptancePackageCount','新建验收包数'],['activeTIDs','有操作TID数量'],['assignmentActions','代修分配任务次数'],['importedTaskIdsJSON','新增分配任务ID JSON'],['initialTaskIdsJSON','首次标注完成任务ID JSON'],['completedTaskIdsJSON','首次验收通过任务ID JSON'],['rejectedTaskIdsJSON','首次确认拒绝任务ID JSON']
+      ['qcPassActions','质检通过操作次数'],['qcFailActions','质检打回操作次数'],['qcRejectedTIDs','质检拒绝TID数量'],['completedTIDs','首次验收通过TID数量'],['acceptanceRejectedTIDs','验收拒绝TID数量'],['rejectedTIDs','最终拒绝TID数量'],['acceptanceFailActions','验收不通过操作次数'],['qcSelfRepairActions','质检自行返修完成次数'],
+      ['qcPackageCount','新建质检包数'],['acceptancePackageCount','历史新建验收包数'],['activeTIDs','有操作TID数量'],['assignmentActions','代修分配任务次数'],['importedTaskIdsJSON','新增分配任务ID JSON'],['initialTaskIdsJSON','首次标注完成任务ID JSON'],['completedTaskIdsJSON','首次验收通过任务ID JSON'],['rejectedTaskIdsJSON','最终拒绝任务ID JSON']
     ]);
     return {
       imports: { columns: importColumns, rows: importRows },
@@ -534,7 +547,7 @@
       movies: {
         columns: columns([['movie','整片影片名']]).concat(summaryColumns, columns([
           ['key','整片汇总标识'],['modeCode','作业类型编码'],['taskCount','整片TID数量'],['closed','是否整片闭环'],['closureStatus','整片流程状态'],
-          ['closedTIDs','已闭环TID数量'],['rejectedTIDs','已确认拒绝TID数量'],['activeTIDs','流程中TID数量'],['closureRate','整片闭环比例'],['sourceNameCount','原始影片包名数量'],['sourceNamesJSON','原始影片名集合JSON'],['groupIdsJSON','参与小组ID JSON']
+          ['activeTIDs','流程中TID数量'],['sourceNameCount','原始影片包名数量'],['sourceNamesJSON','原始影片名集合JSON'],['groupIdsJSON','参与小组ID JSON']
         ])), rows: movieRows
       },
       groups: { columns: columns([['groupId','小组ID'],['group','小组']]).concat(summaryColumns, settingColumns), rows: groupRows },

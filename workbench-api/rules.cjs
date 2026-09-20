@@ -15,6 +15,25 @@ function scope(profile,task,role){check(!role||profile.role===role,'当前身份
 function manager(profile,task){check(['qc','admin'].includes(profile.role),'需要组长 / 质检或管理员权限','FORBIDDEN',403);scope(profile,task);}
 function profileInput(input){check(object(input),'身份格式无效');const role=input.role;check(['annotation','qc','acceptance','admin'].includes(role),'身份无效');if(role==='admin'){check(input.name==='admin','身份或密码不正确','AUTH_FAILED',401);return{name:'admin',role};}const name=chinese(input.name);check(MODES[input.groupId]===input.mode,'请选择正确的镜头类型与小组');return{name,role,mode:input.mode,groupId:input.groupId};}
 function same(a,b){return JSON.stringify(a)===JSON.stringify(b);}
+// Already-open WorkBuddy pages calculate acceptance rounds before direct flow
+// advanced them. Recognize that exact calculation, never an arbitrary stale
+// round. The transaction revision and optional task timestamp still must match.
+function legacyAcceptanceRound(history){
+  let round=0,lastReview=0,packageRound=0;
+  const positive=value=>Number.isSafeInteger(value)&&value>0?value:0;
+  for(const event of Flow.effectiveEvents(history)){
+    if(['package_built','package_claimed'].includes(event.type)&&event.stage==='acceptance'){
+      packageRound=positive(event.packageRound)||(event.type==='package_claimed'?packageRound:0)||round+1;
+      if(event.type==='package_claimed')round=Math.max(round,packageRound);
+    }else if(['qc_pass','qc_repair_done'].includes(event.type))round=Math.max(round,1);
+    else if(['sent_acceptance','acceptance_pass','acceptance_fail','acceptance_reject'].includes(event.type)){
+      round=Math.max(round,positive(event.acceptanceRound)||positive(event.packageRound)||lastReview+1);
+      if(event.type!=='sent_acceptance')lastReview=round;
+    }
+  }
+  return round;
+}
+function rejectNote(value,marker){const note=text(value,2000,true);check(text(note.startsWith(marker)?note.slice(marker.length):note,2000,true),'请填写拒绝原因');return text(note.startsWith(marker)?note:`${marker} ${note}`,2000,true);}
 function snapshot(state,taskId){const raw=state.tasks.find(t=>t.id===taskId);check(raw,'未找到任务');return {...raw,...Flow.project(raw,state.events)};}
 function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled=()=>check(false,'删除功能尚未开放','IMPORT_DELETE_DISABLED',503)}){
   check(object(input),'缺少操作内容');check(Object.keys(input).every(k=>['tasks','events','batches'].includes(k)),'不能覆盖共享存储字段');
@@ -26,6 +45,13 @@ function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled
   const taskMap=new Map(state.tasks.map(t=>[t.id,t])),histories=new Map(state.tasks.map(t=>[t.id,[]])),projected=new Map();
   for(const e of state.events)if(histories.has(e.taskId))histories.get(e.taskId).push(e);
   function view(key){const t=taskMap.get(key);check(t,'未找到任务');if(!projected.has(key))projected.set(key,{...t,...Flow.project(t,histories.get(key)||[])});return projected.get(key);}
+  function canBuildLegacyAcceptance(task){
+    if(task.status!=='pending_acceptance')return false;
+    const history=Flow.effectiveEvents(histories.get(task.id)||[]);
+    const entering=history.findLastIndex(event=>['qc_pass','qc_repair_done'].includes(event.type));
+    return entering>=0&&!history.slice(entering+1).some(event=>['acceptance_pass','acceptance_fail','acceptance_reject'].includes(event.type)||event.type==='package_built'&&event.stage==='acceptance');
+  }
+  const canBuild=(task,stage)=>stage==='acceptance'?canBuildLegacyAcceptance(task):Flow.canBuild(task,stage);
   const deletions=raw.events.filter(event=>event?.type==='task_deleted');
   if(deletions.length){
     check(profile.role==='admin','仅管理员可以删除导入记录','FORBIDDEN',403);checkPin(pin,'admin');checkDeleteEnabled();
@@ -47,12 +73,12 @@ function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled
   const newTasks=new Map(delta.tasks.map(t=>[t.id,t]));
   for(const b of raw.batches){const batch={id:fresh(b),date:date(b.date),groupId:b.groupId,mode:b.mode,movie:text(b.movie,200,true),taskIds:b.taskIds,createdAt:stamp(),createdBy:profile.name};manager(profile,batch);check(Array.isArray(batch.taskIds)&&batch.taskIds.length>0&&batch.taskIds.length<=10000&&new Set(batch.taskIds).size===batch.taskIds.length,'批次任务列表无效');batch.taskIds=batch.taskIds.map(id);
     const tasks=batch.taskIds.map(view);check(tasks.every(t=>t.groupId===batch.groupId&&t.mode===batch.mode&&t.movie===batch.movie),'一个批次只允许同影片同组同模块的任务');
-    if(b.kind==='handoff'){scope(profile,batch,'qc');check(['qc','acceptance'].includes(b.stage),'建包去向无效');check(tasks.every(t=>Flow.canBuild(t,b.stage)),'任务当前不能建包','STATE_CONFLICT',409);Object.assign(batch,{kind:'handoff',stage:b.stage,packageName:text(b.packageName,300,true),tids:tasks.map(t=>t.tid)});}
+    if(b.kind==='handoff'){scope(profile,batch,'qc');check(['qc','acceptance'].includes(b.stage),'建包去向无效');check(tasks.every(t=>canBuild(t,b.stage)),'任务当前不能建包','STATE_CONFLICT',409);Object.assign(batch,{kind:'handoff',stage:b.stage,packageName:text(b.packageName,300,true),tids:tasks.map(t=>t.tid)});}
     else {check(b.kind==null||b.kind==='import','批次类型无效');check(tasks.every(t=>newTasks.has(t.id)&&t.batchId===batch.id&&t.date===batch.date),'导入批次必须对应本次新任务');}
     delta.batches.push(batch);working.batches.push(batch);
   }
   for(const t of delta.tasks)check(delta.batches.some(b=>b.kind!=='handoff'&&b.id===t.batchId&&b.taskIds.includes(t.id)),'导入任务缺少本次导入批次');
-  const allowed=new Set(['dispatch','claim','submit','package_built','package_claimed','qc_pass','qc_fail','annotator_reject','reject_confirm','reject_return','acceptance_pass','acceptance_fail','acceptance_route','qc_repair_done','metadata_edit','group_daily_edit','task_deleted']);
+  const allowed=new Set(['dispatch','claim','submit','package_built','package_claimed','qc_pass','qc_fail','qc_reject','annotator_reject','reject_confirm','reject_return','acceptance_pass','acceptance_fail','acceptance_reject','acceptance_route','qc_repair_done','metadata_edit','group_daily_edit','task_deleted']);
   for(const e of raw.events){const eventId=fresh(e);check(allowed.has(e.type),'不支持此操作');check(!e.identityAlias&&!e.legacyName&&!e.targetStatus,'正式模式不接受旧演示身份或跳步状态');let task;
     const event={id:eventId,taskId:e.taskId,type:e.type,workflowVersion:e.assignmentKind==='rework_transfer'?4:3,at:stamp(),actor:profile.name,actorRole:profile.role};const note=text(e.note,2000);if(note)event.note=note;
     if(e.type==='group_daily_edit'){
@@ -75,13 +101,13 @@ function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled
         case 'annotator_reject':scope(profile,task,'annotation');check(actionable.includes(task.status)&&task.assignee===profile.name,'任务当前不能申请拒绝','STATE_CONFLICT',409);Object.assign(event,{assignee:profile.name,previousAssignee:task.assignee,resumeStatus:task.status,note:text(e.note,2000,true)});break;
         case 'package_built':case 'package_claimed':{
           scope(profile,task,'qc');const batch=working.batches.find(b=>b.id===e.packageId&&b.kind==='handoff');check(batch&&batch.taskIds.includes(task.id)&&batch.stage===e.stage&&batch.groupId===task.groupId&&batch.mode===task.mode,'建包记录或关联任务不正确');check(batch.createdBy===profile.name,'只有原建包人可以领取','FORBIDDEN',403);const stage=batch.stage,prefix=stage==='qc'?'qc':'acceptance';let round;
-          if(e.type==='package_built'){check(delta.batches.includes(batch)&&Flow.canBuild(task,stage),'不能重复建包或跳过作业环节','STATE_CONFLICT',409);round=task[`${prefix}Round`]+1;}
-          else{check(task.status===`${prefix}_pack_unclaimed`&&task[`${prefix}PackageId`]===batch.id,'任务当前不能领取此包','STATE_CONFLICT',409);round=task[`${prefix}PackageRound`];}
+          if(e.type==='package_built'){check(delta.batches.includes(batch)&&canBuild(task,stage),'不能重复建包或跳过作业环节','STATE_CONFLICT',409);round=stage==='acceptance'?task.acceptanceRound:task.qcRound+1;}
+          else{check((task.status===`${prefix}_pack_unclaimed`||stage==='acceptance'&&task.status==='pending_acceptance'&&!task.acceptancePackageClaimedAt)&&task[`${prefix}PackageId`]===batch.id,'任务当前不能领取此包','STATE_CONFLICT',409);round=task[`${prefix}PackageRound`];}
           check(e.packageRound===round,'建包轮次不一致','STATE_CONFLICT',409);Object.assign(event,{stage,packageId:batch.id,packageName:batch.packageName,packageRound:round,builder:batch.createdBy});if(e.type==='package_claimed')event.claimer=profile.name;break;
         }
-        case 'qc_pass':case 'qc_fail':scope(profile,task,'qc');check(['pending_qc','pending_reqc'].includes(task.status),'任务不在待质检环节','STATE_CONFLICT',409);check((e.qcRound==null||e.qcRound===task.qcRound)&&(e.round==null||e.round===task.qcRound),'质检轮次已变化','STATE_CONFLICT',409);Object.assign(event,{round:task.qcRound,qcRound:task.qcRound});if(e.type==='qc_fail'){check(['P0','P1','P2'].includes(e.pLevel),'请选择错误等级');check(Array.isArray(e.tags)&&e.tags.length>0&&e.tags.length<=QC_TAGS.size&&new Set(e.tags).size===e.tags.length&&e.tags.every(t=>QC_TAGS.has(t)),'请选择有效错误标签');Object.assign(event,{pLevel:e.pLevel,tags:e.tags.slice(),note:text(e.note,2000,true)});}break;
+        case 'qc_pass':case 'qc_fail':case 'qc_reject':scope(profile,task,'qc');check(['pending_qc','pending_reqc'].includes(task.status),'任务不在待质检环节','STATE_CONFLICT',409);check((e.qcRound==null||e.qcRound===task.qcRound)&&(e.round==null||e.round===task.qcRound),'质检轮次已变化','STATE_CONFLICT',409);Object.assign(event,{round:task.qcRound,qcRound:task.qcRound});if(e.type==='qc_reject'||Flow.isQcReject({...e,note})){Object.assign(event,{type:'qc_fail',note:rejectNote(note,'[质检拒绝]'),pLevel:'P0',tags:['其他']});}else if(e.type==='qc_fail'){check(['P0','P1','P2'].includes(e.pLevel),'请选择错误等级');check(Array.isArray(e.tags)&&e.tags.length>0&&e.tags.length<=QC_TAGS.size&&new Set(e.tags).size===e.tags.length&&e.tags.every(t=>QC_TAGS.has(t)),'请选择有效错误标签');Object.assign(event,{pLevel:e.pLevel,tags:e.tags.slice(),note:text(e.note,2000,true)});}break;
         case 'reject_confirm':case 'reject_return':scope(profile,task,'qc');check(task.status==='rejection_pending','任务不在拒绝待确认环节','STATE_CONFLICT',409);event.note=text(e.note,2000,true);if(e.type==='reject_return')event.resumeStatus=task.rejectionResumeStatus||'annotating';break;
-        case 'acceptance_pass':case 'acceptance_fail':scope(profile,task,'acceptance');check(task.status==='pending_acceptance','任务不在待验收环节','STATE_CONFLICT',409);check(e.acceptanceRound==null||e.acceptanceRound===task.acceptanceRound,'验收轮次已变化','STATE_CONFLICT',409);event.acceptanceRound=task.acceptanceRound;if(e.type==='acceptance_fail')event.note=text(e.note,2000,true);if(e.source==='acceptance_import')event.source=e.source;break;
+        case 'acceptance_pass':case 'acceptance_fail':case 'acceptance_reject':scope(profile,task,'acceptance');check(task.status==='pending_acceptance','任务不在待验收环节','STATE_CONFLICT',409);check(e.acceptanceRound==null||e.acceptanceRound===task.acceptanceRound||e.acceptanceRound===legacyAcceptanceRound(histories.get(task.id)||[]),'验收轮次已变化','STATE_CONFLICT',409);event.acceptanceRound=task.acceptanceRound;if(e.type==='acceptance_reject'||Flow.isAcceptanceReject({...e,note}))Object.assign(event,{type:'acceptance_fail',note:rejectNote(note,'[验收拒绝]')});else if(e.type==='acceptance_fail')event.note=text(e.note,2000,true);if(e.source==='acceptance_import')event.source=e.source;break;
         case 'acceptance_route':scope(profile,task,'qc');check(task.status==='acceptance_return_pending','任务不在验收打回待处理环节','STATE_CONFLICT',409);check(['qc','annotation'].includes(e.route),'返修去向无效');event.route=e.route;event.note=text(e.note,2000,true);break;
         case 'qc_repair_done':scope(profile,task,'qc');check(task.status==='qc_self_rework','任务不在质检自行返修环节','STATE_CONFLICT',409);event.note=text(e.note,2000,true);break;
         case 'metadata_edit':manager(profile,task);checkPin(pin,'admin');check(object(e.before)&&object(e.after),'修改内容格式无效');check(e.before.tid===task.tid&&e.before.movie===task.movie,'任务资料已有新修改','STATE_CONFLICT',409);event.before={tid:task.tid,movie:task.movie};event.after={tid:tid(e.after.tid),movie:text(e.after.movie,200,true)};check(!same(event.before,event.after),'内容没有变化');event.note=text(e.note,2000,true);if(e.batchId){const batch=working.batches.find(b=>b.id===e.batchId&&b.kind!=='handoff');check(batch&&batch.taskIds.includes(task.id),'任务不属于该导入批次');event.batchId=batch.id;}break;

@@ -9,6 +9,20 @@
     let session = null, state = empty(), revision = -1, queue = Promise.resolve(), syncPromise = null;
     const listeners = new Set();
     const notify = detail => listeners.forEach(listener => listener(detail));
+    function unrestricted() { return !session?.profile || ['admin', 'acceptance'].includes(session.profile.role); }
+    function scopedPayload(payload, includeExisting = false) {
+      const value = clone(payload);
+      if (unrestricted()) return value;
+      const groupId = session.profile.groupId;
+      const tasks = (value.tasks || []).filter(task => task.groupId === groupId);
+      const ids = new Set([...(includeExisting ? state.tasks : []).map(task => task.id), ...tasks.map(task => task.id)]);
+      const events = (value.events || []).filter(event => event.groupId === groupId || ids.has(event.taskId));
+      const batches = (value.batches || []).filter(batch => batch.groupId === groupId || (batch.taskIds || []).some(id => ids.has(id))).map(batch => {
+        const taskIds = (batch.taskIds || []).filter(id => ids.has(id));
+        return { ...batch, taskIds };
+      });
+      return { ...value, tasks, events, batches };
+    }
     function saveSession(value) {
       session = value;
       try { if (value) sessionStorage.setItem(SESSION_KEY, JSON.stringify(value)); else sessionStorage.removeItem(SESSION_KEY); } catch (_) { /* The open tab can still work. */ }
@@ -37,12 +51,12 @@
       const changed = result.revision !== revision;
       if (result.state) {
         if (!collections.every(name => Array.isArray(result.state[name]))) throw new Error('共享数据格式不完整，未替换现有数据。');
-        state = { ...clone(result.state), preferences: {} };
+        state = { ...scopedPayload(result.state), preferences: {} };
       } else if (result.delta && changed) {
-        const next = { ...state };
+        const next = { ...state },delta=scopedPayload(result.delta,true);
         for (const name of collections) {
           const records = new Map(state[name].map(row => [row.id, row]));
-          for (const row of result.delta[name] || []) {
+          for (const row of delta[name] || []) {
             const prior = records.get(row.id);
             if (prior && JSON.stringify(prior) !== JSON.stringify(row)) throw new Error('共享历史记录存在冲突，未覆盖原始数据。');
             records.set(row.id, clone(row));
@@ -123,7 +137,7 @@
       queue = pending.catch(() => {});
       return pending;
     }
-    async function backup() { return request('backup'); }
+    async function backup() { if (session?.profile?.role !== 'admin') throw new Error('完整备份仅管理员可下载。'); return request('backup'); }
     return Object.freeze({ init, read: () => state, refresh, transact, backup, signIn, profile: () => session?.profile || null, revision: () => revision, subscribe: listener => { listeners.add(listener); return () => listeners.delete(listener); } });
   }
   root.WorkbenchStore = Object.freeze({ create, sessionKey: SESSION_KEY });

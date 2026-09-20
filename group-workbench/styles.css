@@ -3855,6 +3855,15 @@ body[data-active-view="overview"] .demo-dot { background: oklch(62% 0.019 255); 
 /* TID matching keeps task identity visible before a bulk result is saved. */
 .tid-match-table { max-height: 26rem; overflow: auto; }
 .import-result + details .table-wrap { max-height: 26rem; overflow: auto; }
+
+/* Acceptance is a batch queue; give the table the full working width. */
+.split-layout.acceptance-layout { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+.acceptance-layout > .queue-panel { min-height: 0; }
+.acceptance-layout .queue-panel table { min-width: 880px; }
+.acceptance-layout .queue-panel th,
+.acceptance-layout .queue-panel td { white-space: nowrap; }
+.acceptance-layout > .workbench { min-height: 0; }
+.acceptance-layout > .workbench:has(> .empty) { display: none; }
 .tid-match-table td { vertical-align: top; }
 .tid-match-table small { display: block; margin-top: .25rem; }
 .tid-match-error td:last-child, .tid-input-error { color: var(--danger, #a52f38); }
