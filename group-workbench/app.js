@@ -180,6 +180,7 @@
     if (task && task.groupId !== profile.groupId && role !== 'acceptance') throw new Error('只能处理自己小组的任务。');
   }
   function requireManager() { if (!profile || !['admin', 'qc'].includes(profile.role)) throw new Error('请使用任务管理或质检身份管理导入内容。'); }
+  function requireImportAdmin() { if(profile?.role!=='admin')throw new Error('任务导入仅管理员可操作，请联系管理员统一导入。'); }
   function canEditGroupDaily(groupId,mode=groupById(groupId)?.defaultMode) {
     const group=groupById(groupId);
     return !!group&&group.defaultMode===mode&&mode===activeMode&&(profile?.role==='admin'||profile?.role==='qc'&&profile.groupId===groupId);
@@ -300,7 +301,7 @@
     $('identityGate').classList.add('hidden');$('appShell').classList.remove('hidden');
     const admin=profile.role==='admin',mode=admin?activeMode:groupById(profile.groupId).defaultMode;
     setText('currentUserLabel',admin?'管理员':`${profile.name} · ${groupLabel(profile.groupId)} · ${roleLabel(profile.role)}`);
-    const visible=new Set(['overview','records',...({annotation:['tasks'],qc:['qc','dispatch'],acceptance:['acceptance'],admin:['dispatch']})[profile.role]]);
+    const visible=new Set(['overview','records',...({annotation:['tasks'],qc:['qc'],acceptance:['acceptance'],admin:['dispatch']})[profile.role]]);
     qsa('nav [data-view]').forEach(button=>button.classList.toggle('hidden',!visible.has(button.dataset.view)));
     $('modeSwitcher').classList.toggle('hidden',!canViewAllGroups());
     applyModule(mode,false);
@@ -309,6 +310,7 @@
   }
   function activateView(view) {
     if (!VIEW_META[view]) view = 'overview';
+    if(view==='dispatch'){try{requireImportAdmin();}catch(error){showToast(error.message,'error');return;}}
     if (!refreshState()) return;
     currentView = view;
     document.body.dataset.activeView=view;
@@ -627,6 +629,7 @@
   }
   function dispatchValues() {const f=$('dispatchForm');return{date:f.elements.date.value,groupId:f.elements.group.value,mode:activeMode,movie:f.elements.movie.value.trim(),text:f.elements.tids.value};}
   function evaluateTaskImport(values,source) {
+    requireImportAdmin();
     if(values.mode!==activeMode||groupById(values.groupId)?.defaultMode!==activeMode)throw new Error('请在对应的单镜头或多镜头模块导入，并选择该业务的小组。');
     if(!/^\d{4}-\d{2}-\d{2}$/.test(values.date)||!groupById(values.groupId))throw new Error('请填写业务日期和小组。');
     if(!values.movie||values.movie.length>200)throw new Error('请单独填写影片名，最长200字。');
@@ -640,15 +643,15 @@
     return `<div class="import-result"><strong>${committed?'成功':'可导入'} ${success} 条</strong><span>重复跳过 ${duplicates} 条 · 失败 ${failed} 条 · 共 ${rows.length} 条</span></div>${rows.some(row=>row.outcome!=='success')?`<details open><summary>查看跳过与失败明细</summary><div class="table-wrap"><table><thead><tr><th>行号</th><th>TID</th><th>原因</th></tr></thead><tbody>${rows.filter(row=>row.outcome!=='success').map(row=>`<tr><td>${row.line}</td><td>${escapeHtml(row.tid||'空')}</td><td>${escapeHtml(row.error||(row.outcome==='duplicate'?'TID 重复，未修改原记录':'状态不允许更新'))}</td></tr>`).join('')}</tbody></table></div></details>`:''}`;
   }
   function previewDispatch() {
-    dispatchDraft=null;$('dispatchCommitBtn').disabled=true;
-    try {if(!refreshState())return;const values=dispatchValues(),rows=evaluateTaskImport(values,state);if(!rows.length)throw new Error('请粘贴本次 TID，每行一个。');dispatchDraft={signature:JSON.stringify(values),rows};$('dispatchPreview').innerHTML=dispatchImportContext(values)+importReport(rows);$('dispatchCommitBtn').disabled=!rows.some(row=>row.outcome==='success');}catch(error){$('dispatchPreview').textContent=error.message;showToast(error.message,'error');}
+    try {requireImportAdmin();dispatchDraft=null;$('dispatchCommitBtn').disabled=true;if(!refreshState())return;const values=dispatchValues(),rows=evaluateTaskImport(values,state);if(!rows.length)throw new Error('请粘贴本次 TID，每行一个。');dispatchDraft={signature:JSON.stringify(values),rows};$('dispatchPreview').innerHTML=dispatchImportContext(values)+importReport(rows);$('dispatchCommitBtn').disabled=!rows.some(row=>row.outcome==='success');}catch(error){$('dispatchCommitBtn').disabled=true;$('dispatchPreview').textContent=error.message;showToast(error.message,'error');}
   }
   function dispatchImportContext(values) {return `<p id="dispatchImportContext" class="dispatch-import-context"><strong>影片：${escapeHtml(values.movie)}</strong><span>${escapeHtml(groupLabel(values.groupId))} · 分配日期 ${escapeHtml(values.date)}</span></p>`;}
   async function commitDispatch() {
+    try{requireImportAdmin();}catch(error){showToast(error.message,'error');return;}
     const values=dispatchValues();if(!dispatchDraft||dispatchDraft.signature!==JSON.stringify(values)){previewDispatch();showToast('内容发生变化，请确认新的预检结果后再导入。','warning');return;}
     let imported=[];
     if(await mutate(source=>{
-      requireManager();imported=evaluateTaskImport(values,source);const valid=imported.filter(row=>row.outcome==='success');if(!valid.length)throw new Error('没有可导入的新 TID。');
+      requireImportAdmin();imported=evaluateTaskImport(values,source);const valid=imported.filter(row=>row.outcome==='success');if(!valid.length)throw new Error('没有可导入的新 TID。');
       const tasks=[],events=[],batches=[],now=new Date().toISOString(),movies=[...new Set(valid.map(row=>row.movie))];
       for(const movie of movies){const batch={id:uid('batch'),date:values.date,groupId:values.groupId,mode:values.mode,movie,taskIds:[],createdAt:now,createdBy:profile.name};
         for(const row of valid.filter(row=>row.movie===movie)){const task={id:uid('task'),tid:row.tid,movie,date:values.date,groupId:values.groupId,mode:values.mode,batchId:batch.id,createdAt:now,createdBy:profile.name};tasks.push(task);batch.taskIds.push(task.id);events.push(newEvent(source,task,'dispatch',{note:'影片与 TID 批量导入'}));}batches.push(batch);

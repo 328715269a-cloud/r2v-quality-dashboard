@@ -39,6 +39,9 @@ function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled
   check(object(input),'缺少操作内容');check(Object.keys(input).every(k=>['tasks','events','batches'].includes(k)),'不能覆盖共享存储字段');
   const raw={};for(const kind of ['tasks','events','batches']){raw[kind]=input[kind]??[];check(Array.isArray(raw[kind])&&raw[kind].length<=10000,'批量内容过大');}
   check(raw.tasks.length+raw.events.length+raw.batches.length<=16000,'请减小本次批量');
+  // Import is an administrator action, regardless of PIN or client-side UI.
+  // Check all entry points before processing mixed transactions or handoff data.
+  if(raw.tasks.length||raw.batches.some(batch=>batch?.kind!=='handoff')||raw.events.some(event=>event?.type==='dispatch'))check(profile.role==='admin','仅管理员可以导入影片任务','FORBIDDEN',403);
   const delta={tasks:[],events:[],batches:[]};const working={...state,tasks:state.tasks.slice(),events:state.events.slice(),batches:state.batches.slice()};
   // Build task histories once. Large imports must not scan every event for every
   // row, and projecting one changed task must not recompute unrelated films.

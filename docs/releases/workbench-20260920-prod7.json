@@ -1,0 +1,201 @@
+{
+  "version": "20260920-prod7",
+  "status": "deployed",
+  "publicUrl": "https://quality.shangyidada.site/group-workbench/",
+  "deployedAt": "2026-09-20T09:35:53.980114+00:00",
+  "verifiedAt": "2026-09-20T09:36:00.864853+00:00",
+  "scope": "Only initial task import permission changes: frontend app/navigation and server rules. QC work, group settings, rework assignment, existing metadata permissions, reports, workflow and database schema are preserved.",
+  "staticAssets": {
+    "styles.20260920-prod7.css": {
+      "sha256": "25e0fecf44765ea39f952a7e0e4c254de17d8e4b0fed67150b30139fd7cf97db",
+      "bytes": 88024
+    },
+    "data-io.20260920-prod7.js": {
+      "sha256": "cb1db444edf83733c356c0187460ee208ba579ca7500852f87376a8bea640338",
+      "bytes": 13665
+    },
+    "shared-store.20260920-prod7.js": {
+      "sha256": "0925b37b9280cc62da45cdf9cdbb1c7bf6652f5d4b8af13d24d1b23deed373b2",
+      "bytes": 8285
+    },
+    "workflow.20260920-prod7.js": {
+      "sha256": "7add069b9f81fd517e9615fb0585731525d2d6fafb0cb5b4a79e9d214451b14b",
+      "bytes": 18660
+    },
+    "reports.20260920-prod7.js": {
+      "sha256": "028e2c74de484e20af73774ef32d2fdaba34769bbe6bf75ba04256b6537b246a",
+      "bytes": 53799
+    },
+    "app.20260920-prod7.js": {
+      "sha256": "b2b4d51ff51b2155c8c773162da874dc635d0afdf22928dfbaa8596cc7d9ba04",
+      "bytes": 160276
+    },
+    "index.html": {
+      "sha256": "0898ee2f97335e1dddeb6acb61bbb0d04be1da2415ea651c97b296cfc8eeddbf",
+      "bytes": 38949
+    }
+  },
+  "apiSource": {
+    "workbench-api/server.cjs": {
+      "sha256": "17e39568a99da3fbda3967aff629a59da0905c1aea531a4fdc00c2d21183796d",
+      "bytes": 17108
+    },
+    "workbench-api/rules.cjs": {
+      "sha256": "906c11227a01df02b50a5fa032ee500b625acc606f6e3e4c165215d7c8a3e785",
+      "bytes": 21062
+    },
+    "group-workbench/workflow.js": {
+      "sha256": "7add069b9f81fd517e9615fb0585731525d2d6fafb0cb5b4a79e9d214451b14b",
+      "bytes": 18660
+    }
+  },
+  "sourceHashes": {
+    "group-workbench/index.html": "692ed6cc8f05c460263aa2daa76a9bf7e2520edf19848676668b8a541b018272",
+    "group-workbench/styles.css": "12c9140703274ce6d8fecccf8b39187bca2cd4817fe9302e8bc6a8711d952299",
+    "group-workbench/data-io.js": "9333273286bbc85bd8fb14bf53a0f179dfadae7a3694a379d52676627e0c52f0",
+    "group-workbench/shared-store.js": "905e18c48a0d15b191a69f4e83111e02052b7e923d500bb55b718a105683dbb2",
+    "group-workbench/workflow.js": "7d7cc2e6b0bca0544e1c130a1427197ba1931c8bc0a4906733d594388c78471a",
+    "group-workbench/reports.js": "6e2a6306eb437dd9c8e9f62a0d1041ee4026fd7f5fb8124c2742ce278cc68ee3",
+    "group-workbench/app.js": "b2b4d51ff51b2155c8c773162da874dc635d0afdf22928dfbaa8596cc7d9ba04",
+    "workbench-api/server.cjs": "d1d211a64ea90a89347ccae38c993657312575f35c096c74c87bef1a6f3dd81d",
+    "workbench-api/rules.cjs": "906c11227a01df02b50a5fa032ee500b625acc606f6e3e4c165215d7c8a3e785"
+  },
+  "preservedSources": {
+    "group-workbench/styles.css": {
+      "sourceSha256": "12c9140703274ce6d8fecccf8b39187bca2cd4817fe9302e8bc6a8711d952299",
+      "packagedSha256": "25e0fecf44765ea39f952a7e0e4c254de17d8e4b0fed67150b30139fd7cf97db",
+      "onlyLineEndingsDiffer": true
+    },
+    "group-workbench/data-io.js": {
+      "sourceSha256": "9333273286bbc85bd8fb14bf53a0f179dfadae7a3694a379d52676627e0c52f0",
+      "packagedSha256": "cb1db444edf83733c356c0187460ee208ba579ca7500852f87376a8bea640338",
+      "onlyLineEndingsDiffer": true
+    },
+    "group-workbench/shared-store.js": {
+      "sourceSha256": "905e18c48a0d15b191a69f4e83111e02052b7e923d500bb55b718a105683dbb2",
+      "packagedSha256": "0925b37b9280cc62da45cdf9cdbb1c7bf6652f5d4b8af13d24d1b23deed373b2",
+      "onlyLineEndingsDiffer": true
+    },
+    "group-workbench/workflow.js": {
+      "sourceSha256": "7d7cc2e6b0bca0544e1c130a1427197ba1931c8bc0a4906733d594388c78471a",
+      "packagedSha256": "7add069b9f81fd517e9615fb0585731525d2d6fafb0cb5b4a79e9d214451b14b",
+      "onlyLineEndingsDiffer": true
+    },
+    "group-workbench/reports.js": {
+      "sourceSha256": "6e2a6306eb437dd9c8e9f62a0d1041ee4026fd7f5fb8124c2742ce278cc68ee3",
+      "packagedSha256": "028e2c74de484e20af73774ef32d2fdaba34769bbe6bf75ba04256b6537b246a",
+      "onlyLineEndingsDiffer": true
+    },
+    "api/workbench-api/server.cjs": {
+      "sourceSha256": "d1d211a64ea90a89347ccae38c993657312575f35c096c74c87bef1a6f3dd81d",
+      "packagedSha256": "17e39568a99da3fbda3967aff629a59da0905c1aea531a4fdc00c2d21183796d",
+      "onlyLineEndingsDiffer": true
+    },
+    "api/group-workbench/workflow.js": {
+      "sourceSha256": "7d7cc2e6b0bca0544e1c130a1427197ba1931c8bc0a4906733d594388c78471a",
+      "packagedSha256": "7add069b9f81fd517e9615fb0585731525d2d6fafb0cb5b4a79e9d214451b14b",
+      "onlyLineEndingsDiffer": true
+    }
+  },
+  "verification": {
+    "checks": {
+      "adminOnlyTaskImport": true,
+      "qcOperationalPermissions": true,
+      "legacySessionAndWrites": true,
+      "sharedWalConcurrency": true,
+      "exportsPreserved": true,
+      "node22PinnedRuntime": true,
+      "isolatedUi": true
+    },
+    "node22": {
+      "runtime": "v22.23.2",
+      "suites": {
+        "verify-admin-import.cjs": {
+          "ok": true,
+          "checks": {
+            "adminOnlyImports": true,
+            "allEntryPointsGuarded": true,
+            "oldSessionsPreserved": true,
+            "qcWorkflowPreserved": true,
+            "atomicDeniedImports": true,
+            "idempotencyPreserved": true,
+            "adminSingleMultiImports": true,
+            "groupAndMetadataPermissionsPreserved": true
+          }
+        },
+        "verify-direct-acceptance.cjs": {
+          "ok": true,
+          "checks": {
+            "directAcceptanceRules": true,
+            "batchDecisions": true,
+            "cloudPersistence": true,
+            "legacySessionAndWrites": true,
+            "sharedWalConcurrency": true,
+            "exportsPreserved": true,
+            "node22PinnedRuntime": true
+          }
+        },
+        "verify-boundaries.cjs": {
+          "ok": true,
+          "checks": [
+            "缺批次/缺导入事件/重复ID/旧身份/无效日期/跳步状态整批拒绝",
+            "200条导入、完成、建包、质检及2000条校验性能",
+            "建包关联/非法和重复质检标签拒绝",
+            "原始TID保留及事务内双向更正",
+            "负责人跨日继承、日期设置冲突、半人精度",
+            "标注登记不能重置敏感角色密码尝试限制"
+          ]
+        }
+      }
+    },
+    "efficiencyRegression": {
+      "passed": true,
+      "checkCount": 14
+    },
+    "acceptanceReportRegression": {
+      "passed": true,
+      "syntheticEvents": 37
+    },
+    "oldQcContinuity": {
+      "localFixtureOnly": true,
+      "oldSessionPreserved": true,
+      "oldInitialImportReturns403": true,
+      "importDraftPreserved": true,
+      "ordinaryQcPackageSaveSucceeded": true,
+      "afterApiCutover": true,
+      "committedRetryIdempotencyPreserved": true,
+      "newImportForbidden": true
+    },
+    "publicUi": {
+      "readOnly": true,
+      "qcLoginSucceeded": true,
+      "sharedConnectionConfirmed": true,
+      "navigation": [
+        "小组总览",
+        "质检台",
+        "全部任务"
+      ],
+      "taskImportHidden": true,
+      "ownGroupScopeLocked": true,
+      "qcPackageAndReviewControlsVisible": true,
+      "reworkAssignmentVisible": true,
+      "productionTaskWrites": 0,
+      "consoleErrors": 0
+    },
+    "publicFilesMatch": 12,
+    "existingContainerCount": 9,
+    "protection": {
+      "protectedCurrentModeAndDemosUnchanged": true,
+      "existingFormalAssetsUnchanged": true,
+      "existingServicesUnchanged": true,
+      "nginxMasterUnchanged": true,
+      "existingGateAndPrivateEnvUnchanged": true
+    },
+    "oldRequestsDrainedBeforeUi": true,
+    "existingBackupOwnerPreserved": true,
+    "productionRevision": 14,
+    "productionBusinessWritesSent": false
+  },
+  "packaging": "Development HTML uses six unversioned ?v=20260920-prod7 references; packaging replaces them with immutable .20260920-prod7 filenames. Unchanged sources keep captured live bytes after verifying CRLF/LF-only checkout differences.",
+  "note": "No tokens, production passwords, real tasks, database files, private server environment, SSH details or runtime artifacts are included."
+}
