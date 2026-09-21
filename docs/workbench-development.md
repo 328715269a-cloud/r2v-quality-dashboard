@@ -1,8 +1,10 @@
 # 新作业模式开发
 
-`group-workbench/` 是正式多人共享模式的前端，`workbench-api/` 是独立 HTTP / SQLite API。当前 `20260920-prod8` 验收退回后的质检批量转交修复已于 2026-09-20 18:05（北京时间）上线；发布事实见 `docs/releases/workbench-20260920-prod8.json`，最新业务说明见 `group-workbench/HANDOFF.md`。
+`group-workbench/` 是正式多人共享模式的前端，`workbench-api/` 是独立 HTTP / SQLite API。当前前端为 `20260920-prod8`，API 为 2026-09-21 10:08（北京时间）上线的 `20260921-prod9`；最近发布与受控清理事实见 `docs/releases/workbench-20260921-prod9.json`，最新业务说明见 `group-workbench/HANDOFF.md`。
 
-prod8 只改前端批量事件选择与表单保护，API 继续使用 prod7，数据库保持原状。管理员导入边界等 prod7 规则继续有效。
+prod8 前端批量事件选择与表单保护保持原样，管理员导入边界等 prod7 规则继续有效。
+
+prod9 已部署并完成已授权测试数据精准清理：仅 server 增加全量同步屏障与停用内部任务 ID 检查，前端继续 prod8，rules/workflow 不变，不新增表或 HTTP 清理入口。
 
 只读 / 修改新模式时，不要改根看板、`group-beta/` 或 `group-workbench-beta/`。完整内部运维接手包由项目负责人单独保存；生产访问凭据、环境文件、真实数据库与内部密码不进 Git。
 
@@ -25,6 +27,7 @@ node .\tools\workbench\dev-server.cjs --repo .
 ```powershell
 node --check group-workbench/app.js
 node --check workbench-api/server.cjs
+node workbench-api/verify-maintenance-cleanup.cjs
 node scripts/verify-workbench-qc-return.cjs
 node workbench-api/verify-admin-import.cjs
 node workbench-api/verify-direct-acceptance.cjs
@@ -44,6 +47,10 @@ prod7 新增 `verify-admin-import.cjs`，使用测试专属假 PIN 和独立临�
 
 prod8 的 `verify-workbench-qc-return.cjs` 直接提取实际 app 函数并结合既有服务端规则，以合成数据完成 8 类检查：验收退回转交、普通质检与混选、错误等级/标签范围、过期状态、小组权限、整批原子性、草稿保留和重复提交保护。隔离浏览器复现了旧页面错误，新页面纯验收退回 2 条与混选 2 条实际保存成功；漏标签和过期任务整批拒绝并保留说明/勾选。保持打开的 prod7 页在发布后草稿原样，普通质检批量打回仍成功保存。公网只预览表单并核对 12 个静态文件，无真实任务提交；真实业务任务不进入测试或文档。
 
+prod9 的 `verify-maintenance-cleanup.cjs` 使用独立 SQLite 与真实 HTTP，验证屏障缺失时协议不变、全量替换清掉旧缓存、两个运行服务动态读取 WAL 元数据、丢响应后的裁剪幂等重试、三种引用入口 `TASK_REMOVED`，以及普通作业/每日设置/会话/触发器与完整性。固定 Node 22.23.2 上此专项 8 类、权限、验收/WAL/导出和边界回归已通过。隔离旧 prod8 实际页面在清理期间保留草稿，另一列表自动从 4 条变为 1 条；原草稿保存成功，没有重新登录。
+
+`python workbench-api/maintenance/verify-maintenance.py` 检查受控 Python 运维工具，本轮 9 类隔离检查通过。两份 Python 脚本须保持同目录；只使用合成临时库，禁止以生产备份或真实任务作为测试 fixture。工具说明和 stdin prepare/apply 模板见同目录 README。
+
 已知历史限制：`verify-workbench-reports.cjs` 的 `qcOperator` / `acceptance_pass` 旧断言在 `d222657` 基线也失败；本次不修改该操作人解析规则。不要把这一基线问题混同为新增效率测试通过或失败的结论。
 
 Git 中 prod8 的六个资源引用使用未版本化文件名加 `?v=20260920-prod8`，本地启动器可直接提供文件；线上构建将这些引用转换为不可变版本文件名。不要用生产版本文件名覆盖本地源文件名，也不要复用已发布的版本资产。
@@ -57,6 +64,8 @@ Git 中 prod8 的六个资源引用使用未版本化文件名加 `?v=20260920-p
 - API `server.cjs` / `rules.cjs`：SQLite WAL、会话、权限、PIN、流程、CAS 与幂等校验。
 
 任务 / 事件 / 批次为追加记录，更正通过事件保存。整批删除仅允许从未开始作业的导入，必须重新校验管理密码；追加墓碑保留完整审计。同 TID 重导必须使用新 ID。旧客户端会话、进行中的表单与后续保存必须兼容。
+
+受控运维清理是另行授权的后台操作，不扩大上述页面删除权限，也不能经 HTTP 发起。运维脚本只处理私有审核计划中的精确内部任务 ID，执行前在线一致备份并核验散列；删除目标记录及相关历史引用后追加维护审计，保留无关任务、会话与后续正常写入。server 在同一读取/写入事务内动态读取现有 metadata 的同步屏障和停用 ID，启动时不初始化它们。实际 TID、人员、业务 ID、计划和备份禁止提交 Git。
 
 prod7 初始影片/TID 导入仅管理员执行；前端隐藏质检入口，服务端对新增任务、导入批次与 dispatch 全入口检查。旧 QC 导入草稿提交收到 403 是授权后的预期权限变化，输入必须保留；质检建包、审核、返修分配、每日设置及既有资料更正权限保持原样。不要把“管理 PIN 正确”当成导入角色授权。
 
@@ -77,3 +86,7 @@ prod7 使用新 API 实例与平滑路由切换，复用原数据库/会话；se
 prod8 已完成仅静态发布，继续使用 prod7 API。除 app/index 外的五个前端文件先核对与线上相同（仅允许 checkout 换行差异），封包保留线上原字节；API 源不打包。发布前后核对全部十个容器身份与启动时间、API 源、Nginx、旧资源、原模式和两个 Demo，均保持不变。发布工具不读取真实任务或数据库，用户业务 revision 可正常推进；切换必须同时具备验证证明、旧页草稿连续性和精确源散列。
 
 已启用删除事件之后，不得回退到不认识删除墓碑的旧 API。需要回退时仍须保持有效 TID 唯一性、历史审计和旧页面兼容。
+
+prod9 已仅部署兼容 API，前端仍为 prod8，旧十个容器和备份 owner 留存。新路由切换、旧请求排空和私有计划审核后，精准清理了 3 条测试任务及关联历史，revision 17→18；非目标记录、会话、小组设置、触发器和备份均通过核验。旧版本公网同步返回完整快照，当前版本恢复增量，重复 apply 只验证已应用状态。12 个公网静态文件保持原字节。
+
+清理后业务路由不得回退到 prod7 或任何不识别 fullSnapshotRevision / retiredTaskIds 的版本；不能用准备时的整库备份覆盖现库，因为正常业务会继续新增。恢复须先在隔离库审阅，并保留清理后新写入、会话和递增 revision。

@@ -52,6 +52,20 @@ function createService(options={}){
   db.exec('PRAGMA synchronous=FULL; PRAGMA busy_timeout=3000; PRAGMA foreign_keys=ON;');
   }catch(error){db.close();throw error;}
   const getRevision=()=>Number(db.prepare('SELECT value FROM metadata WHERE key=?').get('revision').value);
+  function fullSnapshotRevision(){
+    const value=db.prepare('SELECT value FROM metadata WHERE key=?').get('fullSnapshotRevision')?.value??'0';
+    if(!/^\d+$/.test(value)||!Number.isSafeInteger(Number(value)))throw new Error('Invalid full-snapshot revision metadata.');
+    return Number(value);
+  }
+  function checkRetiredTaskReferences(delta){
+    const value=db.prepare('SELECT value FROM metadata WHERE key=?').get('retiredTaskIds')?.value;
+    const ids=value===undefined?[]:JSON.parse(value);
+    if(!Array.isArray(ids)||ids.some(id=>typeof id!=='string'))throw new Error('Invalid retired-task metadata.');
+    const retired=new Set(ids);if(!retired.size)return;
+    const rows=key=>Array.isArray(delta[key])?delta[key]:[];
+    const referenced=rows('tasks').some(task=>retired.has(task?.id))||rows('events').some(event=>retired.has(event?.taskId))||rows('batches').some(batch=>Array.isArray(batch?.taskIds)&&batch.taskIds.some(id=>retired.has(id)));
+    check(!referenced,'所选任务已清理，本次操作未保存。请同步最新数据后重新选择任务。','TASK_REMOVED',409);
+  }
   const creation=db.prepare('SELECT value FROM metadata WHERE key=?').get('createdAt').value;
   function collect(after){const out={tasks:[],events:[],batches:[]};for(const row of db.prepare('SELECT kind,json FROM records WHERE revision>? ORDER BY revision,ordinal').all(after))out[row.kind].push(JSON.parse(row.json));return out;}
   function state(){return{version:3,createdAt:creation,...collect(-1),preferences:{}};}
@@ -77,6 +91,7 @@ function createService(options={}){
     db.exec('BEGIN IMMEDIATE');
     try{
       const concurrent=db.prepare('SELECT payload_hash,result FROM transactions WHERE id=?').get(body.id);if(concurrent){check(concurrent.payload_hash===payloadHash,'同一请求 ID 不能用于其他操作','IDEMPOTENCY_MISMATCH',409);db.exec('COMMIT');return JSON.parse(concurrent.result);}
+      checkRetiredTaskReferences(body.delta);
       const revision=getRevision();check(body.revision===revision,'共享数据已有更新，请同步后重试','REVISION_CONFLICT',409);
       const delta=normalizeDelta(state(),body.delta,profile,{pin:body.pin,checkPin,now:new Date().toISOString(),checkDeleteEnabled:()=>check(importDeleteEnabled(),'删除功能尚未开放，请稍后重试','IMPORT_DELETE_DISABLED',503)});
       check(delta.tasks.length+delta.events.length+delta.batches.length>0,'没有需要保存的操作','EMPTY_TRANSACTION');
@@ -104,7 +119,7 @@ function createService(options={}){
       const token=request.headers['x-workbench-session'],profile=authenticate(token);
       if(endpoint==='session'&&request.method==='GET')return respond(response,200,{profile});
       if(endpoint==='session'&&request.method==='DELETE'){db.prepare('DELETE FROM sessions WHERE token_hash=?').run(sha(token));return respond(response,200,{ok:true});}
-      if(endpoint==='state'&&request.method==='GET'){const after=url.searchParams.get('after');db.exec('BEGIN');try{const revision=getRevision();if(after!==null)check(/^\d+$/.test(after)&&Number.isSafeInteger(Number(after))&&Number(after)<=revision,'增量版本无效','INVALID_REVISION',400);const legacy=request.headers['x-workbench-client']!=='import-delete-v1'&&hasDeletedTasks();const result=legacy?{revision,state:legacyState(state())}:after===null?{revision,state:state()}:{revision,delta:collect(Number(after))};db.exec('COMMIT');return respond(response,200,result);}catch(error){db.exec('ROLLBACK');throw error;}}
+      if(endpoint==='state'&&request.method==='GET'){const after=url.searchParams.get('after');db.exec('BEGIN');try{const revision=getRevision();if(after!==null)check(/^\d+$/.test(after)&&Number.isSafeInteger(Number(after))&&Number(after)<=revision,'增量版本无效','INVALID_REVISION',400);const legacy=request.headers['x-workbench-client']!=='import-delete-v1'&&hasDeletedTasks();const full=after===null||Number(after)<fullSnapshotRevision();const result=legacy?{revision,state:legacyState(state())}:full?{revision,state:state()}:{revision,delta:collect(Number(after))};db.exec('COMMIT');return respond(response,200,result);}catch(error){db.exec('ROLLBACK');throw error;}}
       if(endpoint==='transactions'&&request.method==='POST')return respond(response,200,transact(await bodyOf(request),profile));
       if(endpoint==='backup'&&request.method==='GET')return respond(response,200,exportBackup());
       throw new ApiError(404,'NOT_FOUND','未找到接口');

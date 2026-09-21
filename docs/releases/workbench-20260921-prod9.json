@@ -1,0 +1,249 @@
+{
+  "version": "20260921-prod9",
+  "status": "deployed",
+  "publicUrl": "https://quality.shangyidada.site/group-workbench/",
+  "deployedAt": "2026-09-21T02:08:22.018390+00:00",
+  "verifiedAt": "2026-09-21T02:10:07.257255+00:00",
+  "frontendVersion": "20260920-prod8",
+  "scope": "Backend-only compatibility for specifically authorized test-data cleanup. Adds fullSnapshotRevision read barrier and retiredTaskIds guards using the existing metadata table; no schema, public cleanup endpoint, frontend, rule or workflow change.",
+  "apiSource": {
+    "workbench-api/server.cjs": {
+      "sha256": "30b5ed5c7308a2f93aad9b60a572432f3a18d428c89e81b3efcc53937bc2c36e",
+      "bytes": 18429
+    },
+    "workbench-api/rules.cjs": {
+      "sha256": "906c11227a01df02b50a5fa032ee500b625acc606f6e3e4c165215d7c8a3e785",
+      "bytes": 21062
+    },
+    "group-workbench/workflow.js": {
+      "sha256": "7add069b9f81fd517e9615fb0585731525d2d6fafb0cb5b4a79e9d214451b14b",
+      "bytes": 18660
+    }
+  },
+  "staticAssetsPreserved": {
+    "index.html": {
+      "sha256": "b7d41587b7525c735d17d36dbf4f2f94a0f3b7855c433053cd5539397109af64",
+      "bytes": 38949
+    },
+    "app.20260920-prod8.js": {
+      "sha256": "7cab1e8c87efc75ab5b9ecf188694fa49eb0765473123d342df140d18f173b23",
+      "bytes": 164073
+    },
+    "workflow.20260920-prod8.js": {
+      "sha256": "7add069b9f81fd517e9615fb0585731525d2d6fafb0cb5b4a79e9d214451b14b",
+      "bytes": 18660
+    },
+    "reports.20260920-prod8.js": {
+      "sha256": "028e2c74de484e20af73774ef32d2fdaba34769bbe6bf75ba04256b6537b246a",
+      "bytes": 53799
+    },
+    "shared-store.20260920-prod8.js": {
+      "sha256": "0925b37b9280cc62da45cdf9cdbb1c7bf6652f5d4b8af13d24d1b23deed373b2",
+      "bytes": 8285
+    },
+    "data-io.20260920-prod8.js": {
+      "sha256": "cb1db444edf83733c356c0187460ee208ba579ca7500852f87376a8bea640338",
+      "bytes": 13665
+    },
+    "styles.20260920-prod8.css": {
+      "sha256": "25e0fecf44765ea39f952a7e0e4c254de17d8e4b0fed67150b30139fd7cf97db",
+      "bytes": 88024
+    }
+  },
+  "sourceHashes": {
+    "group-workbench/index.html": "6d5bf43fb927dffc6abfc8657eb4c690e55658d81f88fa4d4f967c44884d4d03",
+    "group-workbench/styles.css": "12c9140703274ce6d8fecccf8b39187bca2cd4817fe9302e8bc6a8711d952299",
+    "group-workbench/data-io.js": "9333273286bbc85bd8fb14bf53a0f179dfadae7a3694a379d52676627e0c52f0",
+    "group-workbench/shared-store.js": "905e18c48a0d15b191a69f4e83111e02052b7e923d500bb55b718a105683dbb2",
+    "group-workbench/workflow.js": "7d7cc2e6b0bca0544e1c130a1427197ba1931c8bc0a4906733d594388c78471a",
+    "group-workbench/reports.js": "6e2a6306eb437dd9c8e9f62a0d1041ee4026fd7f5fb8124c2742ce278cc68ee3",
+    "group-workbench/app.js": "13f067246ef920b477cb28b1b3d23c57e0bc8ecd1e09db5b53fe88172fc94c02",
+    "workbench-api/server.cjs": "30b5ed5c7308a2f93aad9b60a572432f3a18d428c89e81b3efcc53937bc2c36e",
+    "workbench-api/rules.cjs": "5c51f553ce86925c942cee13d1b15560289af5f5a03cb134e4945c8e1e1d0328"
+  },
+  "preservedSources": {
+    "group-workbench/styles.css": {
+      "sourceSha256": "12c9140703274ce6d8fecccf8b39187bca2cd4817fe9302e8bc6a8711d952299",
+      "liveSha256": "25e0fecf44765ea39f952a7e0e4c254de17d8e4b0fed67150b30139fd7cf97db",
+      "onlyLineEndingsDiffer": true,
+      "packaged": false
+    },
+    "group-workbench/data-io.js": {
+      "sourceSha256": "9333273286bbc85bd8fb14bf53a0f179dfadae7a3694a379d52676627e0c52f0",
+      "liveSha256": "cb1db444edf83733c356c0187460ee208ba579ca7500852f87376a8bea640338",
+      "onlyLineEndingsDiffer": true,
+      "packaged": false
+    },
+    "group-workbench/shared-store.js": {
+      "sourceSha256": "905e18c48a0d15b191a69f4e83111e02052b7e923d500bb55b718a105683dbb2",
+      "liveSha256": "0925b37b9280cc62da45cdf9cdbb1c7bf6652f5d4b8af13d24d1b23deed373b2",
+      "onlyLineEndingsDiffer": true,
+      "packaged": false
+    },
+    "group-workbench/workflow.js": {
+      "sourceSha256": "7d7cc2e6b0bca0544e1c130a1427197ba1931c8bc0a4906733d594388c78471a",
+      "liveSha256": "7add069b9f81fd517e9615fb0585731525d2d6fafb0cb5b4a79e9d214451b14b",
+      "onlyLineEndingsDiffer": true,
+      "packaged": false
+    },
+    "group-workbench/reports.js": {
+      "sourceSha256": "6e2a6306eb437dd9c8e9f62a0d1041ee4026fd7f5fb8124c2742ce278cc68ee3",
+      "liveSha256": "028e2c74de484e20af73774ef32d2fdaba34769bbe6bf75ba04256b6537b246a",
+      "onlyLineEndingsDiffer": true,
+      "packaged": false
+    },
+    "group-workbench/app.js": {
+      "sourceSha256": "13f067246ef920b477cb28b1b3d23c57e0bc8ecd1e09db5b53fe88172fc94c02",
+      "liveSha256": "7cab1e8c87efc75ab5b9ecf188694fa49eb0765473123d342df140d18f173b23",
+      "onlyLineEndingsDiffer": true,
+      "packaged": false
+    },
+    "api/workbench-api/rules.cjs": {
+      "sourceSha256": "5c51f553ce86925c942cee13d1b15560289af5f5a03cb134e4945c8e1e1d0328",
+      "liveSha256": "906c11227a01df02b50a5fa032ee500b625acc606f6e3e4c165215d7c8a3e785",
+      "onlyLineEndingsDiffer": true,
+      "packaged": true
+    },
+    "api/group-workbench/workflow.js": {
+      "sourceSha256": "7d7cc2e6b0bca0544e1c130a1427197ba1931c8bc0a4906733d594388c78471a",
+      "liveSha256": "7add069b9f81fd517e9615fb0585731525d2d6fafb0cb5b4a79e9d214451b14b",
+      "onlyLineEndingsDiffer": true,
+      "packaged": true
+    }
+  },
+  "maintenanceSourceHashes": {
+    "workbench-api/maintenance/maintenance.py": "5b40f68c005f02a8b62393e2f63fed1ca89ac6d4019765fd9d04720a7c0bcd7e",
+    "workbench-api/maintenance/verify-maintenance.py": "09f9b7825381527f7e3cf890e22281a5a29fd2b4d77b385b2fcc9c26344e1d0c",
+    "workbench-api/verify-maintenance-cleanup.cjs": "4145abb2fead561c0f1124d7145ca25eb569f951939eec6bea40b0b8f8affc00"
+  },
+  "verification": {
+    "checks": {
+      "fullSnapshotBarrier": true,
+      "retiredTaskIds": true,
+      "legacySessionAndWrites": true,
+      "sharedWalConcurrency": true,
+      "exportsPreserved": true,
+      "node22PinnedRuntime": true
+    },
+    "node22": {
+      "runtime": "v22.23.2",
+      "suites": {
+        "verify-maintenance-cleanup.cjs": {
+          "ok": true,
+          "checks": [
+            "metadata absent keeps delta protocol and does not write on startup",
+            "three retired tasks and all related histories vanish from full replacement",
+            "already-running shared WAL services observe maintenance immediately",
+            "real shared-store lost-response retry uses clipped idempotent result then full refresh",
+            "historical request replay retains revision/hash/profile and cannot revive removed records",
+            "new task/event/batch references reject the whole transaction with TASK_REMOVED",
+            "normal imports and work continue; unrelated tasks and group_daily settings are retained",
+            "sessions persist without re-login; legacy filtering, append-only triggers and SQLite integrity remain valid"
+          ]
+        },
+        "verify-admin-import.cjs": {
+          "ok": true,
+          "checks": {
+            "adminOnlyImports": true,
+            "allEntryPointsGuarded": true,
+            "oldSessionsPreserved": true,
+            "qcWorkflowPreserved": true,
+            "atomicDeniedImports": true,
+            "idempotencyPreserved": true,
+            "adminSingleMultiImports": true,
+            "groupAndMetadataPermissionsPreserved": true
+          }
+        },
+        "verify-direct-acceptance.cjs": {
+          "ok": true,
+          "checks": {
+            "directAcceptanceRules": true,
+            "batchDecisions": true,
+            "cloudPersistence": true,
+            "legacySessionAndWrites": true,
+            "sharedWalConcurrency": true,
+            "exportsPreserved": true,
+            "node22PinnedRuntime": true
+          }
+        },
+        "verify-boundaries.cjs": {
+          "ok": true,
+          "checks": [
+            "缺批次/缺导入事件/重复ID/旧身份/无效日期/跳步状态整批拒绝",
+            "200条导入、完成、建包、质检及2000条校验性能",
+            "建包关联/非法和重复质检标签拒绝",
+            "原始TID保留及事务内双向更正",
+            "负责人跨日继承、日期设置冲突、半人精度",
+            "标注登记不能重置敏感角色密码尝试限制"
+          ]
+        }
+      }
+    },
+    "maintenanceToolIsolatedTestCount": 9,
+    "isolatedOldPage": {
+      "exactProd8Frontend": true,
+      "oldPageHeld": true,
+      "draftPreserved": true,
+      "ordinarySaveSucceeded": true,
+      "automaticFullReplacementObserved": true,
+      "syntheticTaskCountBefore": 4,
+      "syntheticTaskCountAfter": 1,
+      "reloginRequired": false,
+      "productionBusinessWritesBlocked": true
+    },
+    "publicFilesMatch": 12,
+    "existingContainerCount": 10,
+    "oldRequestsDrainedBeforeCleanup": true,
+    "protection": {
+      "protectedCurrentModeAndDemosUnchanged": true,
+      "allFormalStaticBytesUnchanged": true,
+      "existingServicesUnchanged": true,
+      "existingApiCodeUnchanged": true,
+      "nginxMasterUnchanged": true,
+      "existingGateAndPrivateEnvUnchanged": true
+    },
+    "newApiBackupDelegated": true,
+    "oldApiRetainedAndHealthy": true,
+    "existingBackupOwnerHealthy": true,
+    "staticFilesWritten": false,
+    "oldServicesStoppedOrRestarted": false
+  },
+  "authorizedCleanup": {
+    "status": "applied",
+    "previousRevision": 17,
+    "revision": 18,
+    "removedCounts": {
+      "tasks": 3,
+      "events": 26,
+      "batches": 3
+    },
+    "sanitizedTransactionResponses": 17,
+    "transactionMs": 3.668,
+    "postcheck": {
+      "integrity": "ok",
+      "fullSnapshotRevision": 18,
+      "targetRecordsRemaining": 0,
+      "relatedResponseCopiesRemaining": 0,
+      "unrelatedRecordsPreserved": true,
+      "existingSessionsPreserved": true,
+      "groupSettingsPreserved": true,
+      "appendOnlyTriggersRestored": true,
+      "backupVerified": true
+    },
+    "repeatApply": {
+      "status": "alreadyApplied",
+      "revisionUnchanged": true
+    },
+    "publicState": {
+      "verifiedAt": "2026-09-21T02:10:05.206Z",
+      "priorRevisionGetsFullSnapshot": true,
+      "currentRevisionGetsDelta": true,
+      "remainingTasks": 0,
+      "remainingBatches": 0,
+      "groupSettingsPreserved": true,
+      "taskWritesSent": false
+    }
+  },
+  "rollbackConstraint": "After cleanup, do not route to prod7 or any API lacking fullSnapshotRevision and retiredTaskIds support. Never overwrite the live database with a pre-cleanup whole-database backup; preserve subsequent writes and sessions.",
+  "note": "Public evidence contains only aggregate results and source hashes. No real TIDs, names, business IDs, operation IDs, private plans, backup locations, database files, tokens, PINs or private environment are included."
+}
