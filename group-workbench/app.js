@@ -593,12 +593,23 @@
     },'当天的小组总量、负责人和在班人数已保存，修改历史已保留。',{pin:form.elements.pin.value,form});
     if(ok){groupDayDrafts.delete(`${groupId}|${date}`);if($('groupDailyForm')===form){$('groupDailyEditor').classList.add('hidden');$('groupDailyEditor').innerHTML='';}renderOverview();}
   }
+  function firstQcAccuracy(tasks, range = selectedRange()) {
+    let firstPass = 0, firstTotal = 0;
+    if (range.dateFrom && range.dateTo && range.dateFrom > range.dateTo) return { firstPass, firstTotal, rate: null };
+    tasks.forEach(task => {
+      const qc = window.WorkbenchReports.annotationContributors(eventsForTask(task.id)).firstQc;
+      if (!qc || !['qc_pass', 'qc_fail'].includes(qc.type) || !inDateRange(eventDate(qc), range)) return;
+      firstTotal += 1;
+      if (qc.type === 'qc_pass') firstPass += 1;
+    });
+    return { firstPass, firstTotal, rate: firstTotal ? firstPass / firstTotal * 100 : null };
+  }
+
   function renderOverview() {
     const tasks=allTasks().filter(task=>inCurrentScope(task,false)),c=counts(tasks);
-    let firstPass=0,firstTotal=0;
-    tasks.forEach(task=>{const qc=window.WorkbenchReports.annotationContributors(eventsForTask(task.id)).firstQc;if(qc&&(qc.type==='qc_pass'||qc.type==='qc_fail')){firstTotal++;if(qc.type==='qc_pass')firstPass++;}});
-    Object.entries({metricMovies:new Set(tasks.map(task=>window.WorkbenchReports.movieTitle(task))).size,metricActive:c.total-c.accepted-c.rejected,metricTotal:c.total,metricComplete:c.accepted+c.rejected,metricQcBuild:c.awaitingQcBuild,metricPendingQc:c.qc,metricRework:c.repairs,metricRate:c.total?`${((c.accepted+c.rejected)/c.total*100).toFixed(1)}%`:'0%',metricRejected:validScopeRange()?countRangeRejected():'—',metricRejectPending:c.rejection_pending,metricAcceptance:c.pending_acceptance,metricUnsent:0,metricQcClaim:c.qc_pack_unclaimed,metricReturnPending:c.acceptance_return_pending,metricQcSelf:c.qc_self_rework,metricAcceptanceClaim:0,metricFirstQcAccuracy:firstTotal?`${(firstPass/firstTotal*100).toFixed(1)}%`:'—'}).forEach(([id,value])=>setText(id,value));
-    setText('metricFirstQcDetail',firstTotal?`首检 ${firstTotal} 条 · 一次通过 ${firstPass}`:'暂无首检记录');
+    const { firstPass, firstTotal, rate } = firstQcAccuracy(tasks);
+    Object.entries({metricMovies:new Set(tasks.map(task=>window.WorkbenchReports.movieTitle(task))).size,metricActive:c.total-c.accepted-c.rejected,metricTotal:c.total,metricComplete:c.accepted+c.rejected,metricQcBuild:c.awaitingQcBuild,metricPendingQc:c.qc,metricRework:c.repairs,metricRate:c.total?`${((c.accepted+c.rejected)/c.total*100).toFixed(1)}%`:'0%',metricRejected:validScopeRange()?countRangeRejected():'—',metricRejectPending:c.rejection_pending,metricAcceptance:c.pending_acceptance,metricUnsent:0,metricQcClaim:c.qc_pack_unclaimed,metricReturnPending:c.acceptance_return_pending,metricQcSelf:c.qc_self_rework,metricAcceptanceClaim:0,metricFirstQcAccuracy:rate===null?'—':`${rate.toFixed(1)}%`}).forEach(([id,value])=>setText(id,value));
+    setText('metricFirstQcDetail',!validScopeRange()?'请修正日期区间':`${scopeRangeLabel()} · ${firstTotal?`首检 ${firstTotal} 条 · 一次通过 ${firstPass}`:'暂无首检记录'}`);
     setText('metricRejectedHint',validScopeRange()?`${singleScopeDate()?'当日':'区间'}拒绝（条）· 按拒绝日期`:'请修正日期区间');
     const followups=[['repairs','返修 / 打回待处理','danger'],['rejection_pending','标注拒绝待确认','danger']];
     $('overviewFollowups').innerHTML=followups.map(([key,label,tone])=>{const count=key==='rejection_pending'?c.rejection_pending:tasks.filter(task=>matchesOverviewBucket(task,key)).length;return `<button type="button" class="overview-followup" data-action="overview-bucket" data-bucket="${key}" data-tone="${tone}"${count===0?' data-empty="true"':''}><span>${label}</span><strong>${count}</strong><span class="followup-arrow" aria-hidden="true">›</span></button>`;}).join('');

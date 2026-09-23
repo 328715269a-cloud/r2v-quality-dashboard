@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="styles.css?v=styles.20260922-prod25-today.css">
   <link rel="stylesheet" href="styles.20260922-prod31-accept.css">
   <link rel="stylesheet" href="styles.20260922-prod35-cards.css">
+  <link rel="stylesheet" href="first-qc-date.css?v=20260923-prod36">
   <link rel="stylesheet" href="/work-mode-entry.20260910.css">
 </head>
 <body>
@@ -84,12 +85,11 @@
               <button class="btn small" type="button" data-export="backup">完整备份（含单多）</button>
             </div>
           </div>
-          <div class="overview-metrics" aria-label="累计任务概况">
+          <div class="overview-metrics overview-metrics-cumulative" aria-label="累计任务概况">
             <button class="overview-metric overview-metric-total" type="button" data-action="overview-bucket" data-bucket="all"><span>累计分配 TID</span><strong id="metricTotal">—</strong><small>全部任务</small></button>
             <button class="overview-metric overview-metric-movies" type="button" data-overview-tab="movies"><span>影片 / 包</span><strong id="metricMovies">—</strong><small>查看影片进度</small></button>
             <button class="overview-metric overview-metric-accepted" type="button" data-action="overview-bucket" data-bucket="closed"><span>已闭环</span><strong id="metricComplete">—</strong><small>通过 + 拒绝 <b id="metricRate">—</b></small></button>
             <button class="overview-metric overview-metric-active" type="button" data-action="overview-bucket" data-bucket="active"><span>处理中</span><strong id="metricActive">—</strong><small>尚在流转的任务</small></button>
-<div class="overview-metric overview-metric-firstqc" title="仅统计每个任务的第一位质检员的判定；质检「拒绝」不计入"><span>首次质检准确率</span><strong id="metricFirstQcAccuracy">—</strong><small id="metricFirstQcDetail">仅首检 · 拒绝不计入</small></div>
           </div>
           <div class="overview-metrics overview-metrics-today" aria-label="当日作业情况">
             <div class="overview-metric overview-metric-today-annotation" title="统计所选日期内每个任务的首次标注提交条数；返修提交不计入。范围跟随上方日期与小组筛选。"><span>标注完成</span><strong id="metricTodayAnnotation">—</strong><small id="metricTodayAnnotationHint">首次标完（条）</small></div>
@@ -100,6 +100,7 @@
             <div class="overview-metric overview-metric-today-qc-pending" title="统计所选日期内首次标完、但截至此刻还没有质检判定的条数。"><span>待质检</span><strong id="metricTodayQcPending">—</strong><small id="metricTodayQcPendingHint">首交待质检（条）</small></div>
             <div class="overview-metric overview-metric-today-ann-people" title="统计所选日期内有过标注提交（含返修重交）的去重人数。范围跟随上方日期与小组筛选。"><span>标注人数</span><strong id="metricTodayAnnotators">—</strong><small id="metricTodayAnnotatorsHint">有标注提交（人）</small></div>
             <div class="overview-metric overview-metric-today-qc-people" title="统计所选日期内做过质检判定（通过或打回）的去重人数。范围跟随上方日期与小组筛选。"><span>质检人数</span><strong id="metricTodayQcUsers">—</strong><small id="metricTodayQcUsersHint">有质检判定（人）</small></div>
+            <div class="overview-metric overview-metric-firstqc" title="所选日期内首检通过的 TID ÷ 所选日期内首检通过或打回的 TID，按首检发生日期统计。质检拒绝不计入，后续返修复检不改变首次结果。"><span>首次质检准确率</span><strong id="metricFirstQcAccuracy">—</strong><small id="metricFirstQcDetail">按首检日期 · 拒绝不计入</small></div>
             <button class="overview-metric overview-metric-today-rejected" type="button" data-action="overview-bucket" data-bucket="rejected" title="统计所选日期内被最终拒绝（质检拒绝 / 验收拒绝 / 标注拒绝确认废弃）的任务条数，按拒绝操作日期计入，可随上方日期筛选。点击查看已拒绝任务列表。"><span>已拒绝</span><strong id="metricRejected">—</strong><small id="metricRejectedHint">当日拒绝（条）</small></button>
           </div>
         </section>
@@ -301,6 +302,6 @@
   <script src="shared-store.js?v=shared-store.20260920-prod8.js" defer></script>
   <script src="workflow.js?v=workflow.20260922-prod30-release.js" defer></script>
   <script src="reports.js?v=reports.20260920-prod8.js" defer></script>
-  <script src="app.js?v=app.20260922-prod35-cards.js" defer></script>
+  <script src="app.js?v=20260923-prod36" defer></script>
 </body>
 </html>
