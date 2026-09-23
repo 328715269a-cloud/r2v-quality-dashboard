@@ -104,6 +104,7 @@
             <div class="overview-metric overview-metric-today-qc-people" title="统计所选日期内做过质检判定（通过或打回）的去重人数。范围跟随上方日期与小组筛选。"><span>质检人数</span><strong id="metricTodayQcUsers">—</strong><small id="metricTodayQcUsersHint">有质检判定（人）</small></div>
             <div class="overview-metric overview-metric-firstqc" title="所选日期内首检通过的 TID ÷ 所选日期内首检通过或打回的 TID，按首检发生日期统计。质检拒绝不计入，后续返修复检不改变首次结果。"><span>首次质检准确率</span><strong id="metricFirstQcAccuracy">—</strong><small id="metricFirstQcDetail">按首检日期 · 拒绝不计入</small></div>
             <button class="overview-metric overview-metric-today-rejected" type="button" data-action="overview-bucket" data-bucket="rejected" title="统计所选日期内被最终拒绝（质检拒绝 / 验收拒绝 / 标注拒绝确认废弃）的任务条数，按拒绝操作日期计入，可随上方日期筛选。点击查看已拒绝任务列表。"><span>已拒绝</span><strong id="metricRejected">—</strong><small id="metricRejectedHint">当日拒绝（条）</small></button>
+            <div class="overview-metric overview-metric-firstqc" title="所选日期内首次验收通过的 TID ÷ 首次验收通过或不通过的 TID，按首次验收的北京时间统计。每个 TID 只取第一次，拒绝和后续复验不计入。"><span>首次验收准确率</span><strong id="metricAcceptanceAccuracy">—</strong><small id="metricAcceptanceAccuracyDetail">按首次验收日期 · 复验不计入</small></div>
           </div>
         </section>
         <section class="overview-followup-section" aria-labelledby="overviewFollowupsHeading">
@@ -160,7 +161,7 @@
           </div>
         </section>
         <section id="overviewPanel-people" class="overview-panel hidden" data-overview-panel="people" role="tabpanel" aria-labelledby="overviewTab-people">
-          <div class="panel"><div class="panel-heading"><div><h3>人员产出与质量</h3><p data-overview-range-label>按统计日期汇总，首次质检与返修分开统计。</p></div></div><details id="errorAnalysisDetails" class="overview-disclosure"><summary>错误标签分析（饼图 · 仅首次质检打回）</summary><div class="error-analysis-controls"><label class="field compact"><span>分析范围</span><select id="errorScope"><option value="all">整体</option></select></label><label class="field compact"><span>错误等级</span><select id="errorLevel"><option value="all">全部等级</option><option>P0</option><option>P1</option><option>P2</option></select></label></div><p class="overview-detail-note">仅统计首次质检打回勾选的错误标签（可多选，各计一次），质检「拒绝，直接废弃」不计入。点击人员表中的小标签可直达该人的分布。</p><div id="errorAnalysisBody"></div></details><div class="table-wrap"><table><thead><tr><th>人员</th><th>小组</th><th>首次提交</th><th>返修提交</th><th>验收通过</th><th>首次质检</th><th>首检通过</th><th>P0</th><th>P1</th><th>P2</th><th>首检准确率</th><th>常犯错误<small>点标签看分布</small></th></tr></thead><tbody id="personStatsBody"></tbody></table></div></div>
+          <div class="panel"><div class="panel-heading"><div><h3>人员产出与质量</h3><p data-overview-range-label>按统计日期汇总，首次质检与返修分开统计。</p></div></div><details id="errorAnalysisDetails" class="overview-disclosure"><summary>错误标签分析（饼图 · 仅首次质检打回）</summary><div class="error-analysis-controls"><label class="field compact"><span>分析范围</span><select id="errorScope"><option value="all">整体</option></select></label><label class="field compact"><span>错误等级</span><select id="errorLevel"><option value="all">全部等级</option><option>P0</option><option>P1</option><option>P2</option></select></label></div><p class="overview-detail-note">仅统计首次质检打回勾选的错误标签（可多选，各计一次），质检「拒绝，直接废弃」不计入。点击人员表中的小标签可直达该人的分布。</p><div id="errorAnalysisBody"></div></details><div class="table-wrap"><table><thead><tr><th>人员</th><th>小组</th><th>首次提交</th><th>返修提交</th><th>验收通过</th><th>首次质检</th><th>首检通过</th><th>P0</th><th>P1</th><th>P2</th><th>首检准确率</th><th title="按首次验收日期统计，一次通过 TID ÷ 首次验收通过或不通过 TID；拒绝、复验不计入，归属首次验收对应的标注人。">首次验收准确率</th><th>常犯错误<small>点标签看分布</small></th></tr></thead><tbody id="personStatsBody"></tbody></table></div></div>
         </section>
       </section>
 
@@ -317,7 +318,7 @@
   <script src="data-io.js?v=data-io.20260920-prod8.js" defer></script>
   <script src="shared-store.js?v=20260923-prod37" defer></script>
   <script src="workflow.js?v=workflow.20260922-prod30-release.js" defer></script>
-  <script src="reports.js?v=20260923-prod37" defer></script>
-  <script src="app.js?v=20260923-prod39" defer></script>
+  <script src="reports.js?v=20260923-prod40" defer></script>
+  <script src="app.js?v=20260923-prod40" defer></script>
 </body>
 </html>

@@ -717,6 +717,22 @@
     });
     return { firstPass, firstTotal, rate: firstTotal ? firstPass / firstTotal * 100 : null };
   }
+  function acceptanceEventDate(event) {
+    const time=Date.parse(event.at);
+    return Number.isFinite(time)?new Date(time+8*60*60*1000).toISOString().slice(0,10):'';
+  }
+  function acceptanceAccuracy(tasks, range = selectedRange()) {
+    let passed=0,total=0;
+    if(range.dateFrom&&range.dateTo&&range.dateFrom>range.dateTo)return{passed,total,rate:null};
+    tasks.forEach(task=>{
+      const event=window.WorkbenchReports.annotationContributors(eventsForTask(task.id)).firstAcceptanceDecision;
+      if(!event||!['acceptance_pass','acceptance_fail'].includes(event.type))return;
+      const date=acceptanceEventDate(event);
+      if(!date||!inDateRange(date,range))return;
+      total++;if(event.type==='acceptance_pass')passed++;
+    });
+    return{passed,total,rate:total?passed/total*100:null};
+  }
 
   function renderOverview() {
     const tasks=allTasks().filter(task=>inCurrentScope(task,false)),c=counts(tasks);
@@ -724,6 +740,9 @@
     Object.entries({metricMovies:new Set(tasks.map(task=>window.WorkbenchReports.movieTitle(task))).size,metricActive:c.total-c.accepted-c.rejected,metricTotal:c.total,metricComplete:c.accepted+c.rejected,metricQcBuild:c.awaitingQcBuild,metricPendingQc:c.qc,metricRework:c.repairs,metricRate:c.total?`${((c.accepted+c.rejected)/c.total*100).toFixed(1)}%`:'0%',metricRejected:validScopeRange()?countRangeRejected():'—',metricRejectPending:c.rejection_pending,metricAcceptance:c.pending_acceptance,metricUnsent:0,metricQcClaim:c.qc_pack_unclaimed,metricReturnPending:c.acceptance_return_pending,metricQcSelf:c.qc_self_rework,metricAcceptanceClaim:0,metricFirstQcAccuracy:rate===null?'—':`${rate.toFixed(1)}%`}).forEach(([id,value])=>setText(id,value));
     setText('metricFirstQcDetail',!validScopeRange()?'请修正日期区间':`${scopeRangeLabel()} · ${firstTotal?`首检 ${firstTotal} 条 · 一次通过 ${firstPass}`:'暂无首检记录'}`);
     setText('metricRejectedHint',validScopeRange()?`${singleScopeDate()?'当日':'区间'}拒绝（条）· 按拒绝日期`:'请修正日期区间');
+    const accuracy=acceptanceAccuracy(tasks);
+    setText('metricAcceptanceAccuracy',accuracy.rate===null?'—':`${accuracy.rate.toFixed(1)}%`);
+    setText('metricAcceptanceAccuracyDetail',!validScopeRange()?'请修正日期区间':`${scopeRangeLabel()} · ${accuracy.total?`首验 ${accuracy.total} 条 · 一次通过 ${accuracy.passed}`:'暂无首次验收记录'}`);
     const followups=[['repairs','返修 / 打回待处理','danger'],['rejection_pending','标注拒绝待确认','danger']];
     $('overviewFollowups').innerHTML=followups.map(([key,label,tone])=>{const count=key==='rejection_pending'?c.rejection_pending:tasks.filter(task=>matchesOverviewBucket(task,key)).length;return `<button type="button" class="overview-followup" data-action="overview-bucket" data-bucket="${key}" data-tone="${tone}"${count===0?' data-empty="true"':''}><span>${label}</span><strong>${count}</strong><span class="followup-arrow" aria-hidden="true">›</span></button>`;}).join('');
     const groups=[['标注与质检',['unclaimed','annotation_done','annotation_rework_done','qc_pack_unclaimed','pending_qc','pending_reqc']],['送验与完成',['qc_pass_unsent','qc_self_done','acceptance_pack_unclaimed','pending_acceptance','accepted']],['返修与拒绝',['rework','acceptance_return_pending','qc_self_rework','acceptance_rework','rejection_pending','rejected']]];
@@ -762,17 +781,19 @@
     activateView('records');multiSet('recordMovie',[recordWholeMovie.value]);renderRecords();
   }
   function renderPersonStats() {
-    if(!validScopeRange()){$('personStatsBody').innerHTML=emptyRow(12,'请修正日期区间');return;}
+    if(!validScopeRange()){$('personStatsBody').innerHTML=emptyRow(13,'请修正日期区间');return;}
     const result = new Map();
-    const person=(groupId,name)=>{if(!name)return null;const key=JSON.stringify([groupId,name]);if(!result.has(key))result.set(key,{name,groupId,initial:0,rework:0,accepted:0,first:0,pass:0,P0:0,P1:0,P2:0,tags:new Map()});return result.get(key);};
+    const person=(groupId,name)=>{if(!name)return null;const key=JSON.stringify([groupId,name]);if(!result.has(key))result.set(key,{name,groupId,initial:0,rework:0,accepted:0,acceptancePassed:0,acceptanceTotal:0,first:0,pass:0,P0:0,P1:0,P2:0,tags:new Map()});return result.get(key);};
     allTasks().filter(task=>inCurrentScope(task,false)).forEach(task => {
       person(task.groupId,task.assignee);
       const contribution=window.WorkbenchReports.annotationContributors(eventsForTask(task.id)),day=event=>inDateRange(eventDate(event));
       contribution.submissions.forEach(event=>{const row=person(task.groupId,event.name);if(row&&day(event))row[event.kind==='initial'?'initial':'rework']++;});
       const accept=contribution.firstAcceptance;if(accept&&day(accept)){const row=person(task.groupId,accept.name);if(row)row.accepted++;}
+      const firstAccept=contribution.firstAcceptanceDecision,date=firstAccept?acceptanceEventDate(firstAccept):'';
+      if(firstAccept&&['acceptance_pass','acceptance_fail'].includes(firstAccept.type)&&date&&inDateRange(date)){const row=person(task.groupId,firstAccept.name||'未记录标注人');row.acceptanceTotal++;if(firstAccept.type==='acceptance_pass')row.acceptancePassed++;}
       const qc=contribution.firstQc;if(qc&&day(qc)){const row=person(task.groupId,qc.name);if(row){row.first++;if(qc.type==='qc_pass')row.pass++;else if(qc.type==='qc_fail'&&['P0','P1','P2'].includes(qc.pLevel)){row[qc.pLevel]++;(qc.tags||[]).forEach(tag=>row.tags.set(tag,(row.tags.get(tag)||0)+1));}}}
     });
-    $('personStatsBody').innerHTML=[...result.values()].map(row=>{const chips=[...row.tags.entries()].sort((a,b)=>b[1]-a[1]).slice(0,2).map(([tag,count])=>`<button type="button" class="error-chip" data-action="error-person" data-key="${encodeURIComponent(JSON.stringify([row.groupId,row.name]))}" title="查看 ${escapeHtml(row.name)} 的错误标签分布">${escapeHtml(tag)}×${count}</button>`).join(' ');return `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(groupLabel(row.groupId))}</td>${['initial','rework','accepted','first','pass','P0','P1','P2'].map(key=>`<td>${row[key]}</td>`).join('')}<td>${row.first?`${(row.pass/row.first*100).toFixed(1)}%`:'暂无首检'}</td><td class="error-chip-cell">${chips||'<span class="muted">—</span>'}</td></tr>`;}).join('')||emptyRow(12,'当前范围还没有人员作业记录。');
+    $('personStatsBody').innerHTML=[...result.values()].map(row=>{const chips=[...row.tags.entries()].sort((a,b)=>b[1]-a[1]).slice(0,2).map(([tag,count])=>`<button type="button" class="error-chip" data-action="error-person" data-key="${encodeURIComponent(JSON.stringify([row.groupId,row.name]))}" title="查看 ${escapeHtml(row.name)} 的错误标签分布">${escapeHtml(tag)}×${count}</button>`).join(' ');return `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(groupLabel(row.groupId))}</td>${['initial','rework','accepted','first','pass','P0','P1','P2'].map(key=>`<td>${row[key]}</td>`).join('')}<td>${row.first?`${(row.pass/row.first*100).toFixed(1)}%`:'暂无首检'}</td><td title="首次验收通过 TID ÷ 首次验收通过或不通过 TID，按首次验收日期统计；拒绝、复验不计入">${row.acceptanceTotal?`${(row.acceptancePassed/row.acceptanceTotal*100).toFixed(1)}%<br><small>首验 ${row.acceptanceTotal} 条 · 一次通过 ${row.acceptancePassed}</small>`:'暂无首验'}</td><td class="error-chip-cell">${chips||'<span class="muted">—</span>'}</td></tr>`;}).join('')||emptyRow(13,'当前范围还没有人员作业记录。');
   }
   function errorTagStats(tasks) {
     const stats=new Map();
@@ -1859,6 +1880,6 @@
     try {state=await store.init();profile=store.profile();const retiredProfile=profile&&!validProfile(profile);initializeControls();initializeWorkflowControls();bindEvents();bindBulkEvents();bindModuleEvents();bindOverviewEvents();bindReassignEvents();if(profile&&!retiredProfile)enterApp();else{profile=null;showIdentity();if(retiredProfile)showToast('组别已更新，请按新的单镜头1—3组或多镜头1—8组重新选择身份。');}}
     catch(error){$('appShell').classList.add('hidden');$('identityGate').classList.remove('hidden');const box=document.createElement('div');box.className='panel';const text=document.createElement('p');text.textContent='共享服务暂时无法连接，云端数据未清空。'+error.message;const button=document.createElement('button');button.type='button';button.className='btn primary';button.textContent='重试连接';button.addEventListener('click',()=>location.reload());box.append(text,button);$('identityGate').replaceChildren(box);}
   }
-  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20260923-prod39',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
+  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20260923-prod40',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
   init();
 })();

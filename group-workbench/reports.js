@@ -42,7 +42,7 @@
       const from = nameOf(pair[0]), to = nameOf(pair[1]);
       if (from && to && from !== to) aliases.set(from, to);
     });
-    const result = { initial: null, submissions: [], rework: [], firstQc: null, firstAcceptance: null };
+    const result = { initial: null, submissions: [], rework: [], firstQc: null, firstAcceptance: null, firstAcceptanceDecision: null };
     const rework = new Map();
     let lastSubmit = null, firstClaim = null;
     const identity = event => ({ name: nameOf(event?.actor), rawName: text(event?.actor) });
@@ -69,6 +69,10 @@
       if (event.type === 'acceptance_pass' && !result.firstAcceptance) {
         const owner = lastSubmit || firstClaim || { name: '', rawName: '' };
         result.firstAcceptance = { name: owner.name, rawName: owner.rawName, at: text(event.at), eventId: text(event.id) };
+      }
+      if (['acceptance_pass', 'acceptance_fail', 'acceptance_reject'].includes(event.type) && !result.firstAcceptanceDecision) {
+        const owner = lastSubmit || firstClaim || { name: '', rawName: '' };
+        result.firstAcceptanceDecision = { name: owner.name, rawName: owner.rawName, at: text(event.at), eventId: text(event.id), type: flow.isAcceptanceReject(event) ? 'acceptance_reject' : event.type };
       }
     });
     result.rework = Array.from(rework.values());
@@ -355,13 +359,15 @@
       const qcEvents = history.filter(event => ['qc_pass', 'qc_fail', 'qc_reject'].includes(event.type));
       const operator = qcOperator(history);
       const contributors = annotationContributors(history), assignments = history.filter(isReworkAssignment), assignment = assignments.at(-1);
+      // Keep the existing export JSON schema while the UI uses the first acceptance decision.
+      const contributionHistory = { initial: contributors.initial, submissions: contributors.submissions, rework: contributors.rework, firstQc: contributors.firstQc, firstAcceptance: contributors.firstAcceptance };
       const row = {
         taskId: task.id, tid: text(task.tid), movie: text(task.movie), movieTitle: movieTitle(task), date: task.date || '',
         groupId: task.groupId || '', group: groupName(task.groupId), mode: modeLabel(task.mode),
         assignee: task.assignee || '', originalAssignee: task.originalAssignee || firstClaim?.assignee || firstClaim?.actor || '', previousAssignee: task.previousAssignee || '',
         qcOperator: operator.name, qcOperatorAt: operator.at,
         initialAnnotationName: contributors.initial?.name || '', initialAnnotationRawName: contributors.initial?.rawName || '', initialAnnotationAt: contributors.initial?.at || '',
-        reworkPeopleJSON: json(contributors.rework.map(person => person.name)), reworkContributionsJSON: json(contributors.rework), annotationContributionsJSON: json(contributors),
+        reworkPeopleJSON: json(contributors.rework.map(person => person.name)), reworkContributionsJSON: json(contributors.rework), annotationContributionsJSON: json(contributionHistory),
         assignmentCount: assignments.length, assignedFrom: assignment?.fromAssignee || '', assignedTo: assignment?.assignee || '', assignedBy: assignment?.actor || '', assignedAt: assignment?.at || '',
         assignmentReason: assignment?.note || '', assignmentStatus: assignment?.assignmentStatus || '', assignmentsJSON: json(rawHistory.filter(isReworkAssignment)),
         status: task.status, statusLabel: statusName(task), submitRound: task.round || 0, qcRound: task.qcRound || 0, acceptanceRound: task.acceptanceRound || 0,

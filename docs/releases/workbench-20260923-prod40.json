@@ -1,0 +1,150 @@
+{
+  "version": "20260923-prod40",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "releasedAt": "2026-09-23T16:01:50.368335+08:00",
+  "baselineVersion": "20260923-prod39",
+  "baselineCommit": "749b71147314fb947767476c4a574ff57870f351",
+  "feature": {
+    "label": "首次验收准确率",
+    "definition": "每个 TID 只取按有效工作流顺序识别的首次验收结果；首次通过 TID /（首次通过 TID + 首次不通过 TID）。首次拒绝不进入分子或分母，后续复验不替换首次结果，也不新增计数。",
+    "dateBasis": "首次验收事件北京时间日期，按所选日期区间包含首尾日；不受任务分配日期截断。",
+    "scope": "现有单/多镜头、小组及角色权限范围。",
+    "personalAttribution": "归属首次验收时的实际标注贡献人员；后续改派不能转移首验结果。",
+    "placement": [
+      "小组总览日期指标区域：已拒绝之后",
+      "人员质量表：首检准确率之后"
+    ],
+    "empty": "无有效首验时总览显示 —，人员显示 暂无首验。",
+    "preservedSemantics": "既有首次验收通过产出、首检、任务流转及导出字段保持原义。"
+  },
+  "staticFiles": {
+    "app.20260923-prod40.js": {
+      "sha256": "35a133789aa77fdd56be4feb43c72fadeec25101f94a2a13936e060b0de53b4f",
+      "bytes": 209249
+    },
+    "reports.20260923-prod40.js": {
+      "sha256": "171133606e5b643e44b66926aa65b6287683360ca162918a78100ed4d6481d8a",
+      "bytes": 55494
+    },
+    "index.html": {
+      "sha256": "48ce04ceb1364313793af5adfc02a5eb1c0ace61ce7488abea846eb0ac123005",
+      "bytes": 48490
+    }
+  },
+  "sourceHashes": {
+    "group-workbench/index.html": "6847a0fd0021b8060103dbcfcf94178588678a3122bb7e02fccfb6f9830b0d4e",
+    "group-workbench/app.js": "35a133789aa77fdd56be4feb43c72fadeec25101f94a2a13936e060b0de53b4f",
+    "group-workbench/reports.js": "171133606e5b643e44b66926aa65b6287683360ca162918a78100ed4d6481d8a",
+    "workbench-api/server.cjs": "fdddad59d4c64f44a9737160793e4afb5d2e058009f66d4daff5a21f108807d0",
+    "workbench-api/rules.cjs": "c785ec714fdf90da77596cd061f5c38d100fe94114883daea231989f9495c19d",
+    "workbench-api/record-index.cjs": "406cecfc647d69ba2be927211a1675b2714b56c1e26f60a8e3196521f0da5133",
+    "group-workbench/workflow.js": "79c615269e536ad6e07c018ab6fe7c9c615b8f52cb815d8e4d092ce6b71507ce",
+    "group-workbench/styles.css": "36ae5d3ee0812ee1d90843754014437f9563f03dab49ba7e9843231eea22223e",
+    "group-workbench/styles.20260922-prod31-accept.css": "34b5f2f6a4fd65dc79f6b33a8e20f5d8350f64d94b046759e8e251520b9bbd57",
+    "group-workbench/styles.20260922-prod35-cards.css": "fe7a483f8e707858d528db4a8d597ef6d2787605f650fb6d33e0d10aae8ccba6",
+    "group-workbench/first-qc-date.css": "f97b9ff8de1cc10ea9a282ec2a3425170a559859018cf0f62ef927bd46302975",
+    "group-workbench/pagination.css": "112d8d821d307c5b7d9963f8880d93f5941bc7cfe7b71cda1820765845768a75",
+    "group-workbench/acceptance-filters.css": "5bc693035543137e42df9810149cedaa45db3a6bf63ecece1b0aab0c77f2399d",
+    "group-workbench/data-io.js": "cb1db444edf83733c356c0187460ee208ba579ca7500852f87376a8bea640338",
+    "group-workbench/shared-store.js": "edbe732e31e51f18da5f06bf787e0784490ba5c21a58441fa9da313e406ac7ba",
+    "group-workbench/export-worker.js": "ffc694a915e627196955400bd3bbdabc78dfc7b85713b37de14b7077e145a45d"
+  },
+  "preservedAssets": {
+    "acceptance-filters.css": {
+      "reference": "acceptance-filters.20260923-prod39.css",
+      "sha256": "5bc693035543137e42df9810149cedaa45db3a6bf63ecece1b0aab0c77f2399d"
+    },
+    "export-worker.js": {
+      "reference": "export-worker.20260923-prod39.js",
+      "sha256": "ffc694a915e627196955400bd3bbdabc78dfc7b85713b37de14b7077e145a45d"
+    }
+  },
+  "checks": {
+    "acceptanceAccuracyDates": true,
+    "isolatedUi": true,
+    "workflowAndApiUnchanged": true,
+    "personalAttribution": true,
+    "existingExports": true,
+    "bothModes": true
+  },
+  "validation": {
+    "uiAssertions": 125,
+    "uiTimezones": [
+      "UTC",
+      "Asia/Shanghai"
+    ],
+    "firstQcRegressionChecks": 27,
+    "firstQcRegressionScript": "scripts/verify-first-qc-date.cjs",
+    "existingCsvByteComparisons": 16,
+    "existingReportJsonByteIdentical": true,
+    "isolatedBrowser": {
+      "multiDates": {
+        "2026-09-22": "0.0% 0/2",
+        "2026-09-21": "50.0% 1/2",
+        "all": "25.0% 1/4"
+      },
+      "personal": "First failure stays with historical annotator甲 after transfer to乙; rejection has no denominator",
+      "consoleErrors": 0,
+      "layout": "card after 已拒绝, personal column after 首检准确率, screenshot checked",
+      "singleDates": {
+        "2026-09-22": "33.3% 1/3",
+        "2026-09-21": "100.0% 2/2",
+        "2026-09-23": "— 0 first decisions",
+        "all": "60.0% 3/5"
+      },
+      "source": "CUA browser UI at localhost:8995",
+      "groups": {
+        "single_g01": "66.7% 2/3",
+        "multi_g07": "0.0% 0/2",
+        "multi_g06": "50.0% 1/2"
+      }
+    },
+    "knownBaselineFailure": {
+      "test": "node scripts/verify-workbench-reports.cjs",
+      "assertion": "unrelated action never overwrites QC operator: acceptance_pass",
+      "alsoFailsOnBaselineCommit": "749b71147314fb947767476c4a574ff57870f351",
+      "fixedByThisRelease": false,
+      "proof": "outputs/workbench-acceptance-accuracy-20260923/core-verification.json"
+    }
+  },
+  "publicFilesMatch": 21,
+  "existingServicesUnchanged": true,
+  "existingServiceCount": 13,
+  "activeApiVersion": "20260923-prod37",
+  "activeApiPort": 3020,
+  "databaseRead": false,
+  "databaseWritten": false,
+  "apiRequestsSent": false,
+  "apiCodeUnchanged": true,
+  "workflowUnchanged": true,
+  "servicesStartedOrStopped": false,
+  "existingFormalAssetsUnchanged": true,
+  "nginxConfigAndMasterUnchanged": true,
+  "currentModeAndDemosUnchanged": true,
+  "oldPageContinuity": {
+    "version": "20260923-prod39",
+    "isolatedSyntheticOnly": true,
+    "noReloadOrLogin": true,
+    "draftPreserved": true,
+    "submitSucceeded": true,
+    "revisionBefore": 79,
+    "revisionAfter": 80,
+    "eventType": "acceptance_fail",
+    "productionApiAccess": false,
+    "proof": "outputs/workbench-acceptance-accuracy-20260923/continuity.json"
+  },
+  "proofs": {
+    "verification": {
+      "path": "outputs/workbench-acceptance-accuracy-20260923/verification.json",
+      "sha256": "7b43ff7b41f86adee905f2c5a4b9e4878622d23570220426a5ba1aec8316002c"
+    },
+    "core": "outputs/workbench-acceptance-accuracy-20260923/core-verification.json",
+    "ui": "outputs/workbench-acceptance-accuracy-20260923/ui-unit-verification.json",
+    "continuity": "outputs/workbench-acceptance-accuracy-20260923/continuity.json",
+    "manifest": "outputs/workbench-acceptance-accuracy-20260923/release/manifest.json",
+    "activate": "outputs/workbench-acceptance-accuracy-20260923/release/activate-2026-09-23T08-01-50.365Z.json",
+    "verify": "outputs/workbench-acceptance-accuracy-20260923/release/verify-2026-09-23T08-01-52.053Z.json"
+  },
+  "evidence": "outputs/workbench-acceptance-accuracy-20260923",
+  "backup": "/opt/r2v/backups/workbench-acceptance-accuracy-20260923/"
+}

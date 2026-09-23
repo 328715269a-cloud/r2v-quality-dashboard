@@ -22,7 +22,8 @@ function browserFunction(name) {
 const helperNames = [
   'localDateString', 'eventDate', 'selectedRange', 'validScopeRange', 'singleScopeDate', 'scopeRangeLabel', 'inDateRange',
   'canViewAllGroups', 'canViewGroup', 'selectedGroup', 'inCurrentScope',
-  'eventsForTask', 'taskSnapshot', 'taskWithSnapshot', 'taskIndex', 'allTasks', 'firstQcAccuracy'
+  'eventsForTask', 'taskSnapshot', 'taskWithSnapshot', 'taskIndex', 'allTasks', 'firstQcAccuracy',
+  'acceptanceEventDate', 'acceptanceAccuracy'
 ];
 const overviewSource = browserFunction('renderOverview');
 const metricRenderSource = overviewSource.slice(0, overviewSource.indexOf('    const followups=')) + '\n  }';
