@@ -1,0 +1,53 @@
+{
+  "version": "20260923-prod38",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "releasedAt": "2026-09-23T07:13:11.115514Z",
+  "staticFiles": {
+    "app.20260923-prod38.js": {
+      "sha256": "1420b9cb1252254b0d4632f63afb7784872c2a447ed3582db95e635951749e32",
+      "bytes": 203456
+    },
+    "export-worker.20260923-prod38.js": {
+      "sha256": "1e8f72923b73679dfe12199f1ea25d1031864a1877422571ca014dd3e8c31137",
+      "bytes": 13066
+    },
+    "index.html": {
+      "sha256": "0400dbdd6a2120d0886bea316954ea4ed1a4489fa0ae851bd1150051dcdd4182",
+      "bytes": 45692
+    }
+  },
+  "sourceHashes": {
+    "group-workbench/index.html": "51e1f7436fe1557b35675566936a8d689580ed39efcf74dcb410c32de7949e8d",
+    "group-workbench/app.js": "1420b9cb1252254b0d4632f63afb7784872c2a447ed3582db95e635951749e32",
+    "group-workbench/export-worker.js": "1e8f72923b73679dfe12199f1ea25d1031864a1877422571ca014dd3e8c31137",
+    "workbench-api/server.cjs": "fdddad59d4c64f44a9737160793e4afb5d2e058009f66d4daff5a21f108807d0",
+    "workbench-api/rules.cjs": "c785ec714fdf90da77596cd061f5c38d100fe94114883daea231989f9495c19d",
+    "workbench-api/record-index.cjs": "406cecfc647d69ba2be927211a1675b2714b56c1e26f60a8e3196521f0da5133",
+    "group-workbench/workflow.js": "79c615269e536ad6e07c018ab6fe7c9c615b8f52cb815d8e4d092ce6b71507ce",
+    "group-workbench/styles.css": "36ae5d3ee0812ee1d90843754014437f9563f03dab49ba7e9843231eea22223e",
+    "group-workbench/styles.20260922-prod31-accept.css": "34b5f2f6a4fd65dc79f6b33a8e20f5d8350f64d94b046759e8e251520b9bbd57",
+    "group-workbench/styles.20260922-prod35-cards.css": "fe7a483f8e707858d528db4a8d597ef6d2787605f650fb6d33e0d10aae8ccba6",
+    "group-workbench/first-qc-date.css": "f97b9ff8de1cc10ea9a282ec2a3425170a559859018cf0f62ef927bd46302975",
+    "group-workbench/pagination.css": "112d8d821d307c5b7d9963f8880d93f5941bc7cfe7b71cda1820765845768a75",
+    "group-workbench/data-io.js": "cb1db444edf83733c356c0187460ee208ba579ca7500852f87376a8bea640338",
+    "group-workbench/shared-store.js": "edbe732e31e51f18da5f06bf787e0784490ba5c21a58441fa9da313e406ac7ba",
+    "group-workbench/reports.js": "21406543de3bc95346dfbeb54e3c4f9aec7c3e2ed6024ee93c6f2f4faadc0835"
+  },
+  "checks": {
+    "acceptanceExportScopes": true,
+    "historyAndDates": true,
+    "existingExports": true,
+    "isolatedUi": true,
+    "readOnlyExport": true,
+    "workflowAndApiUnchanged": true
+  },
+  "publicFilesMatch": 20,
+  "existingServicesUnchanged": true,
+  "databaseWritten": false,
+  "apiCodeUnchanged": true,
+  "existingFormalAssetsUnchanged": true,
+  "nginxConfigAndMasterUnchanged": true,
+  "oldPageContinuity": "Unreloaded prod37 page retained synthetic draft and submitted acceptance_fail after isolated static cutover",
+  "evidence": "outputs/workbench-acceptance-export-20260923",
+  "backup": "/opt/r2v/backups/workbench-acceptance-export-20260923/"
+}

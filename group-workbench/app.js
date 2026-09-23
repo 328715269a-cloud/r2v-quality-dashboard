@@ -1291,7 +1291,7 @@
       const script=qsa('script[src]').find(node=>new URL(node.src,location.href).pathname.split('/').pop().match(new RegExp('^'+name+'(?:\\.[^/]+)?\\.js$')));
       if(!script)throw new Error('导出组件未加载，请稍后重试。');return script.src;
     });
-    const worker=new Worker(new URL('export-worker.20260923-prod37.js',location.href));job.worker=worker;
+    const worker=new Worker(new URL('export-worker.20260923-prod38.js',location.href));job.worker=worker;
     const result=new Promise((resolve,reject)=>{
       worker.onmessage=event=>{const data=event.data;if(data.type==='progress')setExportStatus(data.text);else if(data.type==='complete')resolve(data);else if(data.type==='error'){job.error=new Error(data.message);reject(job.error);}};
       worker.onerror=()=>{job.error=new Error('导出组件加载或生成失败，填写内容已保留，请重试。');reject(job.error);};
@@ -1334,7 +1334,13 @@
       if(!exportScopeCurrent(scope))throw new Error('作业身份或导出范围已变化，已取消下载，请重新导出。');
       if(kind==='backup'){download(`作业流程完整备份-单多全部-${todayString()}.json`,result.blob);const message='完整备份已下载，包含单、多镜头全部原始数据和最新任务状态。';setExportStatus(message);showToast(message);return;}
       if(kind==='legacyPackages'){download(`全部建包记录-${todayString()}.csv`,result.blob);const message=`已导出全部 ${result.rowCount} 个建包批次。`;setExportStatus(message);showToast(message);return;}
-      const names={imports:'导入记录',tasks:'任务明细',events:'操作流水',packages:'建包记录',movies:'影片汇总',groups:'小组汇总',daily:'每日统计',personDaily:'个人每日明细',summary:'小组影片综合汇总'},dateLabel=range==='scope'?scopeRangeLabel():'全部日期';
+      const names={imports:'导入记录',tasks:'任务明细',events:'操作流水',packages:'建包记录',movies:'影片汇总',groups:'小组汇总',daily:'每日统计',personDaily:'个人每日明细',summary:'小组影片综合汇总',acceptancePending:'待验收明细',acceptanceHistory:'验收记录'},dateLabel=range==='scope'?scopeRangeLabel():'全部日期';
+      if(kind==='acceptancePending'||kind==='acceptanceHistory'){
+        const group=scope.groupId==='all'?'全部小组':groupLabel(scope.groupId),date=kind==='acceptancePending'?'全部待办':dateLabel;
+        download(`${modeLabel(scope.mode)}-${group}-${names[kind]}-${date}-${todayString()}.csv`,result.blob);
+        const message=`已导出${modeLabel(scope.mode)} · ${group}的${names[kind]}，共 ${result.rowCount} 条（${date}）。`;
+        setExportStatus(message);showToast(message);return;
+      }
       download(`${modeLabel(scope.mode)}-${names[kind]}-${dateLabel}-${todayString()}.csv`,result.blob);const message=range==='scope'?`已导出当前范围的${names[kind]}，共 ${result.rowCount} 条。`:`已导出${modeLabel(scope.mode)}全部日期的${names[kind]}，不受当前日期筛选限制。`;setExportStatus(message);showToast(message);
     }catch(error){const message=error.message||'导出失败，填写内容已保留，请重试。';setExportStatus(message);showToast(message,'error');}
     finally{job.worker?.terminate();job.buttons.forEach(({button,disabled})=>{button.disabled=disabled;button.removeAttribute('aria-busy');});if(exportJob===job)exportJob=null;}
@@ -1773,7 +1779,7 @@
     document.addEventListener('click',async event=>{
       const button=event.target.closest('[data-action],[data-export]');if(!button)return;
       try {
-        if(button.dataset.export){exportData(button.dataset.export,button.dataset.exportRange||'all');return;}
+        if(button.dataset.export){button.closest('#acceptanceExportMenu')?.removeAttribute('open');exportData(button.dataset.export,button.dataset.exportRange||'all');return;}
         const action=button.dataset.action,id=button.dataset.taskId;
         if(action==='copy'){await copyTid(button.dataset.tid);return;}
         if(action==='submit')await submitTask(id);

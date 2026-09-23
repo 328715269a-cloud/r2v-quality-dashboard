@@ -250,7 +250,11 @@
         </details>
       </section>
       <section id="acceptanceView" class="view hidden" aria-labelledby="acceptanceHeading">
-        <div class="section-heading"><div><h2 id="acceptanceHeading">验收台</h2><p>质检通过后直接流入，勾选即可验收，无需建包或领取。</p></div></div>
+        <div class="section-heading"><div><h2 id="acceptanceHeading">验收台</h2><p>质检通过后直接流入，勾选即可验收，无需建包或领取。</p></div><div class="actions export-actions"><details id="acceptanceExportMenu" class="export-menu"><summary>导出</summary><div class="export-menu-list">
+          <button class="btn small" type="button" data-export="acceptancePending" title="导出当前镜头和小组范围的全部待验收任务，不受日期、分页或勾选限制">待验收明细（全部待办）</button>
+          <button class="btn small" type="button" data-export="acceptanceHistory" data-export-range="scope" title="按上方统计日期和小组导出，以验收实际操作日期为准，每次判定一行">验收记录（所选日期）</button>
+          <button class="btn small" type="button" data-export="acceptanceHistory" title="导出当前镜头和小组范围的全部验收通过、不通过及拒绝记录">验收记录（全部日期）</button>
+        </div></details></div></div>
         <div class="split-layout acceptance-layout">
           <div class="panel queue-panel">
             <div class="panel-heading"><div><h3>待验收 <span id="acceptanceQueueCount" class="tag neutral">0</span></h3><p id="acceptanceQueueScope">当前模块 · 全部小组 · 全部日期</p></div><button id="acceptanceSelectAllButton" class="btn small" type="button">一键全选</button></div>
@@ -303,6 +307,6 @@
   <script src="shared-store.js?v=20260923-prod37" defer></script>
   <script src="workflow.js?v=workflow.20260922-prod30-release.js" defer></script>
   <script src="reports.js?v=20260923-prod37" defer></script>
-  <script src="app.js?v=20260923-prod37" defer></script>
+  <script src="app.js?v=20260923-prod38" defer></script>
 </body>
 </html>

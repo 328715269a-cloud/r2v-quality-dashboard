@@ -12,6 +12,12 @@
         const date = new Date(value);
         return Number.isNaN(date.getTime()) ? '' : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
       };
+      const beijingTime = value => {
+        if (!value) return '';
+        const timestamp = Date.parse(value);
+        return Number.isNaN(timestamp) ? '' : new Date(timestamp + 8 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+      };
+      const beijingDate = value => beijingTime(value).slice(0, 10);
       const histories = new Map(), general = [], order = new Map();
       (source.events || []).forEach((event, index) => {
         if (!histories.has(event.taskId)) histories.set(event.taskId, []);
@@ -60,14 +66,49 @@
         if(event.note)parts.push(event.note);return parts.join(' · ')||'已记录';
       };
       progress('正在生成所选报表…');
-      const reports = Reports.build({state:source,tasks,auditTasks,groups:reportGroups,mode:scope.mode,statusMeta,groupLabel,eventLabel,eventDetail,localDate,kind});
-      let report = reports[kind];
-      if (kind === 'summary') {
-        const columns = new Map([...reports.groups.columns, ...reports.movies.columns].map(column => [column.key, column]));
-        report = {columns:[{key:'scope',label:'汇总层级'}, ...columns.values()],rows:[...reports.groups.rows.map(row=>({...row,scope:'小组'})),...reports.movies.rows.map(row=>({...row,scope:'影片'}))]};
+      const reportInput = {state:source,tasks,auditTasks,groups:reportGroups,mode:scope.mode,statusMeta,groupLabel,eventLabel,eventDetail,localDate};
+      const columns = definitions => definitions.map(([key,label]) => ({key,label}));
+      let report;
+      if (kind === 'acceptancePending') {
+        const pending = tasks.filter(task => task.status === 'pending_acceptance');
+        const detail = Reports.build({...reportInput,tasks:pending,auditTasks:pending,kind:'tasks'}).tasks;
+        report = {columns:columns([
+          ['tid','TID'],['movie','影片 / 包'],['group','小组'],['mode','类型'],['assignee','标注人'],['qcOperator','质检人'],
+          ['statusLabel','当前状态'],['qcRound','质检轮次'],['acceptanceRound','验收轮次'],
+          ['submittedAt','最近提交时间（北京时间）'],['reviewedAt','最近质检时间（北京时间）'],['acceptanceReviewedAt','最近验收时间（北京时间）'],
+          ['latestQcNote','最近质检说明'],['acceptanceNote','最近验收说明'],['qcRepairNote','质检返修说明'],['lastUpdated','更新时间（北京时间）']
+        ]),rows:detail.rows.map(row => ({...row,submittedAt:beijingTime(row.submittedAt),reviewedAt:beijingTime(row.reviewedAt),acceptanceReviewedAt:beijingTime(row.acceptanceReviewedAt),lastUpdated:beijingTime(row.lastUpdated)}))};
+      } else if (kind === 'acceptanceHistory') {
+        // Build conflicts from complete task histories before selecting verdicts.
+        // Audit tasks include deleted tasks so earlier valid decisions stay visible.
+        const detail = Reports.build({...reportInput,localDate:beijingDate,kind:'events'}).events;
+        const rawTasks = new Map(source.tasks.map(task => [task.id,task])), currentTasks = new Map(auditTasks.map(task => [task.id,task]));
+        const rawEvents = new Map((source.events || []).map(event => [event.id,event]));
+        const positions = new Map();
+        for (const [taskId,events] of histories) positions.set(taskId,new Map(events.map((event,index) => [event.id,index])));
+        const rows = detail.rows.filter(row => ['acceptance_pass','acceptance_fail','acceptance_reject'].includes(row.type) && !row.excludedFromProgress).map(row => {
+          const event = rawEvents.get(row.eventId), raw = rawTasks.get(row.taskId), current = currentTasks.get(row.taskId);
+          const atDecision = Flow.project(raw,(histories.get(row.taskId) || []).slice(0,positions.get(row.taskId).get(row.eventId) + 1));
+          return {tid:event.tidAtEvent ?? atDecision.tid ?? raw.tid,movie:event.movieAtEvent ?? atDecision.movie ?? raw.movie,
+            group:row.group,mode:row.mode,assignee:atDecision.assignee || '',actor:row.actor,
+            result:Flow.isAcceptanceReject(event)?'拒绝':event.type === 'acceptance_pass'?'通过':'不通过',acceptanceRound:atDecision.acceptanceRound,
+            note:row.note,date:beijingDate(event.at),at:beijingTime(event.at),statusLabel:Flow.label(current),eventId:row.eventId};
+        });
+        report = {columns:columns([
+          ['tid','TID'],['movie','影片 / 包'],['group','小组'],['mode','类型'],['assignee','验收时标注人'],['actor','验收人'],
+          ['result','验收结果'],['acceptanceRound','验收轮次'],['note','验收说明'],['date','验收日期（北京时间）'],['at','验收时间（北京时间）'],
+          ['statusLabel','当前最新状态'],['eventId','事件ID']
+        ]),rows};
+      } else {
+        const reports = Reports.build({...reportInput,kind});
+        report = reports[kind];
+        if (kind === 'summary') {
+          const summaryColumns = new Map([...reports.groups.columns, ...reports.movies.columns].map(column => [column.key, column]));
+          report = {columns:[{key:'scope',label:'汇总层级'}, ...summaryColumns.values()],rows:[...reports.groups.rows.map(row=>({...row,scope:'小组'})),...reports.movies.rows.map(row=>({...row,scope:'影片'}))]};
+        }
       }
       if (!report) throw new Error('未找到此导出类型。');
-      if (scope.range === 'scope') {
+      if (scope.range === 'scope' && kind !== 'acceptancePending') {
         if (scope.dateFrom && scope.dateTo && scope.dateFrom > scope.dateTo) throw new Error('请修正日期区间后再导出。');
         report = {...report, rows:report.rows.filter(row => {const date=String(row.date);return !!date&&(!scope.dateFrom||date>=scope.dateFrom)&&(!scope.dateTo||date<=scope.dateTo);})};
       }
