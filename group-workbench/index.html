@@ -6,7 +6,9 @@
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="data:,">
   <title>R2V 新作业模式</title>
-  <link rel="stylesheet" href="styles.css?v=20260920-prod8">
+  <link rel="stylesheet" href="styles.css?v=styles.20260922-prod25-today.css">
+  <link rel="stylesheet" href="styles.20260922-prod31-accept.css">
+  <link rel="stylesheet" href="styles.20260922-prod35-cards.css">
   <link rel="stylesheet" href="/work-mode-entry.20260910.css">
 </head>
 <body>
@@ -18,7 +20,7 @@
       <p id="identityIntro" class="hidden"></p>
       <form id="identityForm" class="identity-form">
         <label class="field" for="identityName"><span>中文名</span><input id="identityName" name="name" type="text" placeholder="填写中文名" required maxlength="20" autocomplete="name"></label>
-        <label class="field" for="identityMode"><span>先选作业类型</span><select id="identityMode" name="mode" required aria-describedby="identityModeHelp"><option value="single">单镜头（3个小组）</option><option value="multi">多镜头（8个小组）</option></select><small id="identityModeHelp">选择后，下方只显示对应类型的小组。</small></label>
+        <label class="field" for="identityMode"><span>先选作业类型</span><select id="identityMode" name="mode" required aria-describedby="identityModeHelp"><option value="single">单镜头</option><option value="multi">多镜头</option></select><small id="identityModeHelp">选择后，下方只显示对应类型的小组。</small></label>
         <div class="form-grid">
           <label class="field" for="identityGroup"><span>再选所属小组</span><select id="identityGroup" name="group" required aria-describedby="identityGroupHelp"></select><small id="identityGroupHelp">单镜头1—3组；多镜头1—8组。</small></label>
           <label class="field" for="identityRole"><span>角色</span><select id="identityRole" name="role" required><option value="annotation">标注</option><option value="qc">组长 / 质检</option><option value="acceptance">验收</option></select></label>
@@ -77,7 +79,7 @@
                 <button class="btn small" type="button" data-export="personDaily">个人每日明细</button>
                 <button class="btn small" type="button" data-export="summary">综合汇总</button>
                 <button class="btn small" type="button" data-export="events">操作流水</button>
-                <button class="btn small" type="button" data-export="packages">建包记录</button>
+                <button class="btn small" type="button" data-export="packages">历史建包记录</button>
               </div></details>
               <button class="btn small" type="button" data-export="backup">完整备份（含单多）</button>
             </div>
@@ -87,7 +89,18 @@
             <button class="overview-metric overview-metric-movies" type="button" data-overview-tab="movies"><span>影片 / 包</span><strong id="metricMovies">—</strong><small>查看影片进度</small></button>
             <button class="overview-metric overview-metric-accepted" type="button" data-action="overview-bucket" data-bucket="closed"><span>已闭环</span><strong id="metricComplete">—</strong><small>通过 + 拒绝 <b id="metricRate">—</b></small></button>
             <button class="overview-metric overview-metric-active" type="button" data-action="overview-bucket" data-bucket="active"><span>处理中</span><strong id="metricActive">—</strong><small>尚在流转的任务</small></button>
-            <button class="overview-metric overview-metric-rejected" type="button" data-action="overview-bucket" data-bucket="rejected"><span>已拒绝</span><strong id="metricRejected">—</strong><small>标注 / 质检 / 验收废弃</small></button>
+<div class="overview-metric overview-metric-firstqc" title="仅统计每个任务的第一位质检员的判定；质检「拒绝」不计入"><span>首次质检准确率</span><strong id="metricFirstQcAccuracy">—</strong><small id="metricFirstQcDetail">仅首检 · 拒绝不计入</small></div>
+          </div>
+          <div class="overview-metrics overview-metrics-today" aria-label="当日作业情况">
+            <div class="overview-metric overview-metric-today-annotation" title="统计所选日期内每个任务的首次标注提交条数；返修提交不计入。范围跟随上方日期与小组筛选。"><span>标注完成</span><strong id="metricTodayAnnotation">—</strong><small id="metricTodayAnnotationHint">首次标完（条）</small></div>
+            <div class="overview-metric overview-metric-today-qc" title="统计所选日期内质检判定通过的次数；通过即流转验收，视为闭环。"><span>质检通过</span><strong id="metricTodayQcPass">—</strong><small id="metricTodayQcPassHint">通过并闭环（次）</small></div>
+            <div class="overview-metric overview-metric-today-accept" title="统计所选日期内首次验收通过的任务条数，记在验收通过当天；与每日工作量表「首次验收通过」口径一致。"><span>验收通过</span><strong id="metricTodayAccept">—</strong><small id="metricTodayAcceptHint">首验通过（条）</small></div>
+            <div class="overview-metric overview-metric-today-rework" title="统计所选日期内有过返修提交的任务去重条数；一个 case 当天返修多次也只算一条（区别于日报「返修提交（次）」）。"><span>返修量</span><strong id="metricTodayRework">—</strong><small id="metricTodayReworkHint">返修任务（条）· 去重</small></div>
+            <div class="overview-metric overview-metric-today-rework-pending" title="统计所选日期内首次标完、且最后一次质检判定为打回、截至此刻还没通过的条数。"><span>待返修</span><strong id="metricTodayReworkPending">—</strong><small id="metricTodayReworkPendingHint">打回待返修（条）</small></div>
+            <div class="overview-metric overview-metric-today-qc-pending" title="统计所选日期内首次标完、但截至此刻还没有质检判定的条数。"><span>待质检</span><strong id="metricTodayQcPending">—</strong><small id="metricTodayQcPendingHint">首交待质检（条）</small></div>
+            <div class="overview-metric overview-metric-today-ann-people" title="统计所选日期内有过标注提交（含返修重交）的去重人数。范围跟随上方日期与小组筛选。"><span>标注人数</span><strong id="metricTodayAnnotators">—</strong><small id="metricTodayAnnotatorsHint">有标注提交（人）</small></div>
+            <div class="overview-metric overview-metric-today-qc-people" title="统计所选日期内做过质检判定（通过或打回）的去重人数。范围跟随上方日期与小组筛选。"><span>质检人数</span><strong id="metricTodayQcUsers">—</strong><small id="metricTodayQcUsersHint">有质检判定（人）</small></div>
+            <button class="overview-metric overview-metric-today-rejected" type="button" data-action="overview-bucket" data-bucket="rejected" title="统计所选日期内被最终拒绝（质检拒绝 / 验收拒绝 / 标注拒绝确认废弃）的任务条数，按拒绝操作日期计入，可随上方日期筛选。点击查看已拒绝任务列表。"><span>已拒绝</span><strong id="metricRejected">—</strong><small id="metricRejectedHint">当日拒绝（条）</small></button>
           </div>
         </section>
         <section class="overview-followup-section" aria-labelledby="overviewFollowupsHeading">
@@ -144,7 +157,7 @@
           </div>
         </section>
         <section id="overviewPanel-people" class="overview-panel hidden" data-overview-panel="people" role="tabpanel" aria-labelledby="overviewTab-people">
-          <div class="panel"><div class="panel-heading"><div><h3>人员产出与质量</h3><p data-overview-range-label>按统计日期汇总，首次质检与返修分开统计。</p></div></div><div class="table-wrap"><table><thead><tr><th>人员</th><th>小组</th><th>首次提交</th><th>返修提交</th><th>验收通过</th><th>首次质检</th><th>首检通过</th><th>P0</th><th>P1</th><th>P2</th><th>首检准确率</th></tr></thead><tbody id="personStatsBody"></tbody></table></div></div>
+          <div class="panel"><div class="panel-heading"><div><h3>人员产出与质量</h3><p data-overview-range-label>按统计日期汇总，首次质检与返修分开统计。</p></div></div><details id="errorAnalysisDetails" class="overview-disclosure"><summary>错误标签分析（饼图 · 仅首次质检打回）</summary><div class="error-analysis-controls"><label class="field compact"><span>分析范围</span><select id="errorScope"><option value="all">整体</option></select></label><label class="field compact"><span>错误等级</span><select id="errorLevel"><option value="all">全部等级</option><option>P0</option><option>P1</option><option>P2</option></select></label></div><p class="overview-detail-note">仅统计首次质检打回勾选的错误标签（可多选，各计一次），质检「拒绝，直接废弃」不计入。点击人员表中的小标签可直达该人的分布。</p><div id="errorAnalysisBody"></div></details><div class="table-wrap"><table><thead><tr><th>人员</th><th>小组</th><th>首次提交</th><th>返修提交</th><th>验收通过</th><th>首次质检</th><th>首检通过</th><th>P0</th><th>P1</th><th>P2</th><th>首检准确率</th><th>常犯错误<small>点标签看分布</small></th></tr></thead><tbody id="personStatsBody"></tbody></table></div></div>
         </section>
       </section>
 
@@ -166,6 +179,27 @@
         <div class="panel"><div class="panel-heading"><div><h3>导入记录</h3><p id="batchRecordCount">查看每次导入及修改记录</p></div><div class="row-actions"><label class="field"><span>记录状态</span><select id="batchRecordFilter"><option value="all">全部记录</option><option value="active">未删除</option><option value="deleted">已删除</option></select></label><button class="btn small" type="button" data-export="imports">导出导入记录</button></div></div><div class="table-wrap"><table><thead><tr><th>影片 / 包</th><th>分配日期</th><th>小组</th><th>任务数</th><th>导入人</th><th>导入时间</th><th>记录状态</th><th>操作</th></tr></thead><tbody id="batchBody"></tbody></table></div></div>
         <aside id="batchDetail" class="panel hidden" aria-live="polite"></aside>
         <aside id="batchEditor" class="panel editor-panel hidden" aria-live="polite"></aside>
+        <div class="panel" id="reassignPanel">
+          <div class="panel-heading"><div><h3>改派处理人</h3><p>按 TID 搜索当前模块（<span id="reassignModeLabel">单镜头</span>）的任务。换成标注人后状态回到待标注，换成质检 / 组长后状态变为待质检。需要管理员权限密码，原处理人的流水全部保留。</p></div></div>
+          <div class="panel-body">
+            <form id="reassignSearchForm" class="toolbar">
+              <label class="field grow"><span>搜索 TID</span><input id="reassignSearchInput" type="text" spellcheck="false" autocomplete="off" placeholder="输入完整或部分 TID"></label>
+              <button class="btn" type="submit">搜索</button>
+            </form>
+            <div id="reassignResults" class="preview-box" aria-live="polite"><span>输入 TID 后搜索，最多显示 20 条。</span></div>
+            <form id="reassignForm" class="hidden" data-task-id="" data-expected="">
+              <div class="form-grid compact">
+                <label class="field"><span>新处理人</span><input name="assignee" type="text" required maxlength="20" list="reassignNameList" autocomplete="off" placeholder="填写姓名"></label>
+                <label class="field"><span>改派为</span><select name="toRole"><option value="annotation">标注人（状态回到待标注）</option><option value="qc">质检 / 组长（状态变为待质检）</option></select></label>
+                <label class="field"><span>权限密码</span><input name="pin" type="password" required inputmode="numeric" autocomplete="off"></label>
+                <label class="field"><span>改派原因（可选）</span><input name="note" type="text" maxlength="200"></label>
+              </div>
+              <p id="reassignTarget" class="field-help"></p>
+              <div class="row-actions"><button class="btn primary" type="submit">验证密码并改派</button><button class="btn ghost" type="button" id="reassignCancel">取消</button></div>
+            </form>
+            <datalist id="reassignNameList"></datalist>
+          </div>
+        </div>
       </section>
       <section id="tasksView" class="view hidden" aria-labelledby="tasksHeading">
         <div class="section-heading"><div><h2 id="tasksHeading">标注台</h2><p>先认领 TID，完成标注后再提交完成；需要返修或申请拒绝的任务在下方处理。</p></div></div>
@@ -182,18 +216,9 @@
         </div>
       </section>
       <section id="qcView" class="view hidden" aria-labelledby="qcHeading">
-        <div class="section-heading"><div><h2 id="qcHeading">质检台</h2><p>登记质检包后执行质检；可选择通过、打回或拒绝。通过后直接流入验收，拒绝后直接废弃。</p></div></div>
-        <div class="panel package-panel">
-          <div class="panel-heading"><div><h3>登记质检包与领取</h3><p>这里只登记质检包。质检通过后自动流入验收台，不再建立验收包。</p></div></div>
-          <form id="packageForm" class="package-form">
-            <div class="form-grid">
-              <label class="field"><span>建包去向</span><input name="stage" type="hidden" value="qc"><div class="dispatch-mode-fixed">质检包</div><small>验收不建包，质检通过后自动流入。</small></label>
-              <label class="field"><span>通航包名 / 编号（可选）</span><input name="packageName" type="text" maxlength="200" placeholder="用于核对通航中的包"></label>
-              <label class="field full" for="packageTids"><span>本次建包的 TID</span><textarea id="packageTids" name="tids" rows="3" spellcheck="false" placeholder="粘贴本次已建包的 TID，每行一条"></textarea></label>
-            </div>
-            <div class="bulk-entry-actions"><div class="actions"><button id="packageBuildAndClaim" class="btn primary" type="button">已建包并领取</button></div><div id="packageResult" class="inline-result" aria-live="polite"></div></div>
-          </form>
-          <div class="table-wrap package-table"><table><thead><tr><th>批次</th><th>影片 / 包</th><th>去向</th><th>TID 数</th><th>建包人</th><th>领取人</th><th>状态</th><th>操作</th></tr></thead><tbody id="packageBody"></tbody></table></div>
+        <div class="section-heading"><div><h2 id="qcHeading">质检台</h2><p>标注提交完成后实时进入质检；可选择通过、打回标注或拒绝。通过后直接流入验收，打回可循环多轮，拒绝后直接废弃。</p></div></div>
+        <div class="panel live-flow-notice">
+          <div class="panel-heading"><div><h3>实时质检流转</h3><p>这里不再建包、不再领取。标注完成后自动进入待质检队列；质检打回标注修改后，重新提交会自动进入下一次质检。</p></div><span class="tag success">无需建包</span></div>
         </div>
         <div class="split-layout qc-layout">
           <div class="panel queue-panel">
@@ -248,7 +273,7 @@
         </details>
       </section>
       <section id="recordsView" class="view hidden" aria-labelledby="recordsHeading">
-        <div class="section-heading"><div><h2 id="recordsHeading">全部任务与流水</h2><p>按分配日期区间筛选任务，状态始终显示最新。可复制 TID、用 PIN 纠错并查看完整流水。</p></div></div>
+        <div class="section-heading"><div><h2 id="recordsHeading">全部任务与流水</h2><p>按分配日期区间筛选任务，状态始终显示最新。为避免卡顿，默认不展开全部任务，先选影片、包或状态标签再列出。可复制 TID、用 PIN 纠错并查看完整流水。</p></div></div>
                 <div class="export-bar" aria-label="导出本模块全部日期数据">
           <span>导出当前单 / 多镜头模块的全部分配日期数据</span>
           <div class="actions export-actions">
@@ -260,22 +285,22 @@
               <button class="btn small" type="button" data-export="personDaily">个人每日明细</button>
               <button class="btn small" type="button" data-export="summary">综合汇总</button>
               <button class="btn small" type="button" data-export="events">操作流水</button>
-              <button class="btn small" type="button" data-export="packages">建包记录</button>
+              <button class="btn small" type="button" data-export="packages">历史建包记录</button>
             </div></details>
             <button class="btn small" type="button" data-export="backup">完整备份（含单多）</button>
           </div>
         </div>
-        <div class="panel"><div class="panel-heading records-toolbar"><label class="field grow"><span>搜索</span><input id="recordSearch" placeholder="搜索 TID、影片、标注人或质检人"></label><label class="field compact"><span>影片 / 包</span><select id="recordMovie"><option value="all">全部影片</option></select></label><label class="field compact"><span>当前状态</span><select id="recordStatus"><option value="all">全部状态</option></select></label><label class="field compact"><span>质检轮次</span><select id="recordQcRound"><option value="all">全部轮次</option><option value="1">第 1 轮</option><option value="2">第 2 轮</option><option value="3plus">第 3 轮及以上</option></select></label><label class="field compact"><span>分配日期范围</span><select id="recordDateMode"><option value="all" selected>全部分配日期</option><option value="range">自定义分配日期</option><option value="scope">上方日期区间</option></select></label><label class="field compact"><span>分配开始</span><input id="recordDateFrom" type="date"></label><label class="field compact"><span>分配结束</span><input id="recordDateTo" type="date"></label></div><div class="records-status-section"><p id="recordSummary" class="record-summary" aria-live="polite"></p><div id="recordStatusBoard" class="record-status-board" aria-label="按最新任务状态筛选"></div></div><div class="table-wrap records-table"><table><thead><tr><th>TID</th><th>影片 / 包</th><th>小组</th><th>类型</th><th>标注人</th><th class="records-qc-operator">组长 / 质检操作人</th><th>轮次</th><th>当前状态</th><th>首次质检</th><th>最后更新</th><th>操作</th></tr></thead><tbody id="recordBody"></tbody></table></div></div>
+        <div class="panel"><div class="panel-heading records-toolbar"><label class="field grow"><span>搜索</span><input id="recordSearch" placeholder="搜索 TID、影片、标注人或质检人"></label><div class="field compact"><span>影片 / 包（可多选）</span><div class="multi-select" id="recordMovie" data-placeholder="全部影片包" role="button" tabindex="0" aria-haspopup="listbox" aria-expanded="false"><span class="multi-select-value">全部影片包</span><span class="multi-select-caret" aria-hidden="true">▾</span></div></div><div class="field compact"><span>当前状态（可多选）</span><div class="multi-select" id="recordStatus" data-placeholder="全部状态" role="button" tabindex="0" aria-haspopup="listbox" aria-expanded="false"><span class="multi-select-value">全部状态</span><span class="multi-select-caret" aria-hidden="true">▾</span></div></div><label class="field compact"><span>质检轮次</span><select id="recordQcRound"><option value="all">全部轮次</option><option value="1">第 1 轮</option><option value="2">第 2 轮</option><option value="3plus">第 3 轮及以上</option></select></label><label class="field compact"><span>分配日期范围</span><select id="recordDateMode"><option value="all" selected>全部分配日期</option><option value="range">自定义分配日期</option><option value="scope">上方日期区间</option></select></label><label class="field compact"><span>分配开始</span><input id="recordDateFrom" type="date"></label><label class="field compact"><span>分配结束</span><input id="recordDateTo" type="date"></label></div><div class="records-status-section"><p id="recordSummary" class="record-summary" aria-live="polite"></p><div id="recordStatusBoard" class="record-status-board" aria-label="按最新任务状态筛选"></div></div><div class="table-wrap records-table"><table><thead><tr><th>TID</th><th>影片 / 包</th><th>小组</th><th>类型</th><th>标注人</th><th class="records-qc-operator">组长 / 质检操作人</th><th>轮次</th><th>当前状态</th><th>首次质检</th><th>最后更新</th><th>操作</th></tr></thead><tbody id="recordBody"></tbody></table></div></div>
         <aside id="taskEditor" class="panel editor-panel hidden" aria-live="polite"></aside>
         <aside id="timelinePanel" class="panel timeline-panel" aria-live="polite"><div class="empty"><strong>选择任务查看完整流水</strong><span>历史轮次不会被后续返修覆盖。</span></div></aside>
       </section>
     </main>
   </div>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
-  <script src="data-io.js?v=20260920-prod8" defer></script>
-  <script src="shared-store.js?v=20260920-prod8" defer></script>
-  <script src="workflow.js?v=20260920-prod8" defer></script>
-  <script src="reports.js?v=20260920-prod8" defer></script>
-  <script src="app.js?v=20260920-prod8" defer></script>
+  <script src="data-io.js?v=data-io.20260920-prod8.js" defer></script>
+  <script src="shared-store.js?v=shared-store.20260920-prod8.js" defer></script>
+  <script src="workflow.js?v=workflow.20260922-prod30-release.js" defer></script>
+  <script src="reports.js?v=reports.20260920-prod8.js" defer></script>
+  <script src="app.js?v=app.20260922-prod35-cards.js" defer></script>
 </body>
 </html>

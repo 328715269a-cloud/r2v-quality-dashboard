@@ -9,8 +9,8 @@
   const STATUS_META = Object.freeze(Object.fromEntries(Object.entries({
     unclaimed: { label: '待标注', tone: 'pending' },
     annotating: { label: '待标注', tone: 'active' },
-    annotation_done: { label: '标注完成·待建质检包', tone: 'review' },
-    annotation_rework_done: { label: '标注返修完成·待建质检包', tone: 'review' },
+    annotation_done: { label: '标注完成·待质检', tone: 'review' },
+    annotation_rework_done: { label: '标注返修完成·待再次质检', tone: 'review' },
     qc_pack_unclaimed: { label: '质检包待认领', tone: 'review' },
     pending_qc: { label: '待一次质检', tone: 'review' },
     pending_reqc: { label: '待再次质检', tone: 'review' },
@@ -65,7 +65,9 @@
       finalRejectStage: '', finalRejectReason: '', finalRejectedBy: '', finalRejectedAt: '',
       acceptanceNote: '', acceptanceReviewedBy: '', acceptanceReviewedAt: '',
       acceptanceRoute: '', acceptanceRouteNote: '', acceptanceRoutedBy: '', acceptanceRoutedAt: '',
-      qcRepairNote: '', qcRepairedBy: '', qcRepairedAt: ''
+      qcRepairNote: '', qcRepairedBy: '', qcRepairedAt: '',
+      reassignedBy: '', reassignedAt: '', reassignReason: '', reassignRole: '',
+      releasedBy: '', releasedAt: '', releaseReason: ''
     };
     let lastQcReviewRound = 0;
     let lastAcceptanceReviewRound = 0;
@@ -165,9 +167,14 @@
         case 'submit':
           assignee(event); s.round += 1; s.submittedAt = event.at || '';
           if (Number(event.workflowVersion) >= 3 || s.assignmentId) {
-            s.status = s.round === 1 ? 'annotation_done' : 'annotation_rework_done';
+            // Live QC flow: annotation completion enters QC immediately. A QC
+            // return (or an acceptance return routed to annotation) increments
+            // the QC round and re-enters the same queue without a package.
+            const rework = s.round > 1 || ['rework', 'acceptance_rework'].includes(s.status);
+            s.qcRound = Math.max(s.qcRound, rework ? s.qcRound + 1 : 1);
+            s.status = rework ? 'pending_reqc' : 'pending_qc';
           } else {
-            // Old submitted cases were already in QC. Keep their actual state;
+            // Legacy submitted cases were already in QC. Keep their actual state;
             // do not silently invent an unclaimed package during this upgrade.
             s.status = event.targetStatus || (s.round === 1 ? 'pending_qc' : 'pending_reqc');
             if (['pending_qc', 'pending_reqc'].includes(s.status)) s.qcRound = Math.max(s.qcRound, positiveRound(event.qcRound), lastQcReviewRound + 1);
@@ -237,9 +244,46 @@
           if (event.after && event.after.tid) s.tid = event.after.tid;
           if (event.after && event.after.movie) s.movie = event.after.movie;
           break;
+        case 'admin_reassign':
+          // An administrator or group leader hands the task to another person.
+          // Ownership changes and the task returns to the matching step: a new
+          // annotator restarts annotation, a new QC owner enters the QC queue.
+          assignee(event);
+          s.reassignedBy = event.actor || ''; s.reassignedAt = event.at || '';
+          s.reassignReason = event.note || ''; s.reassignRole = event.toRole || '';
+          s.assignmentId = ''; s.assignedFrom = ''; s.assignedBy = ''; s.assignedAt = ''; s.assignmentReason = '';
+          if (event.toRole === 'qc') { s.status = 'pending_qc'; s.qcRound = Math.max(s.qcRound, 1); }
+          else s.status = 'annotating';
+          break;
+        case 'admin_release':
+          // An administrator drops the current owner and puts the task back
+          // into the shared unclaimed pool. Only work that never left
+          // annotation can be released: submitted, reviewed or accepted tasks
+          // keep their history and ignore this event.
+          if (s.round > 0 || !['unclaimed', 'annotating'].includes(s.status)) break;
+          if (s.assignee) s.previousAssignee = s.assignee;
+          s.assignee = ''; s.originalAssignee = '';
+          s.status = 'unclaimed';
+          s.releasedBy = event.actor || ''; s.releasedAt = event.at || '';
+          s.releaseReason = event.note || '';
+          s.assignmentId = ''; s.assignedFrom = ''; s.assignedBy = ''; s.assignedAt = ''; s.assignmentReason = '';
+          s.reassignedBy = ''; s.reassignedAt = ''; s.reassignReason = ''; s.reassignRole = '';
+          break;
         default: break;
       }
     });
+    // Live QC migration: tasks submitted by the current workflow before this
+    // release may still project as annotation_done/annotation_rework_done
+    // because they were waiting for a QC package. Move only those package-less
+    // states into the real-time QC queue; existing package histories remain
+    // readable and continue through their historical claim state.
+    if (!s.deleted && s.status === 'annotation_done') {
+      s.status = 'pending_qc';
+      s.qcRound = Math.max(s.qcRound, 1);
+    } else if (!s.deleted && s.status === 'annotation_rework_done') {
+      s.status = 'pending_reqc';
+      s.qcRound = Math.max(s.qcRound, positiveRound(s.round) || 2);
+    }
     // Earlier releases recorded an acceptance package before claiming it.
     // Keep those records, but include every task that reached acceptance in the
     // direct queue. No synthetic records or production data migration are needed.
@@ -299,7 +343,9 @@
   }
 
   function canBuild(task, stage) {
-    return !!task && !task.deleted && task.status !== 'deleted' && stage === 'qc' && ['annotation_done', 'annotation_rework_done'].includes(task.status);
+    // New workflow never creates QC or acceptance packages. The server keeps
+    // a separate legacy acceptance-package reader for old historical records.
+    return false;
   }
 
   return Object.freeze({ STATUS_META, project, label, counts, canBuild, isReworkAssignment, isQcReject, isAcceptanceReject, eventConflicts, effectiveEvents });

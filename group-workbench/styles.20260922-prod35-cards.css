@@ -1,0 +1,17 @@
+/* prod35：当日作业行扩为 9 卡（流程量 6 + 人 / 拒绝 3）；「已拒绝」从累计行下移到本行 */
+.overview-metrics-today { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+/* 取消 prod31 的人数块分隔线（人数块已换到第二行行首） */
+.overview-metrics-today .overview-metric-today-ann-people { border-left: none; padding-left: 0; }
+.overview-metric-today-rework > strong { color: var(--danger); }
+.overview-metric-today-rework-pending > strong { color: var(--tone-danger); }
+.overview-metric-today-qc-pending > strong { color: var(--tone-warning); }
+.overview-metric-today-rejected > strong { color: var(--danger); }
+.overview-metric-today-rejected { cursor: pointer; text-align: left; }
+@media (max-width: 1080px) {
+  .overview-metrics-today { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .overview-metrics-today { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .overview-metrics-today .overview-metric { grid-column: span 1; padding: 3px 9px 9px; }
+  .overview-metrics-today .overview-metric > strong { font-size: 20px; }
+}

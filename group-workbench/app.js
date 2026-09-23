@@ -2,10 +2,11 @@
   'use strict';
 
   const GROUPS = [
-    ...[1,2,3].map(number=>({id:'g0'+number,name:`单镜头${number}组`,leader:'',defaultMode:'single',members:[]})),
-    ...[1,2,3,4,5,6,7,8].map(number=>({id:number<=5?'g'+String(number+5).padStart(2,'0'):'m0'+number,name:`多镜头${number}组`,leader:'',defaultMode:'multi',members:[]}))
+    ...[1,2,3,4,5].map(number=>({id:'g0'+number,name:`单镜头${number}组`,leader:'',defaultMode:'single',members:[]})),
+    ...[1,2,3,4,5,6,7,8,9,10,11,12].map(number=>({id:number<=5?'g'+String(number+5).padStart(2,'0'):'m'+String(number).padStart(2,'0'),name:`多镜头${number}组`,leader:'',defaultMode:'multi',members:[]}))
   ];
-  const QC_TAGS = ['命名/ID错误', '补标缺失', '景别覆盖缺失', '朝向覆盖缺失', '图片模糊', '黑边/裁切', '备注不完整', '其他'];
+  const QC_TAGS = ['命名/ID对齐错误', '分类/标签归属错误', '朝向覆盖缺失（正/侧/背面）', '景别/机位/角度/朝向判定错误', 'AI生成/图片来源异常', 'ID合并/拆分错误', '主体/对象漏标', '图片模糊/清晰度不足', '黑边/裁切不完整', '其他主体混入/画面污染'];
+  const QC_TAG_COLORS = ['#e4574c', '#e8913a', '#c9a227', '#7fae4e', '#3fa17b', '#3f8fae', '#5a6fd0', '#9a5fd0', '#c95893', '#8a8f98'];
   const STATUS_META = Object.fromEntries(Object.entries(window.WorkbenchFlow.STATUS_META).filter(([key])=>key!=='deleted'));
   const VIEW_META = {
     overview:{id:'overviewView',title:'小组总览'}, dispatch:{id:'dispatchView',title:'任务导入'},
@@ -15,9 +16,7 @@
   const OVERVIEW_BUCKETS = {
     active: { label: '处理中', test: task => !['accepted','rejected'].includes(task.status) },
     closed: { label: '已闭环（通过 + 拒绝）', states: ['accepted','rejected'] },
-    qc_build: { label: '待建质检包', states: ['annotation_done','annotation_rework_done'] },
-    repairs: { label: '返修 / 打回待处理', states: ['rework','acceptance_return_pending','qc_self_rework','acceptance_rework'] },
-    unclaimed_packages: { label: '质检包待领取', states: ['qc_pack_unclaimed'] }
+    repairs: { label: '返修 / 打回待处理', states: ['rework','acceptance_return_pending','qc_self_rework','acceptance_rework'] }
   };
 
   let state = null;
@@ -102,8 +101,9 @@
 
   const IO = window.WorkbenchDataIO;
   const store = window.WorkbenchStore.create();
-  // Confirmed: QC packages remain explicit; QC pass flows directly into acceptance without another package.
-  const FLOW = { sendRole: 'qc', acceptanceDirect: true, qcReject: true, acceptanceReject: true, batchPackages: true };
+  // Live flow: annotation completion enters QC immediately; QC has no new
+  // package/claim step, and QC returns can create another QC round.
+  const FLOW = { sendRole: 'qc', acceptanceDirect: true, qcReject: true, acceptanceReject: true, batchPackages: false, liveQc: true };
   let profile = null;
   let activeMode = 'single';
   function canViewAllGroups() { return !profile || ['admin','acceptance'].includes(profile.role); }
@@ -119,6 +119,7 @@
   const qcStatuses = ['pending_qc', 'pending_reqc', 'rejection_pending'];
 
   const eventIndexes = new WeakMap();
+  const snapshotCache = new WeakMap();
   function eventsForTask(taskId, source = state) {
     if (!eventIndexes.has(source)) {
       const index = new Map();
@@ -129,8 +130,20 @@
   }
   function taskSnapshot(task, source = state) { return window.WorkbenchFlow.project(task, eventsForTask(task.id, source)); }
   function taskWithSnapshot(task, source = state) { return Object.assign({}, task, taskSnapshot(task, source)); }
-  function allTaskHistory(source = state) { return source.tasks.map(task => taskWithSnapshot(task, source)).filter(task=>canViewGroup(task.groupId)); }
-  function allTasks(source = state) { return allTaskHistory(source).filter(task=>!task.deleted); }
+  // Heavy projection cache: one pass per shared-state revision instead of one per caller.
+  function taskIndex(source = state) {
+    let entry = snapshotCache.get(source);
+    if (!entry) {
+      const history = source.tasks.map(task => taskWithSnapshot(task, source)).filter(task=>canViewGroup(task.groupId));
+      entry = { history, tasks: history.filter(task=>!task.deleted) };
+      snapshotCache.set(source, entry);
+    }
+    return entry;
+  }
+  function allTaskHistory(source = state) { return taskIndex(source).history; }
+  function allTasks(source = state) { return taskIndex(source).tasks; }
+  function groupTaskMap(tasks) { const map = new Map(); tasks.forEach(task => { const key = task.groupId; if (!map.has(key)) map.set(key, []); map.get(key).push(task); }); return map; }
+  function movieGroupTaskMap(tasks) { const map = new Map(); tasks.forEach(task => { const key = `${task.groupId}|${task.movie}`; if (!map.has(key)) map.set(key, []); map.get(key).push(task); }); return map; }
   function visibleStateSnapshot() {
     const tasks=state.tasks.filter(task=>canViewGroup(task.groupId)),ids=new Set(tasks.map(task=>task.id));
     const events=state.events.filter(event=>canViewGroup(event.groupId)||ids.has(event.taskId));
@@ -215,7 +228,7 @@
   }
   async function syncShared(manual=false) {
     if(!profile||mutationDepth)return;
-    try {const changed=await store.refresh();state=store.read();if(changed||sharedHasUpdates){if(!hasWorkDraft()&&!mutationDepth){renderCurrentView();sharedHasUpdates=false;}else sharedHasUpdates=true;}
+    try {const changed=await store.refresh();state=store.read();if(changed||sharedHasUpdates){if(!hasWorkDraft()&&!mutationDepth){if(manual){if(multiSelectOpen())deferredRender=true;else renderCurrentView();}else{scheduleCurrentView();}sharedHasUpdates=false;}else sharedHasUpdates=true;}
       $('sharedNewUpdatesLabel')?.classList.toggle('hidden',!sharedHasUpdates);setSharedStatus('ready',sharedHasUpdates?'已同步，当前填写内容已保留':'已连接共享数据');if(manual&&sharedHasUpdates)showToast('已同步云端数据，填写内容已保留。提交时会核对最新状态。');
     }catch(error){setSharedStatus('error',error.status===401?'身份验证已过期，请切换身份重新验证，填写内容已保留。':error.message);if(manual)showToast(error.message,'error');}
   }
@@ -226,6 +239,37 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.add('hidden'), tone === 'error' ? 14000 : 6500);
   }
   function emptyRow(n, message) { return `<tr><td colspan="${n}" class="empty-cell">${escapeHtml(message)}</td></tr>`; }
+  const BATCH_FIRST = 200, BATCH_NEXT = 400;
+  const RENDER_GAP_MS = 1500;
+  let lastRenderAt = 0, renderTimer = null, deferredRender = false;
+  function multiSelectOpen() {
+    const layer = $('multiSelectLayer');
+    return !!layer && !layer.classList.contains('hidden');
+  }
+  function scheduleCurrentView() {
+    clearTimeout(renderTimer);
+    /* 多选面板打开时不做自动重渲染，避免列表重排把面板挤走 / 误关闭（8 秒自动同步会走到这里） */
+    if (multiSelectOpen()) { deferredRender = true; return; }
+    renderTimer = setTimeout(() => { renderTimer = null; renderCurrentView(); }, Math.max(0, RENDER_GAP_MS - (Date.now() - lastRenderAt)));
+  }
+  function renderRowsBatched(tbody, rows, colspan, emptyMessage) {
+    if (!tbody) return;
+    const token = `${Date.now()}-${Math.random()}`;
+    tbody.dataset.renderToken = token;
+    if (!rows.length) { tbody.innerHTML = emptyRow(colspan, emptyMessage); return; }
+    tbody.innerHTML = rows.slice(0, BATCH_FIRST).join('');
+    if (rows.length <= BATCH_FIRST) return;
+    let index = BATCH_FIRST;
+    const step = () => {
+      if (tbody.dataset.renderToken !== token) return;
+      const buffer = document.createElement('template');
+      buffer.innerHTML = rows.slice(index, index + BATCH_NEXT).join('');
+      tbody.appendChild(buffer.content);
+      index += BATCH_NEXT;
+      if (index < rows.length) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
   function statusPill(value) {
     const task=typeof value==='string'?{status:value}:value,meta=window.WorkbenchFlow.STATUS_META[task.status]||{tone:'pending'};
     return `<span class="status ${meta.tone}" data-state="${escapeHtml(task.status)}">${escapeHtml(window.WorkbenchFlow.label(task))}</span>`;
@@ -236,6 +280,89 @@
     if (!select) return; select.innerHTML = rows.map(row => `<option value="${escapeHtml(row.value)}">${escapeHtml(row.label)}</option>`).join('');
     if (rows.some(row => row.value === selected)) select.value = selected;
   }
+  // Multi-select filter control: an empty selection means "all".
+  const MULTI_SELECTS = new Map();
+  function multiState(id) {
+    if (!MULTI_SELECTS.has(id)) MULTI_SELECTS.set(id, {rows: [], selected: new Set(), query: ''});
+    return MULTI_SELECTS.get(id);
+  }
+  function recordStatusOptions() {
+    const statuses = Object.entries(STATUS_META).filter(([key]) => key !== 'annotating' && key !== 'qc_pack_unclaimed').map(([value, meta]) => ({value, label: meta.label}));
+    const buckets = Object.entries(OVERVIEW_BUCKETS).map(([key, bucket]) => ({value: `overview_${key}`, label: bucket.label}));
+    return [...statuses, ...buckets, {value: 'rejections', label: '拒绝相关（含待确认）'}];
+  }
+  function multiOptions(id, rows) {
+    const s = multiState(id), valid = new Set(rows.map(row => row.value));
+    s.rows = rows; [...s.selected].forEach(value => { if (!valid.has(value)) s.selected.delete(value); });
+    multiPaint(id);
+    const layer = $('multiSelectLayer');
+    if (layer && !layer.classList.contains('hidden') && layer.dataset.owner === id) multiRenderList();
+  }
+  function multiGet(id) { return [...multiState(id).selected]; }
+  function multiSet(id, values) {
+    const s = multiState(id), list = (Array.isArray(values) ? values : [values]).filter(value => value && value !== 'all');
+    s.selected = new Set(list); multiPaint(id);
+  }
+  function multiPaint(id) {
+    const box = $(id); if (!box) return;
+    const s = multiState(id), selected = s.rows.filter(row => s.selected.has(row.value));
+    const target = box.querySelector('.multi-select-value');
+    const text = selected.length ? (selected.length === 1 ? selected[0].label : `已选 ${selected.length} 项`) : (box.dataset.placeholder || '全部');
+    if (target) target.textContent = text;
+    box.classList.toggle('has-value', selected.length > 0);
+    box.title = selected.length ? selected.map(row => row.label).join('、') : '';
+  }
+  function multiLayer() {
+    let layer = $('multiSelectLayer');
+    if (!layer) {
+      layer = document.createElement('div'); layer.id = 'multiSelectLayer'; layer.className = 'multi-select-layer hidden'; document.body.appendChild(layer);
+      layer.addEventListener('click', event => {
+        event.stopPropagation();
+        const id = layer.dataset.owner; if (!id) return;
+        if (event.target === layer) { closeMultiSelect(); return; }
+        const s = multiState(id);
+        if (event.target.closest('[data-multi-clear]')) { s.selected.clear(); multiPaint(id); multiRenderList(); multiApply(id); return; }
+        const item = event.target.closest('[data-multi-value]'); if (!item) return;
+        const value = item.dataset.multiValue;
+        if (s.selected.has(value)) s.selected.delete(value); else s.selected.add(value);
+        multiPaint(id); multiRenderList(); multiApply(id);
+      });
+      layer.addEventListener('input', event => {
+        const id = layer.dataset.owner;
+        if (!id || !event.target.matches('.multi-select-search')) return;
+        multiState(id).query = event.target.value; multiRenderList();
+      });
+    }
+    return layer;
+  }
+  function multiRenderList() {
+    const layer = multiLayer(), id = layer.dataset.owner; if (!id) return;
+    const s = multiState(id), query = String(s.query || '').trim().toUpperCase();
+    const rows = query ? s.rows.filter(row => String(row.label).toUpperCase().includes(query) || String(row.value).toUpperCase().includes(query)) : s.rows;
+    const list = layer.querySelector('.multi-select-panel-list'); if (!list) return;
+    list.innerHTML = rows.map(row => { const on = s.selected.has(row.value); return `<button type="button" class="multi-option${on ? ' selected' : ''}" data-multi-value="${escapeHtml(row.value)}" aria-pressed="${on}"><span class="multi-option-box" aria-hidden="true">${on ? '✓' : ''}</span><span>${escapeHtml(row.label)}</span></button>`; }).join('') || '<p class="multi-empty">没有匹配的选项。</p>';
+  }
+  function openMultiSelect(id) {
+    const box = $(id); if (!box) return;
+    const layer = multiLayer(); layer.dataset.owner = id; multiState(id).query = '';
+    const rect = box.getBoundingClientRect(), width = Math.max(240, Math.min(320, rect.width + 60));
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+    layer.innerHTML = `<div class="multi-select-panel" style="top:${Math.round(rect.bottom + 6)}px;left:${Math.round(left)}px;width:${Math.round(width)}px"><div class="multi-select-panel-head"><input class="multi-select-search" type="search" placeholder="搜索选项" aria-label="搜索选项"><button type="button" class="btn ghost small" data-multi-clear="1">清空</button></div><div class="multi-select-panel-list"></div><p class="multi-select-hint">不勾选 = 全部，可同时勾选多项。</p></div>`;
+    multiRenderList(); layer.classList.remove('hidden'); box.classList.add('open'); box.setAttribute('aria-expanded', 'true');
+    const search = layer.querySelector('.multi-select-search'); if (search) search.focus();
+  }
+  function closeMultiSelect() {
+    const layer = $('multiSelectLayer');
+    if (layer) { layer.classList.add('hidden'); layer.innerHTML = ''; delete layer.dataset.owner; }
+    qsa('.multi-select.open').forEach(box => { box.classList.remove('open'); box.setAttribute('aria-expanded', 'false'); });
+    if (deferredRender) { deferredRender = false; if (refreshState()) renderCurrentView(); }
+  }
+  function toggleMultiSelect(id) {
+    const layer = $('multiSelectLayer');
+    if (layer && !layer.classList.contains('hidden') && layer.dataset.owner === id) { closeMultiSelect(); return; }
+    closeMultiSelect(); openMultiSelect(id);
+  }
+  function multiApply(id) { if (id === 'recordMovie' || id === 'recordStatus') { if (refreshState()) renderRecords(); } }
   function initializeControls() {
     const groups = GROUPS.map(group => ({value: group.id, label: group.name}));
     configureScopeGroup(state.preferences.scopeGroup || 'all');
@@ -247,7 +374,7 @@
     options(form.elements.group, groups, profile?.groupId || 'g01');
     form.elements.date.value = todayString(); form.elements.mode.value = 'single';
     const statuses = [{value: 'all', label: '全部状态'}, ...Object.entries(STATUS_META).filter(([key]) => key !== 'annotating').map(([value, meta]) => ({value, label: meta.label}))];
-    options($('recordStatus'), [...statuses,...Object.entries(OVERVIEW_BUCKETS).map(([key,bucket])=>({value:`overview_${key}`,label:bucket.label}))], 'all');
+    multiOptions('recordStatus', recordStatusOptions());
     options($('myTaskFilter'), statuses, 'all');
     if ($('demoReset')) $('demoReset').remove();
   }
@@ -255,8 +382,8 @@
     const selectedMode=mode==='multi'?'multi':'single',groups=GROUPS.filter(group=>group.defaultMode===selectedMode);
     $('identityMode').value=selectedMode;
     options($('identityGroup'),groups.map(group=>({value:group.id,label:group.name})),selected);
-    setText('identityModeHelp',selectedMode==='single'?'单镜头固定3个小组。':'多镜头固定8个小组。');
-    setText('identityGroupHelp',selectedMode==='single'?'请选择：单镜头1组、单镜头2组或单镜头3组。':'请选择：多镜头1组至多镜头8组。');
+    setText('identityModeHelp',selectedMode==='single'?'单镜头固定5个小组。':'多镜头固定12个小组。');
+    setText('identityGroupHelp',selectedMode==='single'?'请选择：单镜头1组至单镜头5组。':'请选择：多镜头1组至多镜头12组。');
     if(state)populateLegacyIdentity();
   }
   function validWorkerProfile(value) { return value && /^\p{Script=Han}{1,20}$/u.test(value.name) && GROUPS.some(group => group.id === value.groupId && (!value.mode || group.defaultMode === value.mode)) && ['annotation','qc','acceptance'].includes(value.role); }
@@ -320,6 +447,7 @@
     setText('pageTitle', VIEW_META[view].title); renderCurrentView();
   }
   function renderCurrentView() {
+    lastRenderAt = Date.now();
     syncScopeControls();
     if (currentView === 'overview') renderOverview();
     if (currentView === 'tasks') { renderTaskSearch(); renderMyTasks(); }
@@ -370,8 +498,8 @@
   function openOverviewBucket(key,groupId) {
     if(!['all','accepted','rejected','rejection_pending','closed'].includes(key)&&!OVERVIEW_BUCKETS[key])return;
     if(groupId)$('scopeGroup').value=groupId;
-    $('recordDateMode').value='all';$('recordSearch').value='';$('recordMovie').value='all';$('recordQcRound').value='all';
-    $('recordStatus').value=OVERVIEW_BUCKETS[key]?`overview_${key}`:key;
+    $('recordDateMode').value='all';$('recordSearch').value='';multiSet('recordMovie',[]);$('recordQcRound').value='all';
+    multiSet('recordStatus',[OVERVIEW_BUCKETS[key]?`overview_${key}`:key]);
     activateView('records');
   }
   function countCells(c) {
@@ -398,14 +526,14 @@
     $('personDailyBody').innerHTML=rows.map(row=>`<tr><td>${escapeHtml(row.date)}</td><td>${escapeHtml(groupLabel(row.groupId))}</td><td>${escapeHtml(row.name)}</td><td>${row.completedTIDs??0}</td><td>${row.initialSubmissionTIDs??0}</td><td>${row.reworkSubmissionActions??0}</td></tr>`).join('')||emptyRow(6,'当前日期区间与小组暂无提交完成记录。');
   }
   function renderGroupProgress(tasks) {
-    const validRange=validScopeRange();
+    const validRange=validScopeRange(),byGroup=groupTaskMap(tasks);
     const rows=(validRange?groupDailyRows():GROUPS.filter(group=>group.defaultMode===activeMode).map(group=>({groupId:group.id,leader:'',total:null,headcount:null,members:[]}))).filter(row=>selectedGroup()==='all'||row.groupId===selectedGroup());
     const expanded=new Set(qsa('#groupProgressBody details[open]').map(details=>details.closest('tr').dataset.groupId));
     setText('groupDailyTotalLabel',singleScopeDate()?'当日总量（手填）':'区间总量（手填）');
     setText('groupDailyAttendanceLabel',singleScopeDate()?'在班人数':'区间在班人天');
     setText('groupDailyScopeHint',validRange?`统计日期 ${scopeRangeLabel()} · 实际完成与人数按日${singleScopeDate()?'统计':'累加'}，任务进度截至当前`:'请修正日期区间；累计任务进度仍为最新状态。');
     $('groupProgressBody').innerHTML=rows.map(row=>{
-      const group=groupById(row.groupId),editable=validRange&&canEditGroupDaily(row.groupId),c=counts(tasks.filter(task=>task.groupId===group.id));
+      const group=groupById(row.groupId),editable=validRange&&canEditGroupDaily(row.groupId),c=counts(byGroup.get(group.id)||[]);
       const members=row.members.length?`有标注记录：${row.members.join('、')}`:'所选日期暂无标注记录';
       const field=(name,value,label)=>editable?`<button type="button" class="group-cell-edit" data-action="edit-group-day" data-group-id="${escapeHtml(group.id)}" data-field="${name}" aria-label="修改${escapeHtml(group.name+label)}">${escapeHtml(value)}<span class="group-edit-icon" aria-hidden="true"></span></button>`:escapeHtml(value);
       const states=Object.keys(STATUS_META).filter(key=>key!=='annotating');
@@ -467,15 +595,19 @@
   }
   function renderOverview() {
     const tasks=allTasks().filter(task=>inCurrentScope(task,false)),c=counts(tasks);
-    Object.entries({metricMovies:new Set(tasks.map(task=>window.WorkbenchReports.movieTitle(task))).size,metricActive:c.total-c.accepted-c.rejected,metricTotal:c.total,metricComplete:c.accepted+c.rejected,metricQcBuild:c.awaitingQcBuild,metricPendingQc:c.qc,metricRework:c.repairs,metricRate:c.total?`${((c.accepted+c.rejected)/c.total*100).toFixed(1)}%`:'0%',metricRejected:c.rejected,metricRejectPending:c.rejection_pending,metricAcceptance:c.pending_acceptance,metricUnsent:0,metricQcClaim:c.qc_pack_unclaimed,metricReturnPending:c.acceptance_return_pending,metricQcSelf:c.qc_self_rework,metricAcceptanceClaim:0}).forEach(([id,value])=>setText(id,value));
-    const followups=[['qc_build','待建质检包','warning'],['unclaimed_packages','质检包待领取','warning'],['repairs','返修 / 打回待处理','danger'],['rejection_pending','标注拒绝待确认','danger']];
+    let firstPass=0,firstTotal=0;
+    tasks.forEach(task=>{const qc=window.WorkbenchReports.annotationContributors(eventsForTask(task.id)).firstQc;if(qc&&(qc.type==='qc_pass'||qc.type==='qc_fail')){firstTotal++;if(qc.type==='qc_pass')firstPass++;}});
+    Object.entries({metricMovies:new Set(tasks.map(task=>window.WorkbenchReports.movieTitle(task))).size,metricActive:c.total-c.accepted-c.rejected,metricTotal:c.total,metricComplete:c.accepted+c.rejected,metricQcBuild:c.awaitingQcBuild,metricPendingQc:c.qc,metricRework:c.repairs,metricRate:c.total?`${((c.accepted+c.rejected)/c.total*100).toFixed(1)}%`:'0%',metricRejected:validScopeRange()?countRangeRejected():'—',metricRejectPending:c.rejection_pending,metricAcceptance:c.pending_acceptance,metricUnsent:0,metricQcClaim:c.qc_pack_unclaimed,metricReturnPending:c.acceptance_return_pending,metricQcSelf:c.qc_self_rework,metricAcceptanceClaim:0,metricFirstQcAccuracy:firstTotal?`${(firstPass/firstTotal*100).toFixed(1)}%`:'—'}).forEach(([id,value])=>setText(id,value));
+    setText('metricFirstQcDetail',firstTotal?`首检 ${firstTotal} 条 · 一次通过 ${firstPass}`:'暂无首检记录');
+    setText('metricRejectedHint',validScopeRange()?`${singleScopeDate()?'当日':'区间'}拒绝（条）· 按拒绝日期`:'请修正日期区间');
+    const followups=[['repairs','返修 / 打回待处理','danger'],['rejection_pending','标注拒绝待确认','danger']];
     $('overviewFollowups').innerHTML=followups.map(([key,label,tone])=>{const count=key==='rejection_pending'?c.rejection_pending:tasks.filter(task=>matchesOverviewBucket(task,key)).length;return `<button type="button" class="overview-followup" data-action="overview-bucket" data-bucket="${key}" data-tone="${tone}"${count===0?' data-empty="true"':''}><span>${label}</span><strong>${count}</strong><span class="followup-arrow" aria-hidden="true">›</span></button>`;}).join('');
     const groups=[['标注与质检',['unclaimed','annotation_done','annotation_rework_done','qc_pack_unclaimed','pending_qc','pending_reqc']],['送验与完成',['qc_pass_unsent','qc_self_done','acceptance_pack_unclaimed','pending_acceptance','accepted']],['返修与拒绝',['rework','acceptance_return_pending','qc_self_rework','acceptance_rework','rejection_pending','rejected']]];
     $('statusBoard').innerHTML=groups.map(([label,keys])=>`<section class="status-group"><h3>${label}</h3><ul>${keys.map(key=>`<li>${overviewStateLink(key,c)}</li>`).join('')}${label==='标注与质检'?`<li class="round-breakdown"><button type="button" data-action="state-details" data-status="pending_reqc" data-round="2"><span>其中：待二次质检</span><strong>${c.qcSecond}</strong></button></li><li class="round-breakdown"><button type="button" data-action="state-details" data-status="pending_reqc" data-round="3plus"><span>其中：待三次及以上质检</span><strong>${c.qcThirdPlus}</strong></button></li>`:''}</ul></section>`).join('');
     renderGroupProgress(tasks);
-    const bundles=IO.summaryRows(tasks,STATUS_META,groupLabel);
+    const bundles=IO.summaryRows(tasks,STATUS_META,groupLabel),byMovieGroup=movieGroupTaskMap(tasks);
     renderMovieProgress();
-    $('rejectionSummaryBody').innerHTML=bundles.map(bundle=>{const c=counts(tasks.filter(task=>task.movie===bundle.movie&&task.groupId===bundle.groupId));return `<tr><td>${escapeHtml(bundle.movie)}</td><td>${escapeHtml(bundle.group)}</td><td>${c.rejection_pending}</td><td>${c.rejected}</td><td><button type="button" class="btn ghost small" data-action="package-rejections" data-movie="${escapeHtml(bundle.movie)}" data-group-id="${escapeHtml(bundle.groupId)}">查看明细</button></td></tr>`;}).join('')||emptyRow(5,'当前范围没有影片包。');renderPersonStats();
+    $('rejectionSummaryBody').innerHTML=bundles.map(bundle=>{const c=counts(byMovieGroup.get(`${bundle.groupId}|${bundle.movie}`)||[]);return `<tr><td>${escapeHtml(bundle.movie)}</td><td>${escapeHtml(bundle.group)}</td><td>${c.rejection_pending}</td><td>${c.rejected}</td><td><button type="button" class="btn ghost small" data-action="package-rejections" data-movie="${escapeHtml(bundle.movie)}" data-group-id="${escapeHtml(bundle.groupId)}">查看明细</button></td></tr>`;}).join('')||emptyRow(5,'当前范围没有影片包。');renderPersonStats();renderErrorAnalysis(tasks);
     setText('allocationSummary', `${modeLabel(activeMode)} · ${selectedGroup()==='all'?'全部小组':groupLabel(selectedGroup())} · 截至当前 · 全部分配日期`);
     renderDailyReport();
     selectOverviewTab(overviewTab);
@@ -484,9 +616,10 @@
     const tasks=allTasks(),query=$('movieProgressSearch').value.trim().toLocaleLowerCase(),filter=$('movieProgressFilter').value;
     const rows=window.WorkbenchReports.movieProgress({tasks,mode:activeMode,groupId:selectedGroup(),groupLabel,statusMeta:STATUS_META}).filter(row=>!query||row.movie.toLocaleLowerCase().includes(query));
     const active=rows.filter(row=>!row.closed),closed=rows.filter(row=>row.closed);
+    const byId=new Map(tasks.map(task=>[task.id,task]));
     const expanded=new Set(qsa('.movie-state-details[open]').map(details=>details.closest('tr').dataset.movieKey));
     const renderRow=row=>{
-      const ids=new Set(row.taskIds),c=counts(tasks.filter(task=>ids.has(task.id))),closedCount=row.accepted+row.rejected;
+      const c=counts(row.taskIds.map(id=>byId.get(id)).filter(Boolean)),closedCount=row.accepted+row.rejected;
       const percentage=row.closed?100:Math.floor(row.closureRate*10)/10;
       const link=(status,label,value)=>`<button type="button" data-action="movie-progress-details" data-movie="${escapeHtml(row.movie)}" data-status="${status}" data-tone="${overviewStateTone(status)}"><span>${escapeHtml(label)}</span><strong>${value}</strong></button>`;
       const states=Object.keys(STATUS_META).filter(key=>key!=='annotating').map(key=>link(key,STATUS_META[key].label,key==='unclaimed'?c.annotation:c[key])).join('');
@@ -501,23 +634,62 @@
   }
   function openWholeMovie(movie,status='all') {
     recordWholeMovie={title:movie,value:''};
-    $('scopeGroup').value='all';$('recordDateMode').value='all';$('recordSearch').value='';$('recordQcRound').value='all';$('recordStatus').value=status;$('recordMovie').value='all';
-    activateView('records');$('recordMovie').value=recordWholeMovie.value;renderRecords();
+    $('scopeGroup').value='all';$('recordDateMode').value='all';$('recordSearch').value='';$('recordQcRound').value='all';multiSet('recordStatus',[status]);multiSet('recordMovie',[]);
+    activateView('records');multiSet('recordMovie',[recordWholeMovie.value]);renderRecords();
   }
   function renderPersonStats() {
-    if(!validScopeRange()){$('personStatsBody').innerHTML=emptyRow(11,'请修正日期区间');return;}
+    if(!validScopeRange()){$('personStatsBody').innerHTML=emptyRow(12,'请修正日期区间');return;}
     const result = new Map();
-    const person=(groupId,name)=>{if(!name)return null;const key=JSON.stringify([groupId,name]);if(!result.has(key))result.set(key,{name,groupId,initial:0,rework:0,accepted:0,first:0,pass:0,P0:0,P1:0,P2:0});return result.get(key);};
+    const person=(groupId,name)=>{if(!name)return null;const key=JSON.stringify([groupId,name]);if(!result.has(key))result.set(key,{name,groupId,initial:0,rework:0,accepted:0,first:0,pass:0,P0:0,P1:0,P2:0,tags:new Map()});return result.get(key);};
     allTasks().filter(task=>inCurrentScope(task,false)).forEach(task => {
       person(task.groupId,task.assignee);
       const contribution=window.WorkbenchReports.annotationContributors(eventsForTask(task.id)),day=event=>inDateRange(eventDate(event));
       contribution.submissions.forEach(event=>{const row=person(task.groupId,event.name);if(row&&day(event))row[event.kind==='initial'?'initial':'rework']++;});
       const accept=contribution.firstAcceptance;if(accept&&day(accept)){const row=person(task.groupId,accept.name);if(row)row.accepted++;}
-      const qc=contribution.firstQc;if(qc&&day(qc)){const row=person(task.groupId,qc.name);if(row){row.first++;if(qc.type==='qc_pass')row.pass++;else if(qc.type==='qc_fail'&&['P0','P1','P2'].includes(qc.pLevel))row[qc.pLevel]++;}}
+      const qc=contribution.firstQc;if(qc&&day(qc)){const row=person(task.groupId,qc.name);if(row){row.first++;if(qc.type==='qc_pass')row.pass++;else if(qc.type==='qc_fail'&&['P0','P1','P2'].includes(qc.pLevel)){row[qc.pLevel]++;(qc.tags||[]).forEach(tag=>row.tags.set(tag,(row.tags.get(tag)||0)+1));}}}
     });
-    $('personStatsBody').innerHTML=[...result.values()].map(row=>`<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(groupLabel(row.groupId))}</td>${['initial','rework','accepted','first','pass','P0','P1','P2'].map(key=>`<td>${row[key]}</td>`).join('')}<td>${row.first?`${(row.pass/row.first*100).toFixed(1)}%`:'暂无首检'}</td></tr>`).join('')||emptyRow(11,'当前范围还没有人员作业记录。');
+    $('personStatsBody').innerHTML=[...result.values()].map(row=>{const chips=[...row.tags.entries()].sort((a,b)=>b[1]-a[1]).slice(0,2).map(([tag,count])=>`<button type="button" class="error-chip" data-action="error-person" data-key="${encodeURIComponent(JSON.stringify([row.groupId,row.name]))}" title="查看 ${escapeHtml(row.name)} 的错误标签分布">${escapeHtml(tag)}×${count}</button>`).join(' ');return `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(groupLabel(row.groupId))}</td>${['initial','rework','accepted','first','pass','P0','P1','P2'].map(key=>`<td>${row[key]}</td>`).join('')}<td>${row.first?`${(row.pass/row.first*100).toFixed(1)}%`:'暂无首检'}</td><td class="error-chip-cell">${chips||'<span class="muted">—</span>'}</td></tr>`;}).join('')||emptyRow(12,'当前范围还没有人员作业记录。');
+  }
+  function errorTagStats(tasks) {
+    const stats=new Map();
+    tasks.forEach(task=>{
+      const qc=window.WorkbenchReports.annotationContributors(eventsForTask(task.id)).firstQc;
+      if(!qc||qc.type!=='qc_fail'||!inDateRange(eventDate(qc))||!Array.isArray(qc.tags)||!qc.tags.length)return;
+      const key=JSON.stringify([task.groupId,qc.name]);
+      if(!stats.has(key))stats.set(key,{groupId:task.groupId,name:qc.name,items:[]});
+      stats.get(key).items.push({pLevel:['P0','P1','P2'].includes(qc.pLevel)?qc.pLevel:'',tags:qc.tags});
+    });
+    return stats;
+  }
+  function renderErrorAnalysis(tasks) {
+    const details=$('errorAnalysisDetails');
+    if(!details||!details.open)return;
+    const stats=errorTagStats(tasks),scopeSel=$('errorScope');
+    const groups=new Map(),people=[];
+    [...stats.entries()].forEach(([key,row])=>{groups.set(row.groupId,groupLabel(row.groupId));people.push({key,label:`${row.name}（${groupLabel(row.groupId)}）`});});
+    people.sort((a,b)=>a.label.localeCompare(b.label,'zh-Hans-CN'));
+    const prev=scopeSel.value;
+    scopeSel.innerHTML='<option value="all">整体</option>'+[...groups.entries()].sort((a,b)=>String(a[1]).localeCompare(String(b[1]),'zh-Hans-CN')).map(([id,label])=>`<option value="group:${escapeHtml(id)}">小组：${escapeHtml(label)}</option>`).join('')+people.map(p=>`<option value="person:${encodeURIComponent(p.key)}">${escapeHtml(p.label)}</option>`).join('');
+    if([...scopeSel.options].some(option=>option.value===prev))scopeSel.value=prev;
+    const scope=scopeSel.value,level=$('errorLevel').value,merged=new Map();
+    let total=0,firstChecks=0;
+    [...stats.entries()].forEach(([key,row])=>{
+      if(scope.startsWith('group:')&&row.groupId!==scope.slice(6))return;
+      if(scope.startsWith('person:')&&key!==JSON.parse(decodeURIComponent(scope.slice(7))))return;
+      row.items.forEach(item=>{if(level!=='all'&&item.pLevel!==level)return;firstChecks++;item.tags.forEach(tag=>{merged.set(tag,(merged.get(tag)||0)+1);total++;});});
+    });
+    const body=$('errorAnalysisBody');
+    if(!total){body.innerHTML='<p class="overview-detail-note">当前范围暂无首次质检打回的标签数据（质检拒绝不计入）。</p>';return;}
+    const colorOf=tag=>QC_TAG_COLORS[QC_TAGS.indexOf(tag)]||'#8a8f98';
+    const list=[...merged.entries()].map(([tag,count])=>({tag,count})).sort((a,b)=>b.count-a.count);
+    let acc=0;
+    const stops=list.map(item=>{const start=(acc/total*100).toFixed(2);acc+=item.count;return `${colorOf(item.tag)} ${start}% ${(acc/total*100).toFixed(2)}%`;});
+    const rows=list.map(item=>{const pct=item.count/total*100;return `<div class="error-rank-row"><span class="error-dot" style="background:${colorOf(item.tag)}"></span><span class="error-rank-label" title="${escapeHtml(item.tag)}">${escapeHtml(item.tag)}</span><span class="error-rank-num"><strong>${item.count}</strong><small>${pct.toFixed(1)}%</small></span><span class="error-rank-bar"><span style="width:${pct.toFixed(2)}%;background:${colorOf(item.tag)}"></span></span></div>`;}).join('');
+    body.innerHTML=`<div class="error-analysis-grid"><div class="error-pie-wrap"><div class="error-pie" style="background:conic-gradient(${stops.join(',')})" role="img" aria-label="错误标签占比饼图"></div><p class="muted">首检打回 ${firstChecks} 条 · 标签共 ${total} 个</p></div><div class="error-rank">${rows}</div></div>`;
   }
   function matchesStatus(task,status) { return status.startsWith('overview_')?matchesOverviewBucket(task,status.slice(9)):status==='all'||(status==='unclaimed'?['unclaimed','annotating'].includes(task.status):task.status===status); }
+  function matchesStatusList(task,list) { return !list.length||list.some(status=>status==='rejections'?['rejected','rejection_pending'].includes(task.status):matchesStatus(task,status)); }
+  function matchesQcRound(task,round) { return round==='all'||(round==='3plus'?task.qcRound>=3:String(task.qcRound)===round); }
   function renderTaskSearch() {
     const query=$('taskSearchInput').value.trim().toUpperCase();
     if(!query){$('taskSearchResult').innerHTML='';return;}
@@ -555,10 +727,10 @@
     if(await mutate(source=>{const task=findTask(source,form.dataset.taskId);requireRole('annotation',task);assertFresh(task,form.dataset.expected);if(!ownsTask(task)||!annotationStatuses.includes(task.status)||task.status==='unclaimed')throw new Error('此任务现在不能申请拒绝。');return{events:[newEvent(source,task,'annotator_reject',{note,assignee:profile.name,previousAssignee:task.assignee,resumeStatus:task.status})]};},'标注拒绝已提交，等待质检确认。'))renderMyTasks();
   }
   function renderQcQueue(preserveWorkbench=false) {
-    renderPackages();renderReworkAssignments();const filter=$('qcTaskFilter').value;
-    const statuses=['annotation_done','annotation_rework_done','pending_qc','pending_reqc','rejection_pending','acceptance_return_pending','qc_self_rework'];
-    const rows=allTasks().filter(task=>task.mode===activeMode&&task.groupId===profile.groupId&&statuses.includes(task.status)&&(filter==='all'||filter==='build'&&window.WorkbenchFlow.canBuild(task,'qc')||filter==='review'&&['pending_qc','pending_reqc'].includes(task.status)||filter==='return'&&['acceptance_return_pending','qc_self_rework'].includes(task.status)||filter===task.status)).sort((a,b)=>String(a.updatedAt).localeCompare(String(b.updatedAt)));
-    $('qcQueueBody').innerHTML=rows.map(task=>{const packable=window.WorkbenchFlow.canBuild(task,'qc');return `<tr><td><input type="checkbox" name="qcTask" value="${escapeHtml(task.id)}" data-expected="${escapeHtml(task.updatedAt)}" aria-label="选择 ${escapeHtml(task.tid)}"></td><td>${tidMarkup(task)}</td><td>${escapeHtml(task.assignee)}</td><td>${escapeHtml(task.movie)}</td><td>${statusPill(task)}</td><td>${formatDateTime(task.updatedAt)}</td><td><button type="button" class="btn primary small" data-action="${packable?'prepare-package':'review'}" data-task-id="${escapeHtml(task.id)}">${packable?'登记质检包':task.status==='rejection_pending'?'确认标注拒绝':task.status==='acceptance_return_pending'?'处理验收打回':task.status==='qc_self_rework'?'登记修改完成':'开始质检'}</button></td></tr>`;}).join('')||emptyRow(7,'当前没有匹配的本组待办。');
+    renderReworkAssignments();const filter=$('qcTaskFilter').value;
+    const statuses=['pending_qc','pending_reqc','rejection_pending','acceptance_return_pending','qc_self_rework'];
+    const rows=allTasks().filter(task=>task.mode===activeMode&&task.groupId===profile.groupId&&statuses.includes(task.status)&&(filter==='all'||filter==='review'&&['pending_qc','pending_reqc'].includes(task.status)||filter==='return'&&['acceptance_return_pending','qc_self_rework'].includes(task.status)||filter===task.status)).sort((a,b)=>String(a.updatedAt).localeCompare(String(b.updatedAt)));
+    $('qcQueueBody').innerHTML=rows.map(task=>{const reviewable=['pending_qc','pending_reqc'].includes(task.status);return `<tr><td><input type="checkbox" name="qcTask" value="${escapeHtml(task.id)}" data-expected="${escapeHtml(task.updatedAt)}" aria-label="选择 ${escapeHtml(task.tid)}"></td><td>${tidMarkup(task)}</td><td>${escapeHtml(task.assignee)}</td><td>${escapeHtml(task.movie)}</td><td>${statusPill(task)}</td><td>${formatDateTime(task.updatedAt)}</td><td><button type="button" class="btn primary small" data-action="review" data-task-id="${escapeHtml(task.id)}">${task.status==='rejection_pending'?'确认标注拒绝':task.status==='acceptance_return_pending'?'处理验收打回':task.status==='qc_self_rework'?'登记修改完成':reviewable?'开始质检':'查看处理'}</button></td></tr>`;}).join('')||emptyRow(7,'当前没有匹配的本组待办。标注提交完成后会实时进入这里，无需建质检包。');
     $('qcSelectAll').checked=false;if(selectedQcTaskId&&!rows.some(task=>task.id===selectedQcTaskId))selectedQcTaskId='';if(!preserveWorkbench)renderQcWorkbench(selectedQcTaskId);
   }
   function reworkAssignmentScope() { return JSON.stringify({profile,mode:activeMode}); }
@@ -620,7 +792,7 @@
     else if(task.status==='acceptance_return_pending')fields=`<p><strong>验收打回：</strong>${escapeHtml(task.acceptanceNote)}</p><label><input type="radio" name="decision" value="acceptance_route_qc" required> 我来修改（质检自行返修）</label><label><input type="radio" name="decision" value="acceptance_route_annotation" required> 退给标注修改，改完重新质检</label><label class="field"><span>处理说明（必填）</span><textarea name="note" required maxlength="2000"></textarea></label>`;
     else if(task.status==='qc_self_rework')fields=`<p><strong>验收问题：</strong>${escapeHtml(task.acceptanceNote)}</p><input type="hidden" name="decision" value="qc_repair_done"><label class="field"><span>修改说明（必填）</span><textarea name="note" required maxlength="2000"></textarea></label>`;
     else if(['pending_qc','pending_reqc'].includes(task.status))fields=qcReviewFields();
-    else{target.innerHTML='<p class="muted">请在建包区登记已完成的建包与领取动作。</p>';return;}
+    else{target.innerHTML='<p class="muted">标注提交完成后会自动进入质检队列，无需建包或领取。</p>';return;}
     target.innerHTML=`<div class="panel-heading"><div><h3>${escapeHtml(task.tid)}</h3><p>${escapeHtml(task.movie)} · ${escapeHtml(task.assignee)}</p></div>${statusPill(task)}</div><form id="qcDecisionForm" class="workbench-form" data-task-id="${escapeHtml(id)}" data-expected="${escapeHtml(task.updatedAt)}">${fields}<button class="btn primary" type="submit">${task.status==='qc_self_rework'?'我已修改完成':'保存处理结果'}</button></form>`;
   }
   async function saveQcDecision(form) {
@@ -910,19 +1082,21 @@
     if(event.packageName)parts.push(`建包批次：${event.packageName}`);if(event.stage)parts.push(event.stage==='qc'?'送质检':'送验收');if(event.packageRound)parts.push(`第 ${event.packageRound} 轮`);if(event.route)parts.push(event.route==='qc'?'质检自行修改':'标注修改后重新质检');
     if(event.note)parts.push(event.note);return parts.join(' · ')||'已记录';
   }
+  let recordsGateOpen=false;
   function renderRecords() {
-    let currentMovie=$('recordMovie').value||'all';
-    const names=[...new Set(allTasks().filter(task=>inCurrentScope(task,false)).map(task=>task.movie))].sort(),movieOptions=[{value:'all',label:'全部影片包'},...names.map(movie=>({value:movie,label:movie}))];
-    if(recordWholeMovie){const wasSelected=!!recordWholeMovie.value&&currentMovie===recordWholeMovie.value;let value=`__whole_movie__:${encodeURIComponent(recordWholeMovie.title)}`;while(names.includes(value))value=`_${value}`;recordWholeMovie.value=value;movieOptions.push({value,label:`整片：${recordWholeMovie.title}`});if(wasSelected)currentMovie=value;}
-    options($('recordMovie'),movieOptions,currentMovie);
+    const names=[...new Set(allTasks().filter(task=>inCurrentScope(task,false)).map(task=>task.movie))].sort(),movieOptions=names.map(movie=>({value:movie,label:movie}));
+    if(recordWholeMovie){let value=`__whole_movie__:${encodeURIComponent(recordWholeMovie.title)}`;while(names.includes(value))value=`_${value}`;recordWholeMovie.value=value;movieOptions.push({value,label:`整片：${recordWholeMovie.title}`});}
+    multiOptions('recordMovie',movieOptions);
     const dateMode=$('recordDateMode').value;$('recordDateFrom').disabled=dateMode!=='range';$('recordDateTo').disabled=dateMode!=='range';
     let base=[];try{base=recordBaseTasks();}catch(error){setText('recordSummary',error.message);$('recordBody').innerHTML=emptyRow(11,error.message);$('recordStatusBoard').innerHTML='';return;}
-    const c=counts(base),status=$('recordStatus').value,round=$('recordQcRound').value;
-    const rows=base.filter(task=>(status==='rejections'?['rejected','rejection_pending'].includes(task.status):matchesStatus(task,status))&&(round==='all'||round==='3plus'&&task.qcRound>=3||String(task.qcRound)===round)).sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)));
-    setText('recordSummary',`${modeLabel(activeMode)} · 筛选范围 ${new Set(base.map(task=>window.WorkbenchReports.movieTitle(task))).size} 部影片 / ${base.length} 条 TID · 当前显示 ${rows.length} 条。状态均为最新状态。`);
-    const bucket=OVERVIEW_BUCKETS[status.slice(9)],bucketChip=status.startsWith('overview_')&&bucket?`<button type="button" class="status-count active" data-action="record-state" data-status="${escapeHtml(status)}">${escapeHtml(bucket.label)} <strong>${base.filter(task=>matchesStatus(task,status)).length}</strong></button>`:'';
-    $('recordStatusBoard').innerHTML=bucketChip+`<button type="button" class="status-count ${status==='all'?'active':''}" data-action="record-state" data-status="all">全部 <strong>${base.length}</strong></button>`+Object.entries(STATUS_META).filter(([key])=>key!=='annotating').map(([key,meta])=>`<button type="button" class="status-count ${status===key?'active':''}" data-action="record-state" data-status="${key}" data-tone="${overviewStateTone(key)}">${escapeHtml(meta.label)} <strong>${key==='unclaimed'?c.annotation:c[key]}</strong></button>`).join('')+`<button type="button" class="status-count" data-action="record-state" data-status="pending_reqc" data-round="2">其中：待二次质检 <strong>${c.qcSecond}</strong></button><button type="button" class="status-count" data-action="record-state" data-status="pending_reqc" data-round="3plus">其中：待三次及以上质检 <strong>${c.qcThirdPlus}</strong></button>`;
-    $('recordBody').innerHTML=rows.map(task=>{const qc=firstEvent(task.id,event=>['qc_pass','qc_fail','qc_reject'].includes(event.type)),operator=window.WorkbenchReports.qcOperator(eventsForTask(task.id)),operatorHint=operator.name?`${eventLabel({type:operator.type})} · ${formatDateTime(operator.at)}`:'尚无质检操作记录';return `<tr><td>${tidMarkup(task)}</td><td>${escapeHtml(task.movie)}</td><td>${groupLabel(task.groupId)}</td><td>${modePill(task.mode)}</td><td>${escapeHtml(task.assignee||'未认领')}</td><td class="records-qc-operator" title="${escapeHtml(operatorHint)}">${escapeHtml(operator.name||'暂无')}</td><td>质检 ${task.qcRound} / 验收 ${task.acceptanceRound}</td><td>${statusPill(task)}</td><td>${qc?(qc.type==='qc_pass'?'通过':window.WorkbenchFlow.isQcReject(qc)?'拒绝':escapeHtml(qc.pLevel||'打回')):'暂无'}</td><td>${formatDateTime(task.updatedAt)}</td><td><div class="row-actions"><button type="button" class="btn ghost small" data-action="timeline" data-task-id="${escapeHtml(task.id)}">查看</button><button type="button" class="btn ghost small" data-action="edit-task" data-task-id="${escapeHtml(task.id)}">修改 TID</button></div></td></tr>`;}).join('')||emptyRow(11,'当前筛选没有任务。');renderTimeline(selectedTimelineTaskId);
+    const c=counts(base),statusList=multiGet('recordStatus'),round=$('recordQcRound').value;
+    const gateActive=recordsGateOpen||statusList.length>0||multiGet('recordMovie').length>0||round!=='all'||$('recordSearch').value.trim().length>0;
+    const rows=base.filter(task=>matchesStatusList(task,statusList)&&matchesQcRound(task,round)).sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)));
+    setText('recordSummary',`${modeLabel(activeMode)} · 筛选范围 ${new Set(base.map(task=>window.WorkbenchReports.movieTitle(task))).size} 部影片 / ${base.length} 条 TID · ${gateActive?`当前显示 ${rows.length} 条。${statusList.length>1?`已选 ${statusList.length} 个状态。` : ''}`:'为避免卡顿，默认不展开全部任务：请先选择影片 / 包或点击状态标签，再列出明细。'}状态均为最新状态。`);
+    const single=statusList.length===1?statusList[0]:'',bucketKey=single.startsWith('overview_')?single.slice(9):'',bucket=bucketKey?OVERVIEW_BUCKETS[bucketKey]:null;
+    const bucketChip=bucket?`<button type="button" class="status-count active" data-action="record-state" data-status="${escapeHtml(single)}">${escapeHtml(bucket.label)} <strong>${base.filter(task=>matchesOverviewBucket(task,bucketKey)).length}</strong></button>`:'';
+    $('recordStatusBoard').innerHTML=bucketChip+`<button type="button" class="status-count ${statusList.length===0?'active':''}" data-action="record-state" data-status="all">全部 <strong>${base.length}</strong></button>`+Object.entries(STATUS_META).filter(([key])=>key!=='annotating'&&key!=='qc_pack_unclaimed').map(([key,meta])=>`<button type="button" class="status-count ${single===key?'active':''}" data-action="record-state" data-status="${key}" data-tone="${overviewStateTone(key)}">${escapeHtml(meta.label)} <strong>${key==='unclaimed'?c.annotation:c[key]}</strong></button>`).join('')+`<button type="button" class="status-count" data-action="record-state" data-status="pending_reqc" data-round="2">其中：待二次质检 <strong>${c.qcSecond}</strong></button><button type="button" class="status-count" data-action="record-state" data-status="pending_reqc" data-round="3plus">其中：待三次及以上质检 <strong>${c.qcThirdPlus}</strong></button>`;
+    if(gateActive)renderRowsBatched($('recordBody'),rows.map(task=>{const qc=firstEvent(task.id,event=>['qc_pass','qc_fail','qc_reject'].includes(event.type)),operator=window.WorkbenchReports.qcOperator(eventsForTask(task.id)),operatorHint=operator.name?`${eventLabel({type:operator.type})} · ${formatDateTime(operator.at)}`:'尚无质检操作记录';return `<tr><td>${tidMarkup(task)}</td><td>${escapeHtml(task.movie)}</td><td>${groupLabel(task.groupId)}</td><td>${modePill(task.mode)}</td><td>${escapeHtml(task.assignee||'未认领')}</td><td class="records-qc-operator" title="${escapeHtml(operatorHint)}">${escapeHtml(operator.name||'暂无')}</td><td>质检 ${task.qcRound} / 验收 ${task.acceptanceRound}</td><td>${statusPill(task)}</td><td>${qc?(qc.type==='qc_pass'?'通过':window.WorkbenchFlow.isQcReject(qc)?'拒绝':escapeHtml(qc.pLevel||'打回')):'暂无'}</td><td>${formatDateTime(task.updatedAt)}</td><td><div class="row-actions"><button type="button" class="btn ghost small" data-action="timeline" data-task-id="${escapeHtml(task.id)}">查看</button><button type="button" class="btn ghost small" data-action="edit-task" data-task-id="${escapeHtml(task.id)}">修改 TID</button></div></td></tr>`;}),11,'当前筛选没有任务。');else $('recordBody').innerHTML=emptyRow(11,'为避免卡顿，默认不展开全部任务：请先在上方选择影片 / 包、点击状态标签，或输入搜索、质检轮次后再列出。');renderTimeline(selectedTimelineTaskId);
   }
   function renderTimeline(id) {
     if(!id){$('timelinePanel').innerHTML='<div class="empty"><strong>选择任务查看完整流水</strong><span>保留历次提交、质检、拒绝确认、验收和资料修改。</span></div>';return;}
@@ -940,6 +1114,57 @@
   async function saveTaskEdit(form) {
     const tid=form.elements.tid.value.trim(),pin=form.elements.pin.value,note=form.elements.note.value.trim();if(!note){showToast('请填写修改原因。','error');return;}
     if(await mutate(source=>{requireManager();requirePin(pin);const task=findTask(source,form.dataset.taskId);if(task.mode!==activeMode)throw new Error('请切换回任务所属业务模块后再保存，草稿已保留。');assertFresh(task,form.dataset.expected);if(tid===task.tid)throw new Error('TID 没有变化。');const edit={id:task.id,before:{tid:task.tid,movie:task.movie},after:{tid,movie:task.movie}};validateEdits(source,[edit]);return{events:[newEvent(source,task,'metadata_edit',{before:edit.before,after:edit.after,note})]};},'TID 已修正，完整历史记录已保留。',{pin,form})){$('taskEditor').classList.add('hidden');$('taskEditor').innerHTML='';selectedTimelineTaskId=form.dataset.taskId;renderRecords();}
+  }
+  function reassignSearchValue() { return String($('reassignSearchInput')?.value || '').trim(); }
+  function renderReassignNames() {
+    const list=$('reassignNameList');if(!list)return;
+    const names=new Set(),ids=new Set();
+    for(const task of allTasks()){if(task.deleted||task.mode!==activeMode)continue;ids.add(task.id);if(task.assignee)names.add(task.assignee);}
+    for(const event of state.events)if(ids.has(event.taskId)&&event.actor&&event.actor!=='admin')names.add(event.actor);
+    list.innerHTML=[...names].sort((a,b)=>a.localeCompare(b,'zh')).slice(0,300).map(name=>`<option value="${escapeHtml(name)}"></option>`).join('');
+  }
+  function hideReassignForm() {
+    const form=$('reassignForm');if(!form)return;form.classList.add('hidden');form.reset();form.dataset.taskId='';form.dataset.expected='';setText('reassignTarget','');
+  }
+  function renderReassignResults() {
+    const target=$('reassignResults');if(!target)return;
+    const needle=reassignSearchValue().toUpperCase();
+    if(!needle){target.innerHTML='<span>输入 TID 后搜索，最多显示 20 条。</span>';hideReassignForm();return;}
+    const rows=allTasks().filter(task=>!task.deleted&&task.mode===activeMode&&String(task.tid).toUpperCase().includes(needle)).sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt))).slice(0,20);
+    if(!rows.length){target.innerHTML=`<span>${escapeHtml(modeLabel(activeMode))}模块没有匹配的 TID，请确认单镜头 / 多镜头是否切换正确。</span>`;hideReassignForm();return;}
+    target.innerHTML=`<ul>${rows.map(task=>`<li><button type="button" class="btn ghost small" data-action="reassign-pick" data-task-id="${escapeHtml(task.id)}"><span class="mono">${escapeHtml(task.tid)}</span> · ${escapeHtml(task.movie)} · ${escapeHtml(groupLabel(task.groupId))} · ${escapeHtml(task.assignee||'未认领')} · ${escapeHtml(STATUS_META[task.status]?.label||task.status)}</button></li>`).join('')}</ul>`;
+  }
+  function pickReassignTask(id) {
+    if(!refreshState())return;
+    const task=findTask(state,id),form=$('reassignForm');if(!task||!form)return;
+    form.classList.remove('hidden');form.dataset.taskId=id;form.dataset.expected=task.updatedAt||'';
+    form.querySelector('select[name="toRole"]').value=['pending_qc','pending_reqc','qc_self_rework','pending_acceptance','rejection_pending','accepted','rejected'].includes(task.status)?'qc':'annotation';
+    setText('reassignTarget',`即将改派：${task.tid} · ${task.movie} · ${groupLabel(task.groupId)} · 当前处理人 ${task.assignee||'未认领'} · 当前状态 ${STATUS_META[task.status]?.label||task.status}`);
+    form.querySelector('input[name="assignee"]').focus();form.scrollIntoView({behavior:'smooth',block:'center'});
+  }
+  async function saveReassign(form) {
+    const assignee=form.elements.assignee.value.trim(),pin=form.elements.pin.value,toRole=form.elements.toRole.value,note=form.elements.note.value.trim(),taskId=form.dataset.taskId;
+    if(!assignee){showToast('请填写新处理人姓名。','error');return;}
+    if(await mutate(source=>{
+      requireManager();requirePin(pin);
+      const task=findTask(source,taskId);
+      if(!task)throw new Error('未找到这条任务，请重新搜索。');
+      if(task.mode!==activeMode)throw new Error('请切换回任务所属业务模块后再改派，填写内容已保留。');
+      assertFresh(task,form.dataset.expected);
+      if(assignee===task.assignee&&toRole==='annotation')throw new Error('新处理人与当前处理人相同。');
+      return{events:[newEvent(source,task,'admin_reassign',{assignee,toRole,note})]};
+    },toRole==='qc'?`已改派给 ${assignee}，状态变为待质检。`:`已改派给 ${assignee}，状态回到待标注。`,{pin,form})){hideReassignForm();renderReassignResults();}
+  }
+  function bindReassignEvents() {
+    if(!$('reassignSearchForm'))return;
+    $('reassignSearchForm').addEventListener('submit',event=>{event.preventDefault();if(!refreshState())return;renderReassignNames();renderReassignResults();});
+    $('reassignSearchInput').addEventListener('input',()=>{if(refreshState())renderReassignResults();});
+    $('reassignCancel').addEventListener('click',hideReassignForm);
+    document.addEventListener('click',event=>{const button=event.target.closest('[data-action="reassign-pick"]');if(!button)return;try{pickReassignTask(button.dataset.taskId);}catch(error){showToast(error.message,'error');}});
+  }
+  function syncReassignModule() {
+    if(!$('reassignModeLabel'))return;
+    try{setText('reassignModeLabel',modeLabel(activeMode));$('reassignSearchInput').value='';renderReassignNames();renderReassignResults();}catch(error){}
   }
   function download(name,content,type) {const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}
   async function exportData(kind,range='all') {
@@ -967,7 +1192,7 @@
   }
   function initializeWorkflowControls() {
     options($('myTaskFilter'),[{value:'actionable',label:'待我处理'},{value:'all',label:'全部状态'},...Object.entries(STATUS_META).filter(([key])=>key!=='annotating').map(([value,meta])=>({value,label:meta.label}))],'actionable');
-    options($('qcTaskFilter'),[{value:'all',label:'全部待办'},{value:'build',label:'待建包'},{value:'review',label:'待质检'},{value:'return',label:'验收退回'},{value:'rejection_pending',label:'拒绝待确认'}],'all');
+    options($('qcTaskFilter'),[{value:'all',label:'全部待办'},{value:'review',label:'待质检'},{value:'return',label:'返修处理'},{value:'rejection_pending',label:'拒绝待确认'}],'all');
   }
 
   function eventSequence(source,task,definitions) {
@@ -980,7 +1205,7 @@
     if(task.status==='unclaimed')throw new Error('请先通过“认领 TID”登记到本人名下，再提交完成');
     if(!ownsTask(task))throw new Error('已由其他人员认领，不能覆盖');
     const round=task.round+1,definitions=[];
-    definitions.push(['submit',{round,assignee:profile.name,previousAssignee:task.assignee,submissionKind:round===1?'initial':'rework',note:round===1?'标注完成，等待组长建质检包':'返修完成，等待组长建质检包'}]);
+    definitions.push(['submit',{round,assignee:profile.name,previousAssignee:task.assignee,submissionKind:round===1?'initial':'rework',note:round===1?'标注完成，实时进入质检':'返修完成，实时进入第 '+(task.qcRound+1)+' 次质检'}]);
     return eventSequence(source,task,definitions);
   }
 
@@ -997,7 +1222,7 @@
     const saved=await mutate(source=>{requireRole('annotation');assertBatchInput(snapshot,'annotationBulkTids','annotationTask');report=requestedTasks(snapshot.text,'annotationTask',source,snapshot.selection);if(!report.length)throw new Error('请先勾选任务或粘贴 TID。');const events=[];
       report.forEach(row=>{try{if(row.error)throw new Error(row.error);events.push(...annotationCompletion(source,row.task));row.outcome='success';}catch(error){row.error=error.message;row.outcome='failed';}});
       if(report.some(row=>row.error)){report=report.map(row=>({...row,outcome:'failed',error:row.error||'本批未提交，请先修正异常 TID。'}));throw new Error('TID 存在异常，整批尚未提交，请核对明细。');}if(!events.length)throw new Error('没有可登记的任务，请查看失败原因。');return{events};
-    },'已提交完成，等待组长建包。');if(saved){renderMyTasks();renderTaskSearch();}else report=report.map(row=>({...row,outcome:'failed',error:row.error||'本次未确认保存成功，请刷新状态后核对并重试。'}));
+    },'已提交完成，实时进入质检队列。');if(saved){renderMyTasks();renderTaskSearch();}else report=report.map(row=>({...row,outcome:'failed',error:row.error||'本次未确认保存成功，请刷新状态后核对并重试。'}));
     if(report.length)$('annotationBulkResult').innerHTML=importReport(report,true).replace('成功','成功提交');
   }
 
@@ -1141,9 +1366,8 @@
   }
 
   function bindBulkEvents() {
-    $('annotationBulkForm').addEventListener('submit',event=>event.preventDefault());$('packageForm').addEventListener('submit',event=>event.preventDefault());
+    $('annotationBulkForm').addEventListener('submit',event=>event.preventDefault());
     $('annotationBulkComplete').addEventListener('click',completeAnnotationBulk);
-    $('packageBuildAndClaim').addEventListener('click',()=>buildPackages(true));
     $('qcBulkPass').addEventListener('click',passQcBulk);$('qcBulkFail').addEventListener('click',showBulkQcFail);$('qcBulkReject').addEventListener('click',showBulkQcReject);$('qcTaskFilter').addEventListener('change',()=>{refreshState();renderQcQueue();});
     $('reworkAssignmentSelectAll').addEventListener('change',event=>{qsa('input[name="reworkAssignmentTask"]').forEach(input=>{const task=findTask(state,input.value);input.checked=event.target.checked&&['rework','acceptance_rework'].includes(task.status);if(input.checked){input.dataset.expected=task.updatedAt;input.dataset.assignee=task.assignee;}});syncReworkAssignmentSelection();$('reworkAssignmentResult').textContent='';});
     $('reworkAssignmentBody').addEventListener('change',event=>{const input=event.target.closest('input[name="reworkAssignmentTask"]');if(input?.checked){const task=findTask(state,input.value);if(!['rework','acceptance_rework'].includes(task.status)){input.checked=false;showToast('该任务已不在待标注返修状态，请重新核对。','error');}else{input.dataset.expected=task.updatedAt;input.dataset.assignee=task.assignee;}}syncReworkAssignmentSelection();$('reworkAssignmentResult').textContent='';});
@@ -1155,10 +1379,10 @@
     [['annotationSelectAll','annotationTask'],['qcSelectAll','qcTask']].forEach(([id,name])=>$(id).addEventListener('change',event=>qsa(`input[name="${name}"]`).forEach(input=>input.checked=event.target.checked)));
     $('recordQcRound').addEventListener('change',()=>{refreshState();renderRecords();});
     document.addEventListener('click',event=>{const button=event.target.closest('[data-action]');if(!button)return;const action=button.dataset.action;
-      if(action==='claim-package')claimPackage(button.dataset.packageId);
-      if(action==='prepare-package'){const task=findTask(state,button.dataset.taskId),form=$('packageForm');if(!window.WorkbenchFlow.canBuild(task,'qc'))throw new Error('当前任务无需建包，质检通过后会自动流入验收台。');form.elements.stage.value='qc';$('packageTids').value=task.tid;form.scrollIntoView({block:'nearest'});}
+      // New QC flow has no package build or claim action; historical package
+      // records remain read-only in exports and old timelines.
       if(action==='cancel-bulk-qc'&&!qcBulkReturnBusy)$('qcBulkWorkbench').innerHTML='';if(action==='cancel-bulk-acceptance'&&!acceptanceBusy)$('acceptanceBulkWorkbench').innerHTML='';
-      if(action==='state-details'){if(button.dataset.groupId)$('scopeGroup').value=button.dataset.groupId;$('recordDateMode').value='all';$('recordSearch').value='';$('recordMovie').value='all';$('recordQcRound').value=button.dataset.round||'all';$('recordStatus').value=button.dataset.status;activateView('records');}
+      if(action==='state-details'){if(button.dataset.groupId)$('scopeGroup').value=button.dataset.groupId;$('recordDateMode').value='all';$('recordSearch').value='';multiSet('recordMovie',[]);$('recordQcRound').value=button.dataset.round||'all';multiSet('recordStatus',[button.dataset.status]);activateView('records');}
     });
   }
 
@@ -1174,7 +1398,7 @@
       dispatchModuleDrafts.set(previousMode,{date:dispatchForm.elements.date.value,groupId:dispatchForm.elements.group.value,movie:dispatchForm.elements.movie.value,text:dispatchForm.elements.tids.value});
       const draft=dispatchModuleDrafts.get(nextMode);dispatchForm.elements.date.value=draft?.date??todayString();dispatchForm.elements.movie.value=draft?.movie||'';dispatchForm.elements.tids.value=draft?.text||'';
       dispatchDraft=null;$('dispatchCommitBtn').disabled=true;$('dispatchPreview').textContent='预览后将显示可导入、重复及失败的条数与原因。';
-      recordWholeMovie=null;$('recordMovie').value='all';
+      recordWholeMovie=null;multiSet('recordMovie',[]);recordsGateOpen=false;
       for(const id of ['taskEditor','batchEditor','groupDailyEditor']){
         const editor=$(id);moduleEditorDrafts.set(id+':'+previousMode,{nodes:Array.from(editor.childNodes),hidden:editor.classList.contains('hidden')});
         const draft=moduleEditorDrafts.get(id+':'+nextMode);editor.replaceChildren(...(draft?.nodes||[]));editor.classList.toggle('hidden',!draft||draft.hidden);
@@ -1185,7 +1409,7 @@
     const form=$('dispatchForm'),savedGroup=previousMode!==nextMode?dispatchModuleDrafts.get(nextMode)?.groupId:form.elements.group.value;options(form.elements.group,groups.map(group=>({value:group.id,label:group.name})),groups.some(group=>group.id===savedGroup)?savedGroup:groups.some(group=>group.id===profile?.groupId)?profile.groupId:groups[0].id);form.elements.mode.value=activeMode;setText('dispatchModeLabel',modeLabel(activeMode));
     qsa('[data-mode]').forEach(button=>{button.classList.toggle('active',button.dataset.mode===activeMode);button.setAttribute('aria-pressed',String(button.dataset.mode===activeMode));});setText('currentModeLabel',modeLabel(activeMode));
     selectedQcTaskId='';selectedAcceptanceTaskId='';selectedTimelineTaskId='';if($('recordQcRound'))$('recordQcRound').value='all';
-    syncAcceptanceChoice();
+    syncAcceptanceChoice();syncReassignModule();
     if(render&&refreshState())renderCurrentView();
   }
 
@@ -1196,11 +1420,98 @@
     return window.WorkbenchReports.build({state,tasks,auditTasks,groups,mode:activeMode,statusMeta:STATUS_META,groupLabel,eventLabel,eventDetail,localDate:value=>{const date=new Date(value);return Number.isNaN(date.getTime())?'':localDateString(date);}});
   }
 
+  function renderTodayMetrics(rows) {
+    const ids=['metricTodayAnnotation','metricTodayQcPass','metricTodayAccept','metricTodayRework','metricTodayQcPending','metricTodayReworkPending','metricTodayAnnotators','metricTodayQcUsers','metricRejected'],hints=['metricTodayAnnotationHint','metricTodayQcPassHint','metricTodayAcceptHint','metricTodayReworkHint','metricTodayQcPendingHint','metricTodayReworkPendingHint','metricTodayAnnotatorsHint','metricTodayQcUsersHint','metricRejectedHint'];
+    if(!rows){ids.forEach(id=>setText(id,'—'));hints.forEach(id=>setText(id,'请修正日期区间'));return;}
+    const sum=(...keys)=>rows.reduce((total,row)=>total+keys.reduce((value,key)=>value+Number(row[key]||0),0),0);
+    const dayWord=singleScopeDate()?'当日':'区间',pending=pendingReworkSplit();
+    setText('metricTodayAnnotation',sum('initialAnnotationTIDs'));
+    setText('metricTodayQcPass',sum('qcPassActions'));
+    setText('metricTodayAccept',sum('completedTIDs'));
+    setText('metricTodayRework',countRangeReworkTasks());
+    setText('metricTodayQcPending',pending.qcPending);
+    setText('metricTodayReworkPending',pending.reworkPending);
+    setText('metricTodayAnnotators',countDayActors(['submit']));
+    setText('metricTodayQcUsers',countDayActors(['qc_pass','qc_fail']));
+    setText('metricRejected',countRangeRejected());
+    setText('metricTodayAnnotationHint',`${dayWord}首次标完（条）· 不含返修`);
+    setText('metricTodayQcPassHint',`${dayWord}质检通过（次）· 已闭环`);
+    setText('metricTodayAcceptHint',`${dayWord}首次验收通过（条）`);
+    setText('metricTodayReworkHint',`${dayWord}返修任务（条）· 一个 case 一次`);
+    setText('metricTodayQcPendingHint',`${dayWord}首交待质检（条）`);
+    setText('metricTodayReworkPendingHint',`${dayWord}打回待返修（条）`);
+    setText('metricTodayAnnotatorsHint',`${dayWord}有标注提交（人）· 含返修`);
+    setText('metricTodayQcUsersHint',`${dayWord}有质检判定（人）· 通过/打回`);
+    setText('metricRejectedHint',`${dayWord}最终拒绝（条）· 按拒绝日期`);
+  }
+
+  function countDayActors(types) {
+    const groupId=selectedGroup(),set=new Set();
+    for(const task of allTasks()){
+      if(task.mode!==activeMode)continue;
+      if(groupId!=='all'&&task.groupId!==groupId)continue;
+      for(const event of eventsForTask(task.id)){
+        if(!types.includes(event.type))continue;
+        if(!inDateRange(localDateString(new Date(event.at))))continue;
+        const who=String(event.actor||'').trim();
+        if(who)set.add(who);
+      }
+    }
+    return set.size;
+  }
+
+  /* 未闭环拆分：所选日期内首交的任务，按当前最后一条质检判定分流 —— 待质检（还没质检）/ 待返修（最后被打回） */
+  function pendingReworkSplit() {
+    const groupId=selectedGroup();
+    let qcPending=0,reworkPending=0;
+    for(const task of allTasks()){
+      if(task.mode!==activeMode)continue;
+      if(groupId!=='all'&&task.groupId!==groupId)continue;
+      const events=eventsForTask(task.id).slice().sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+      const first=events.find(event=>event.type==='submit');
+      if(!first||!inDateRange(localDateString(new Date(first.at))))continue;
+      let last=null;
+      for(const event of events)if(event.type==='qc_pass'||event.type==='qc_fail')last=event.type;
+      if(last==='qc_pass')continue;
+      if(last==='qc_fail')reworkPending+=1;else qcPending+=1;
+    }
+    return {qcPending,reworkPending};
+  }
+  /* 返修量：所选日期内有过返修提交的任务去重条数 —— 一个 case 多次返修只算一条（区别于「返修提交（次）」） */
+  function countRangeReworkTasks() {
+    const groupId=selectedGroup(),set=new Set();
+    for(const task of allTasks()){
+      if(task.mode!==activeMode)continue;
+      if(groupId!=='all'&&task.groupId!==groupId)continue;
+      const events=eventsForTask(task.id).slice().sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+      let seen=false;
+      for(const event of events){
+        if(event.type!=='submit')continue;
+        const isRework=seen||(event.submissionKind&&event.submissionKind!=='initial');
+        seen=true;
+        if(isRework&&inDateRange(localDateString(new Date(event.at)))){set.add(task.id);break;}
+      }
+    }
+    return set.size;
+  }
+  function countRangeRejected() {
+    const groupId=selectedGroup(),set=new Set();
+    for(const task of allTasks()){
+      if(task.mode!==activeMode)continue;
+      if(groupId!=='all'&&task.groupId!==groupId)continue;
+      for(const event of eventsForTask(task.id)){
+        const finalReject=window.WorkbenchFlow.isQcReject(event)||window.WorkbenchFlow.isAcceptanceReject(event)||event.type==='reject_confirm';
+        if(finalReject&&inDateRange(localDateString(new Date(event.at)))){set.add(task.id);break;}
+      }
+    }
+    return set.size;
+  }
   function renderDailyReport() {
-    if(!validScopeRange()){$('overviewDailySummary').innerHTML=`<span>请修正日期区间</span>${['metricDailyNew','metricDailyAnnotation','metricDailyQc','metricDailyAccepted'].map(id=>`<strong id="${id}">—</strong>`).join('')}`;$('dailyStatsBody').innerHTML=emptyRow($('dailyStatsBody').closest('table').querySelectorAll('th').length,'请修正日期区间');return;}
+    if(!validScopeRange()){$('overviewDailySummary').innerHTML=`<span>请修正日期区间</span>${['metricDailyNew','metricDailyAnnotation','metricDailyQc','metricDailyAccepted'].map(id=>`<strong id="${id}">—</strong>`).join('')}`;$('dailyStatsBody').innerHTML=emptyRow($('dailyStatsBody').closest('table').querySelectorAll('th').length,'请修正日期区间');renderTodayMetrics(null);return;}
     const labels={date:'日期',importedTIDs:'新增 TID',initialAnnotationTIDs:'首次标完（条）',annotationReworkActions:'标注返修（次）',qcPassActions:'质检通过（次）',qcFailActions:'质检打回（次）',qcRejectedTIDs:'质检拒绝（条）',completedTIDs:'首次验收通过（条）',annotationCompletedTIDs:'实际完成（条）',initialSubmissionTIDs:'首次完成（条）',reworkSubmissionActions:'返修提交（次）',personDayEfficiency:'人均日效率（条/人/天）',efficiencyIssue:'效率核对',acceptanceRejectedTIDs:'验收拒绝（条）',rejectedTIDs:'最终拒绝（条）',acceptanceFailActions:'验收不通过（次）',qcSelfRepairActions:'质检自行返修（次）',qcPackageCount:'建质检包（个）',acceptancePackageCount:'历史验收包（个）',activeTIDs:'有操作 TID',total:'登记总量',autoHeadcount:'自动人数',headcount:'采用人数',headcountSource:'人数口径'};
     const report=scopedReports().daily,rows=report.rows.filter(row=>inDateRange(String(row.date))&&(selectedGroup()==='all'||row.groupId===selectedGroup())),columns=report.columns.filter(column=>!['groupId','mode','latestEditId','isAggregate','initialSubmissionTIDs','reworkSubmissionActions','efficiencyIssue','efficiencyIssueDatesJSON'].includes(column.key)&&!/JSON|TID明细|任务编号/.test(column.label)).map(column=>({...column,title:column.label,label:labels[column.key]||column.label}));
     const sum=(...keys)=>rows.reduce((total,row)=>total+keys.reduce((value,key)=>value+Number(row[key]||0),0),0);
+    renderTodayMetrics(rows);
     $('overviewDailySummary').innerHTML=`<span class="daily-summary-date">${escapeHtml(scopeRangeLabel())} · 作业记录</span><span>${singleScopeDate()?'当日':'区间'}新增分配 <strong id="metricDailyNew">${sum('importedTIDs')}</strong> 条</span><span>标注提交 <strong id="metricDailyAnnotation">${sum('initialAnnotationTIDs','annotationReworkActions')}</strong> 次</span><span>质检处理 <strong id="metricDailyQc">${sum('qcPassActions','qcFailActions','qcRejectedTIDs')}</strong> 次</span><span>验收通过 <strong id="metricDailyAccepted">${sum('completedTIDs')}</strong> 条</span><span>最终拒绝 <strong>${sum('rejectedTIDs')}</strong> 条</span>`;
     const body=$('dailyStatsBody');body.closest('table').querySelector('thead').innerHTML=`<tr>${columns.map(column=>`<th title="${escapeHtml(column.title)}">${escapeHtml(column.label)}</th>`).join('')}</tr>`;
     const value=(row,key)=>key==='personDayEfficiency'?efficiencyText(row):key==='efficiencyIssue'?(row.efficiencyIssue==='completed_without_headcount'?'人数待核对':row.efficiencyIssue==='no_person_days'?'暂无在班人数':'—'):key==='headcountSource'?(row.headcountSource==='manual'?'手动调整':'自动识别'):key==='total'&&row.total===null?'未填写':row[key]??'—';
@@ -1208,28 +1519,32 @@
   }
 
   function recordBaseTasks() {
-    const query=$('recordSearch').value.trim().toUpperCase(),movie=$('recordMovie').value||'all',dateMode=$('recordDateMode').value,from=$('recordDateFrom').value,to=$('recordDateTo').value;
+    const query=$('recordSearch').value.trim().toUpperCase(),movies=multiGet('recordMovie'),dateMode=$('recordDateMode').value,from=$('recordDateFrom').value,to=$('recordDateTo').value;
     if(dateMode==='range'&&from&&to&&from>to)throw new Error('分配开始日期不能晚于结束日期。');
     if(dateMode==='scope'&&!validScopeRange())throw new Error('请修正上方日期区间：开始日期不能晚于结束日期。');
-    return allTasks().filter(task=>inCurrentScope(task,false)&&(movie==='all'||(recordWholeMovie&&movie===recordWholeMovie.value?window.WorkbenchReports.movieTitle(task)===recordWholeMovie.title:task.movie===movie))&&(dateMode==='all'||dateMode==='scope'&&inDateRange(task.date)||dateMode==='range'&&inDateRange(task.date,{dateFrom:from,dateTo:to}))&&(!query||[task.tid,task.movie,task.assignee,window.WorkbenchReports.qcOperator(eventsForTask(task.id)).name,...eventsForTask(task.id).filter(event=>event.type==='metadata_edit').map(event=>event.before?.tid||'')].some(value=>String(value).toUpperCase().includes(query))));
+    return allTasks().filter(task=>inCurrentScope(task,false)&&(!movies.length||movies.some(movie=>recordWholeMovie&&movie===recordWholeMovie.value?window.WorkbenchReports.movieTitle(task)===recordWholeMovie.title:task.movie===movie))&&(dateMode==='all'||dateMode==='scope'&&inDateRange(task.date)||dateMode==='range'&&inDateRange(task.date,{dateFrom:from,dateTo:to}))&&(!query||[task.tid,task.movie,task.assignee,window.WorkbenchReports.qcOperator(eventsForTask(task.id)).name,...eventsForTask(task.id).filter(event=>event.type==='metadata_edit').map(event=>event.before?.tid||'')].some(value=>String(value).toUpperCase().includes(query))));
   }
 
   function bindModuleEvents() {
     qsa('[data-mode]').forEach(button=>button.addEventListener('click',()=>applyModule(button.dataset.mode)));
     ['recordDateFrom','recordDateTo'].forEach(id=>$(id).addEventListener('change',()=>{refreshState();renderRecords();}));
     document.addEventListener('click',event=>{const button=event.target.closest('[data-action]');if(!button)return;
-      if(button.dataset.action==='record-state'){$('recordStatus').value=button.dataset.status;$('recordQcRound').value=button.dataset.round||'all';refreshState();renderRecords();}
-      if(['group-details','movie-details'].includes(button.dataset.action)){$('scopeGroup').value=button.dataset.groupId||'all';$('recordDateMode').value='all';$('recordSearch').value='';$('recordStatus').value='all';$('recordQcRound').value='all';$('recordMovie').value='all';activateView('records');if(button.dataset.movie){$('recordMovie').value=button.dataset.movie;renderRecords();}}
+      if(button.dataset.action==='record-state'){recordsGateOpen=true;multiSet('recordStatus',[button.dataset.status]);$('recordQcRound').value=button.dataset.round||'all';refreshState();renderRecords();}
+      if(['group-details','movie-details'].includes(button.dataset.action)){$('scopeGroup').value=button.dataset.groupId||'all';$('recordDateMode').value='all';$('recordSearch').value='';multiSet('recordStatus',[]);$('recordQcRound').value='all';multiSet('recordMovie',[]);activateView('records');if(button.dataset.movie){multiSet('recordMovie',[button.dataset.movie]);renderRecords();}}
     });
   }
 
   function bindOverviewEvents() {
     $('personDailyDetails').addEventListener('toggle',()=>{if($('personDailyDetails').open)renderPersonDaily();});
+    $('errorAnalysisDetails').addEventListener('toggle',()=>{if($('errorAnalysisDetails').open)renderErrorAnalysis(allTasks().filter(task=>inCurrentScope(task,false)));});
+    ['errorScope','errorLevel'].forEach(id=>$(id).addEventListener('change',()=>renderErrorAnalysis(allTasks().filter(task=>inCurrentScope(task,false)))));
     $('movieProgressSearch').addEventListener('input',()=>{if(refreshState())renderMovieProgress();});
     $('movieProgressFilter').addEventListener('change',()=>{if(refreshState())renderMovieProgress(true);});
     document.addEventListener('click',event=>{
       const movie=event.target.closest('[data-action="movie-progress-details"]');
       if(movie){openWholeMovie(movie.dataset.movie,movie.dataset.status||'all');return;}
+      const chip=event.target.closest('[data-action="error-person"]');
+      if(chip){const details=$('errorAnalysisDetails');details.open=true;$('errorScope').value='person:'+chip.dataset.key;renderErrorAnalysis(allTasks().filter(task=>inCurrentScope(task,false)));if(!$('overviewPanel-people').classList.contains('hidden'))requestAnimationFrame(()=>details.scrollIntoView({behavior:'smooth',block:'center'}));return;}
       const tab=event.target.closest('[data-overview-tab]');
       if(tab){selectOverviewTab(tab.dataset.overviewTab);return;}
       const button=event.target.closest('[data-action="overview-bucket"]');
@@ -1263,7 +1578,26 @@
     qsa('[data-date-preset]').forEach(button=>button.addEventListener('click',()=>{const range=presetRange(button.dataset.datePreset);$('scopeDateFrom').value=range.dateFrom;$('scopeDateTo').value=range.dateTo;syncScopeControls();if(refreshState())renderCurrentView();}));
     $('taskSearchForm').addEventListener('submit',event=>{event.preventDefault();registerAnnotationTid();});$('taskSearchInput').addEventListener('input',renderTaskSearch);
     $('myTaskFilter').addEventListener('change',()=>{refreshState();renderMyTasks();});
-    ['recordStatus','recordMovie','recordDateMode'].forEach(id=>$(id).addEventListener('change',()=>{refreshState();renderRecords();}));$('recordSearch').addEventListener('input',renderRecords);
+    $('recordDateMode').addEventListener('change',()=>{refreshState();renderRecords();});$('recordSearch').addEventListener('input',renderRecords);
+    ['recordMovie','recordStatus'].forEach(id=>{const box=$(id);if(!box)return;box.addEventListener('click',event=>{event.stopPropagation();toggleMultiSelect(id);});box.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();toggleMultiSelect(id);}});});
+    document.addEventListener('click',event=>{
+      /* 选项列表会被重建，被点节点可能已脱离 DOM，此时不要当成「点击外部」误关面板 */
+      const target=event.target;
+      if(target&&target.nodeType===1&&!target.isConnected)return;
+      if(!target.closest('.multi-select')&&!target.closest('#multiSelectLayer'))closeMultiSelect();
+    });
+    window.addEventListener('resize',closeMultiSelect);
+    /* 滚动时不再直接关闭（避免误关），改为跟随锚点重新定位；锚点滚出视口才关闭 */
+    window.addEventListener('scroll',()=>{
+      const layer=$('multiSelectLayer');
+      if(!layer||layer.classList.contains('hidden'))return;
+      const box=$(layer.dataset.owner||'');
+      if(!box){closeMultiSelect();return;}
+      const rect=box.getBoundingClientRect();
+      if(rect.bottom<0||rect.top>window.innerHeight){closeMultiSelect();return;}
+      const panel=layer.querySelector('.multi-select-panel');
+      if(panel)panel.style.top=`${Math.round(rect.bottom+6)}px`;
+    },true);
     $('dispatchForm').addEventListener('submit',event=>event.preventDefault());$('dispatchForm').addEventListener('input',()=>{dispatchDraft=null;$('dispatchCommitBtn').disabled=true;$('dispatchPreview').textContent='内容已更改，请重新预览确认影片和 TID。';});
     $('dispatchPreviewBtn').addEventListener('click',previewDispatch);$('dispatchCommitBtn').addEventListener('click',commitDispatch);
     $('acceptanceText').addEventListener('input',invalidateAcceptancePreview);
@@ -1296,11 +1630,11 @@
         if(action==='close-group-day'){const form=$('groupDailyForm');if(form)groupDayDrafts.delete(`${form.dataset.groupId}|${form.dataset.date}`);$('groupDailyEditor').classList.add('hidden');$('groupDailyEditor').innerHTML='';}
         if(action==='close-task-editor'){$('taskEditor').classList.add('hidden');$('taskEditor').innerHTML='';}
         if(action==='close-batch-editor'){if($('batchDeleteForm')?.dataset.busy)return;batchEditorTicket+=1;$('batchEditor').classList.add('hidden');$('batchEditor').innerHTML='';}
-        if(action==='package-rejections'){$('recordQcRound').value='all';$('scopeGroup').value=button.dataset.groupId;$('recordDateMode').value='all';$('recordSearch').value='';activateView('records');$('recordMovie').value=button.dataset.movie;let option=$('recordStatus').querySelector('[value="rejections"]');if(!option){option=new Option('拒绝相关（含待确认）','rejections');$('recordStatus').add(option);}$('recordStatus').value='rejections';renderRecords();}
+        if(action==='package-rejections'){$('recordQcRound').value='all';$('scopeGroup').value=button.dataset.groupId;$('recordDateMode').value='all';$('recordSearch').value='';activateView('records');multiSet('recordMovie',[button.dataset.movie]);multiSet('recordStatus',['rejections']);renderRecords();}
       }catch(error){showToast(error.message,'error');}
     });
     document.addEventListener('submit',event=>{
-      const form=event.target,handlers={rejectForm:saveReject,qcDecisionForm:saveQcDecision,acceptanceForm:saveAcceptance,batchEditForm:saveBatchEdit,batchDeleteForm:saveBatchDelete,taskEditForm:saveTaskEdit,groupDailyForm:saveGroupDaily,qcBulkDecisionForm:saveBulkQcFail,qcBulkRejectForm:saveBulkQcReject,acceptanceBulkDecisionForm:saveBulkAcceptanceFail,reworkAssignmentForm:saveReworkAssignment};if(!handlers[form.id])return;event.preventDefault();
+      const form=event.target,handlers={rejectForm:saveReject,qcDecisionForm:saveQcDecision,acceptanceForm:saveAcceptance,batchEditForm:saveBatchEdit,batchDeleteForm:saveBatchDelete,taskEditForm:saveTaskEdit,reassignForm:saveReassign,groupDailyForm:saveGroupDaily,qcBulkDecisionForm:saveBulkQcFail,qcBulkRejectForm:saveBulkQcReject,acceptanceBulkDecisionForm:saveBulkAcceptanceFail,reworkAssignmentForm:saveReworkAssignment};if(!handlers[form.id])return;event.preventDefault();
       const button=form.querySelector('button[type="submit"]');if(button.disabled)return;button.disabled=true;Promise.resolve(handlers[form.id](form)).catch(error=>showToast(error.message,'error')).finally(()=>{button.disabled=false;});
     });
     document.addEventListener('change',event=>{if(event.target.matches('#qcDecisionForm input[name="decision"]')&&$('qcFailFields'))$('qcFailFields').classList.toggle('hidden',event.target.value!=='fail');});
@@ -1308,9 +1642,9 @@
     document.addEventListener('change',event=>{if(!event.target.matches('#groupDailyForm [name="date"]'))return;const form=event.target.form,date=event.target.value;try{if(!date)throw new Error('请选择具体登记日期。');if(refreshState())showGroupDailyEditor(form.dataset.groupId,'date',date);}catch(error){event.target.value=form.dataset.date;showToast(error.message,'error');}});
   }
   async function init() {
-    try {state=await store.init();profile=store.profile();const retiredProfile=profile&&!validProfile(profile);initializeControls();initializeWorkflowControls();bindEvents();bindBulkEvents();bindModuleEvents();bindOverviewEvents();if(profile&&!retiredProfile)enterApp();else{profile=null;showIdentity();if(retiredProfile)showToast('组别已更新，请按新的单镜头1—3组或多镜头1—8组重新选择身份。');}}
+    try {state=await store.init();profile=store.profile();const retiredProfile=profile&&!validProfile(profile);initializeControls();initializeWorkflowControls();bindEvents();bindBulkEvents();bindModuleEvents();bindOverviewEvents();bindReassignEvents();if(profile&&!retiredProfile)enterApp();else{profile=null;showIdentity();if(retiredProfile)showToast('组别已更新，请按新的单镜头1—3组或多镜头1—8组重新选择身份。');}}
     catch(error){$('appShell').classList.add('hidden');$('identityGate').classList.remove('hidden');const box=document.createElement('div');box.className='panel';const text=document.createElement('p');text.textContent='共享服务暂时无法连接，云端数据未清空。'+error.message;const button=document.createElement('button');button.type='button';button.className='btn primary';button.textContent='重试连接';button.addEventListener('click',()=>location.reload());box.append(text,button);$('identityGate').replaceChildren(box);}
   }
-  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20260911-prod4',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
+  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20260921-prod14-error-analysis',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
   init();
 })();

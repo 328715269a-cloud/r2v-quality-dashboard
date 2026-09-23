@@ -1,0 +1,16 @@
+/* prod31: 当日作业行重排为 量(标注完成/质检通过/验收通过) + 人(标注人数/质检人数) + 未闭环，共 6 卡 */
+.overview-metrics-today { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.overview-metric-today-ann-people > strong { color: var(--tone-info); }
+.overview-metric-today-qc-people > strong { color: var(--violet); }
+.overview-metric-today-accept > strong { color: var(--warning); }
+/* 人数块与量块之间的视觉分隔 */
+.overview-metrics-today .overview-metric-today-ann-people { border-left: 1px dashed var(--line-strong); padding-left: 14px; }
+@media (max-width: 1080px) {
+  .overview-metrics-today { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .overview-metrics-today .overview-metric-today-ann-people { border-left: none; padding-left: 0; }
+}
+@media (max-width: 640px) {
+  .overview-metrics-today { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .overview-metrics-today .overview-metric { grid-column: span 1; }
+  .overview-metrics-today .overview-metric > strong { font-size: 20px; }
+}

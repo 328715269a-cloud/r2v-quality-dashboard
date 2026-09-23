@@ -1,8 +1,8 @@
 'use strict';
 
 const Flow = require('../group-workbench/workflow.js');
-const MODES = Object.freeze({ g01:'single',g02:'single',g03:'single',g04:'single',g05:'single',s06:'single',g06:'multi',g07:'multi',g08:'multi',g09:'multi',g10:'multi',m06:'multi',m07:'multi',m08:'multi' });
-const QC_TAGS = new Set(['命名/ID错误','补标缺失','景别覆盖缺失','朝向覆盖缺失','图片模糊','黑边/裁切','备注不完整','其他']);
+const MODES = Object.freeze({ g01:'single',g02:'single',g03:'single',g04:'single',g05:'single',s06:'single',g06:'multi',g07:'multi',g08:'multi',g09:'multi',g10:'multi',m06:'multi',m07:'multi',m08:'multi',m09:'multi',m10:'multi',m11:'multi',m12:'multi' });
+const QC_TAGS = new Set(['命名/ID对齐错误','分类/标签归属错误','朝向覆盖缺失（正/侧/背面）','景别/机位/角度/朝向判定错误','AI生成/图片来源异常','ID合并/拆分错误','主体/对象漏标','图片模糊/清晰度不足','黑边/裁切不完整','其他主体混入/画面污染']);
 class ApiError extends Error { constructor(status,code,message){super(message);this.status=status;this.code=code;} }
 function check(ok,message,code='INVALID_TRANSACTION',status=400){if(!ok)throw new ApiError(status,code,message);}
 function object(value){return !!value&&typeof value==='object'&&!Array.isArray(value);}
@@ -81,7 +81,7 @@ function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled
     delta.batches.push(batch);working.batches.push(batch);
   }
   for(const t of delta.tasks)check(delta.batches.some(b=>b.kind!=='handoff'&&b.id===t.batchId&&b.taskIds.includes(t.id)),'导入任务缺少本次导入批次');
-  const allowed=new Set(['dispatch','claim','submit','package_built','package_claimed','qc_pass','qc_fail','qc_reject','annotator_reject','reject_confirm','reject_return','acceptance_pass','acceptance_fail','acceptance_reject','acceptance_route','qc_repair_done','metadata_edit','group_daily_edit','task_deleted']);
+  const allowed=new Set(['dispatch','claim','submit','package_built','package_claimed','qc_pass','qc_fail','qc_reject','annotator_reject','reject_confirm','reject_return','acceptance_pass','acceptance_fail','acceptance_reject','acceptance_route','qc_repair_done','metadata_edit','admin_reassign','group_daily_edit','task_deleted']);
   for(const e of raw.events){const eventId=fresh(e);check(allowed.has(e.type),'不支持此操作');check(!e.identityAlias&&!e.legacyName&&!e.targetStatus,'正式模式不接受旧演示身份或跳步状态');let task;
     const event={id:eventId,taskId:e.taskId,type:e.type,workflowVersion:e.assignmentKind==='rework_transfer'?4:3,at:stamp(),actor:profile.name,actorRole:profile.role};const note=text(e.note,2000);if(note)event.note=note;
     if(e.type==='group_daily_edit'){
@@ -108,11 +108,18 @@ function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled
           else{check((task.status===`${prefix}_pack_unclaimed`||stage==='acceptance'&&task.status==='pending_acceptance'&&!task.acceptancePackageClaimedAt)&&task[`${prefix}PackageId`]===batch.id,'任务当前不能领取此包','STATE_CONFLICT',409);round=task[`${prefix}PackageRound`];}
           check(e.packageRound===round,'建包轮次不一致','STATE_CONFLICT',409);Object.assign(event,{stage,packageId:batch.id,packageName:batch.packageName,packageRound:round,builder:batch.createdBy});if(e.type==='package_claimed')event.claimer=profile.name;break;
         }
-        case 'qc_pass':case 'qc_fail':case 'qc_reject':scope(profile,task,'qc');check(['pending_qc','pending_reqc'].includes(task.status),'任务不在待质检环节','STATE_CONFLICT',409);check((e.qcRound==null||e.qcRound===task.qcRound)&&(e.round==null||e.round===task.qcRound),'质检轮次已变化','STATE_CONFLICT',409);Object.assign(event,{round:task.qcRound,qcRound:task.qcRound});if(e.type==='qc_reject'||Flow.isQcReject({...e,note})){Object.assign(event,{type:'qc_fail',note:rejectNote(note,'[质检拒绝]'),pLevel:'P0',tags:['其他']});}else if(e.type==='qc_fail'){check(['P0','P1','P2'].includes(e.pLevel),'请选择错误等级');check(Array.isArray(e.tags)&&e.tags.length>0&&e.tags.length<=QC_TAGS.size&&new Set(e.tags).size===e.tags.length&&e.tags.every(t=>QC_TAGS.has(t)),'请选择有效错误标签');Object.assign(event,{pLevel:e.pLevel,tags:e.tags.slice(),note:text(e.note,2000,true)});}break;
+        case 'qc_pass':case 'qc_fail':case 'qc_reject':scope(profile,task,'qc');check(['pending_qc','pending_reqc'].includes(task.status),'任务不在待质检环节','STATE_CONFLICT',409);check((e.qcRound==null||e.qcRound===task.qcRound)&&(e.round==null||e.round===task.qcRound),'质检轮次已变化','STATE_CONFLICT',409);Object.assign(event,{round:task.qcRound,qcRound:task.qcRound});if(e.type==='qc_reject'||Flow.isQcReject({...e,note})){Object.assign(event,{type:'qc_fail',note:rejectNote(note,'[质检拒绝]'),pLevel:'P0',tags:['其他主体混入/画面污染']});}else if(e.type==='qc_fail'){check(['P0','P1','P2'].includes(e.pLevel),'请选择错误等级');check(Array.isArray(e.tags)&&e.tags.length>0&&e.tags.length<=QC_TAGS.size&&new Set(e.tags).size===e.tags.length&&e.tags.every(t=>QC_TAGS.has(t)),'请选择有效错误标签');Object.assign(event,{pLevel:e.pLevel,tags:e.tags.slice(),note:text(e.note,2000,true)});}break;
         case 'reject_confirm':case 'reject_return':scope(profile,task,'qc');check(task.status==='rejection_pending','任务不在拒绝待确认环节','STATE_CONFLICT',409);event.note=text(e.note,2000,true);if(e.type==='reject_return')event.resumeStatus=task.rejectionResumeStatus||'annotating';break;
         case 'acceptance_pass':case 'acceptance_fail':case 'acceptance_reject':scope(profile,task,'acceptance');check(task.status==='pending_acceptance','任务不在待验收环节','STATE_CONFLICT',409);check(e.acceptanceRound==null||e.acceptanceRound===task.acceptanceRound||e.acceptanceRound===legacyAcceptanceRound(histories.get(task.id)||[]),'验收轮次已变化','STATE_CONFLICT',409);event.acceptanceRound=task.acceptanceRound;if(e.type==='acceptance_reject'||Flow.isAcceptanceReject({...e,note}))Object.assign(event,{type:'acceptance_fail',note:rejectNote(note,'[验收拒绝]')});else if(e.type==='acceptance_fail')event.note=text(e.note,2000,true);if(e.source==='acceptance_import')event.source=e.source;break;
         case 'acceptance_route':scope(profile,task,'qc');check(task.status==='acceptance_return_pending','任务不在验收打回待处理环节','STATE_CONFLICT',409);check(['qc','annotation'].includes(e.route),'返修去向无效');event.route=e.route;event.note=text(e.note,2000,true);break;
         case 'qc_repair_done':scope(profile,task,'qc');check(task.status==='qc_self_rework','任务不在质检自行返修环节','STATE_CONFLICT',409);event.note=text(e.note,2000,true);break;
+        case 'admin_reassign':{
+          manager(profile,task);checkPin(pin,'admin');
+          check(['annotation','qc'].includes(e.toRole),'改派角色无效');
+          const next=text(e.assignee,20,true);
+          check(next!==(task.assignee||''),'新处理人与当前处理人相同');
+          event.toRole=e.toRole;event.assignee=next;event.previousAssignee=task.assignee||'';
+          break;}
         case 'metadata_edit':manager(profile,task);checkPin(pin,'admin');check(object(e.before)&&object(e.after),'修改内容格式无效');check(e.before.tid===task.tid&&e.before.movie===task.movie,'任务资料已有新修改','STATE_CONFLICT',409);event.before={tid:task.tid,movie:task.movie};event.after={tid:tid(e.after.tid),movie:text(e.after.movie,200,true)};check(!same(event.before,event.after),'内容没有变化');event.note=text(e.note,2000,true);if(e.batchId){const batch=working.batches.find(b=>b.id===e.batchId&&b.kind!=='handoff');check(batch&&batch.taskIds.includes(task.id),'任务不属于该导入批次');event.batchId=batch.id;}break;
       }
     }
