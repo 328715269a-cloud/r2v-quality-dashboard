@@ -49,7 +49,7 @@
     const identity=batchIdentityScope();
     if(name==='annotationTask')return `${identity}|${$('myTaskFilter').value}`;
     if(name==='qcTask')return `${identity}|${$('qcTaskFilter').value}`;
-    if(name==='acceptanceTask')return `${identity}|${selectedGroup()}`;
+    if(name==='acceptanceTask')return acceptanceScopeKey();
     if(name==='records')return JSON.stringify([identity,selectedGroup(),scopeRangeKey(),$('recordSearch').value.trim(),multiGet('recordMovie'),multiGet('recordStatus'),$('recordQcRound').value,$('recordDateMode').value,$('recordDateFrom').value,$('recordDateTo').value,recordsGateOpen]);
     return identity;
   }
@@ -378,9 +378,12 @@
   }
   // Multi-select filter control: an empty selection means "all".
   const MULTI_SELECTS = new Map();
+  const ACCEPTANCE_FILTER_IDS = ['acceptanceMovie','acceptanceGroup','acceptanceAssignee','acceptanceRound'];
+  function isAcceptanceFilter(id) { return ACCEPTANCE_FILTER_IDS.includes(id); }
   function multiState(id) {
-    if (!MULTI_SELECTS.has(id)) MULTI_SELECTS.set(id, {rows: [], selected: new Set(), query: ''});
-    return MULTI_SELECTS.get(id);
+    const key = isAcceptanceFilter(id) ? `${id}|${batchIdentityScope()}` : id;
+    if (!MULTI_SELECTS.has(key)) MULTI_SELECTS.set(key, {rows: [], selected: new Set(), query: ''});
+    return MULTI_SELECTS.get(key);
   }
   function recordStatusOptions() {
     const statuses = Object.entries(STATUS_META).filter(([key]) => key !== 'annotating' && key !== 'qc_pack_unclaimed').map(([value, meta]) => ({value, label: meta.label}));
@@ -389,7 +392,12 @@
   }
   function multiOptions(id, rows) {
     const s = multiState(id), valid = new Set(rows.map(row => row.value));
-    s.rows = rows; [...s.selected].forEach(value => { if (!valid.has(value)) s.selected.delete(value); });
+    // Never widen a queue filter when its final pending task leaves the queue.
+    if (isAcceptanceFilter(id)) {
+      const previous = new Map(s.rows.map(row => [row.value, row.label]));
+      rows = [...rows, ...[...s.selected].filter(value => !valid.has(value)).map(value => ({value, label: previous.get(value) || value}))];
+    } else [...s.selected].forEach(value => { if (!valid.has(value)) s.selected.delete(value); });
+    s.rows = rows;
     multiPaint(id);
     const layer = $('multiSelectLayer');
     if (layer && !layer.classList.contains('hidden') && layer.dataset.owner === id) multiRenderList();
@@ -416,6 +424,7 @@
         event.stopPropagation();
         const id = layer.dataset.owner; if (!id) return;
         if (event.target === layer) { closeMultiSelect(); return; }
+        if (isAcceptanceFilter(id) && (acceptanceBusy || mutationDepth)) return;
         const s = multiState(id);
         if (event.target.closest('[data-multi-clear]')) { s.selected.clear(); multiPaint(id); multiRenderList(); multiApply(id); return; }
         const item = event.target.closest('[data-multi-value]'); if (!item) return;
@@ -428,6 +437,10 @@
         if (!id || !event.target.matches('.multi-select-search')) return;
         multiState(id).query = event.target.value; multiRenderList();
       });
+      layer.addEventListener('keydown', event => {
+        const id = layer.dataset.owner;
+        if (event.key === 'Escape' && isAcceptanceFilter(id)) { event.preventDefault(); closeMultiSelect(); $(id)?.focus(); }
+      });
     }
     return layer;
   }
@@ -439,6 +452,7 @@
     list.innerHTML = rows.map(row => { const on = s.selected.has(row.value); return `<button type="button" class="multi-option${on ? ' selected' : ''}" data-multi-value="${escapeHtml(row.value)}" aria-pressed="${on}"><span class="multi-option-box" aria-hidden="true">${on ? '✓' : ''}</span><span>${escapeHtml(row.label)}</span></button>`; }).join('') || '<p class="multi-empty">没有匹配的选项。</p>';
   }
   function openMultiSelect(id) {
+    if (isAcceptanceFilter(id) && (acceptanceBusy || mutationDepth)) return;
     const box = $(id); if (!box) return;
     const layer = multiLayer(); layer.dataset.owner = id; multiState(id).query = '';
     const rect = box.getBoundingClientRect(), width = Math.max(240, Math.min(320, rect.width + 60));
@@ -458,7 +472,10 @@
     if (layer && !layer.classList.contains('hidden') && layer.dataset.owner === id) { closeMultiSelect(); return; }
     closeMultiSelect(); openMultiSelect(id);
   }
-  function multiApply(id) { if (id === 'recordMovie' || id === 'recordStatus') { if (refreshState()) renderRecords(); } }
+  function multiApply(id) {
+    if (id === 'recordMovie' || id === 'recordStatus') { if (refreshState()) renderRecords(); }
+    if (isAcceptanceFilter(id)) { invalidateAcceptancePreview(); if (refreshState()) renderAcceptance(); }
+  }
   function initializeControls() {
     const groups = GROUPS.map(group => ({value: group.id, label: group.name}));
     configureScopeGroup(state.preferences.scopeGroup || 'all');
@@ -1022,22 +1039,46 @@
       const changed=[...edits.values()].filter(edit=>JSON.stringify(edit.before)!==JSON.stringify(edit.after));if(!changed.length)throw new Error('内容没有变化。');validateEdits(source,changed);return{events:changed.map(edit=>newEvent(source,findTask(source,edit.id),'metadata_edit',{before:edit.before,after:edit.after,note,batchId:form.dataset.batchId}))};
     },'导入内容已修正，原作业记录完整保留。',{pin,form})){$('batchEditor').classList.add('hidden');$('batchEditor').innerHTML='';renderDispatch();}
   }
+  function acceptanceFilters() {
+    return {movies:multiGet('acceptanceMovie').sort(),groupIds:multiGet('acceptanceGroup').sort(),assignees:multiGet('acceptanceAssignee').sort(),rounds:multiGet('acceptanceRound').sort()};
+  }
+  function hasAcceptanceFilters() { return Object.values(acceptanceFilters()).some(values => values.length); }
+  function matchesAcceptanceFilters(task, filters = acceptanceFilters()) {
+    return (!filters.movies.length || filters.movies.includes(task.movie)) &&
+      (!filters.groupIds.length || filters.groupIds.includes(task.groupId)) &&
+      (!filters.assignees.length || filters.assignees.includes(task.assignee)) &&
+      (!filters.rounds.length || filters.rounds.includes(String(task.acceptanceRound || 1)));
+  }
+  function inAcceptanceScope(task) { return inCurrentScope(task,false) && matchesAcceptanceFilters(task); }
+  function renderAcceptanceFilters(rows) {
+    const values = key => [...new Set(rows.map(task => task[key]).filter(Boolean))].sort((a,b) => String(a).localeCompare(String(b),'zh-CN'));
+    multiOptions('acceptanceMovie', values('movie').map(value => ({value,label:value})));
+    multiOptions('acceptanceGroup', values('groupId').map(value => ({value,label:groupLabel(value)})));
+    multiOptions('acceptanceAssignee', values('assignee').map(value => ({value,label:value})));
+    multiOptions('acceptanceRound', [...new Set(rows.map(task => String(task.acceptanceRound || 1)))].sort((a,b) => Number(a)-Number(b)).map(value => ({value,label:`第 ${value} 次验收`})));
+    $('acceptanceClearFilters').disabled = acceptanceBusy || !hasAcceptanceFilters();
+  }
   function renderAcceptance() {
+    const baseRows=allTasks().filter(task=>task.status==='pending_acceptance'&&inCurrentScope(task,false));
+    renderAcceptanceFilters(baseRows);
     rememberQueueWorkbench('acceptanceBulkWorkbench',listScope('acceptanceTask'));
-    const rows=allTasks().filter(task=>task.status==='pending_acceptance'&&inCurrentScope(task,false)).sort((a,b)=>String(a.updatedAt).localeCompare(String(b.updatedAt)));
+    const filters=acceptanceFilters(),rows=baseRows.filter(task=>matchesAcceptanceFilters(task,filters)).sort((a,b)=>String(a.updatedAt).localeCompare(String(b.updatedAt)));
     $('acceptanceBody').innerHTML=listPage('acceptanceTask',rows).map(task=>`<tr><td><input type="checkbox" ${listCheckbox(task,'acceptanceTask')} aria-label="选择 ${escapeHtml(task.tid)}"></td><td>${tidMarkup(task)}</td><td>${escapeHtml(task.movie)}</td><td>${escapeHtml(groupLabel(task.groupId))}</td><td>${escapeHtml(task.assignee)}</td><td>${statusPill(task)}</td><td><button class="btn primary small" type="button" data-action="acceptance-review" data-task-id="${escapeHtml(task.id)}">查看 / 验收</button></td></tr>`).join('')||emptyRow(7,'当前范围没有待验收任务。质检通过后会直接流入这里。');renderListPager('acceptanceTask');
-    setText('acceptanceQueueCount',rows.length);setText('acceptanceQueueScope',`${modeLabel(activeMode)} · ${selectedGroup()==='all'?'全部小组':groupLabel(selectedGroup())} · 全部日期`);
+    setText('acceptanceQueueCount',rows.length);setText('acceptanceQueueScope',`${modeLabel(activeMode)} · ${selectedGroup()==='all'?'全部小组':groupLabel(selectedGroup())} · 全部日期${hasAcceptanceFilters()?` · 筛选后 ${rows.length} / ${baseRows.length} 条`:''}`);
+    if(!rows.length&&hasAcceptanceFilters())$('acceptanceBody').innerHTML=emptyRow(7,'没有符合筛选的待验收任务，请调整或清空筛选。');
     if(selectedAcceptanceTaskId&&!rows.some(task=>task.id===selectedAcceptanceTaskId))selectedAcceptanceTaskId='';
     renderAcceptanceWorkbench(selectedAcceptanceTaskId);syncAcceptanceSelection();syncAcceptanceChoice();
   }
-  function acceptanceScopeKey() {return JSON.stringify({identity:batchIdentityScope(),group:selectedGroup()});}
+  function acceptanceScopeKey() {return JSON.stringify({identity:batchIdentityScope(),group:selectedGroup(),filters:acceptanceFilters()});}
   function checkedAcceptanceTasks() {return listSelection('acceptanceTask');}
   function acceptanceSelectionKey(rows) {return JSON.stringify(rows.map(row=>row.id).sort());}
   function syncAcceptanceSelection() {
     const model=listModel('acceptanceTask'),selected=model.selected.size,all=$('acceptanceSelectAll');
-    setText('acceptanceSelectionSummary',`跨页已选 ${selected} 条 · 当前范围待办 ${model.total} 条`);
+    setText('acceptanceSelectionSummary',`跨页已选 ${selected} 条 · 当前筛选待办 ${model.total} 条`);
     syncListSelection('acceptanceTask');all.disabled=acceptanceBusy||!model.pageRows.length;
-    $('acceptanceSelectAllButton').textContent=`全选全部待办（${model.total} 条）`;$('acceptanceSelectAllButton').disabled=acceptanceBusy||!model.total;
+    $('acceptanceSelectAllButton').textContent=`全选筛选结果（${model.total} 条）`;$('acceptanceSelectAllButton').disabled=acceptanceBusy||!model.total;
+    ACCEPTANCE_FILTER_IDS.forEach(id=>$(id).setAttribute('aria-disabled',String(acceptanceBusy||!!mutationDepth)));
+    $('acceptanceClearFilters').disabled=acceptanceBusy||!!mutationDepth||!hasAcceptanceFilters();
     ['acceptanceBulkPass','acceptanceBulkFail','acceptanceBulkReject'].forEach(id=>$(id).disabled=acceptanceBusy||!selected);
   }
   function rememberAcceptanceForm() {
@@ -1048,7 +1089,7 @@
   function renderAcceptanceWorkbench(id) {
     rememberAcceptanceForm();
     const target=$('acceptanceWorkbench');if(!id){target.innerHTML='<div class="empty"><strong>选择一条任务查看</strong><span>也可在左侧勾选多条，统一提交验收结果。</span></div>';return;}const task=findTask(state,id);
-    if(task.status!=='pending_acceptance'||!inCurrentScope(task,false)){target.innerHTML='<div class="empty">该任务已处理或不在当前范围，请重新选择。</div>';return;}
+    if(task.status!=='pending_acceptance'||!inAcceptanceScope(task)){target.innerHTML='<div class="empty">该任务已处理或不在当前范围，请重新选择。</div>';return;}
     const draftKey=`${batchIdentityScope()}|${id}`,draft=acceptanceSingleDrafts.get(draftKey),stale=!!draft&&draft.expected!==task.updatedAt;
     target.innerHTML=`<div class="panel-heading"><div><h3>${escapeHtml(task.tid)}</h3><p>${escapeHtml(task.movie)} · ${escapeHtml(groupLabel(task.groupId))}</p></div>${statusPill(task)}</div><form id="acceptanceForm" class="workbench-form" data-task-id="${escapeHtml(id)}" data-draft-key="${escapeHtml(draftKey)}" data-scope="${escapeHtml(acceptanceScopeKey())}" data-expected="${escapeHtml(draft?.expected||task.updatedAt)}">${stale?`<div class="inline-result" role="status"><p>任务已有更新，原说明和选择已保留。请核对上方影片、小组与当前状态，再继续验收。</p><button type="button" class="btn small" data-action="reconfirm-acceptance-task" data-latest="${escapeHtml(task.updatedAt)}">已核对最新状态，继续验收</button></div>`:''}<div class="decision-options"><label><input type="radio" name="decision" value="acceptance_pass" required> 验收通过</label><label><input type="radio" name="decision" value="acceptance_fail" required> 不通过，退回质检</label><label><input type="radio" name="decision" value="acceptance_reject" required> 拒绝，结束流转</label></div><label class="field"><span>验收说明（不通过或拒绝时必填）</span><textarea name="note" maxlength="2000"></textarea><small>拒绝后不退回质检或标注，任务与历史记录仍保留。</small></label><button type="submit" class="btn primary" ${stale?'disabled':''}>保存验收结果</button></form>`;
     const form=$('acceptanceForm');if(draft){form.elements.note.value=draft.note;const choice=qsa('input[name="decision"]',form).find(input=>input.value===draft.decision);if(choice)choice.checked=true;dirtyForms.add(form);}syncAcceptanceSingleChoice();
@@ -1057,7 +1098,7 @@
   function acceptanceTransition(task,type,note) {
     requireRole('acceptance',task);
     if(task.mode!==activeMode)throw new Error('此 TID 属于另一业务模块，请切换模块后处理。');
-    if(!inCurrentScope(task,false))throw new Error('此 TID 不在当前小组范围，请重新选择。');
+    if(!inAcceptanceScope(task))throw new Error('此 TID 不在当前筛选范围，请重新选择。');
     if(!['acceptance_pass','acceptance_fail','acceptance_reject'].includes(type))throw new Error('请选择验收通过、不通过或拒绝。');
     if(task.status!=='pending_acceptance')throw new Error('当前任务不在待验收状态，或已有结果，不能覆盖状态。');
     if(type!=='acceptance_pass'&&!note)throw new Error(type==='acceptance_reject'?'验收拒绝需要填写原因。':'请填写不通过的原因，任务将退回质检。');
@@ -1080,7 +1121,7 @@
     if(saved){acceptanceSingleDrafts.delete(form.dataset.draftKey);listModel('acceptanceTask').selected.delete(form.dataset.taskId);form.remove();selectedAcceptanceTaskId='';renderAcceptance();}
     else if(form.isConnected&&refreshState()){
       const task=findTask(state,form.dataset.taskId);
-      if(task.status==='pending_acceptance'&&inCurrentScope(task,false)&&task.updatedAt!==form.dataset.expected)renderAcceptanceWorkbench(task.id);
+      if(task.status==='pending_acceptance'&&inAcceptanceScope(task)&&task.updatedAt!==form.dataset.expected)renderAcceptanceWorkbench(task.id);
     }
   }
   async function reconfirmAcceptanceTask(button) {
@@ -1090,7 +1131,7 @@
       await refreshBatchSource();
       if(!form.isConnected||$('acceptanceForm')!==form||scope!==acceptanceScopeKey())throw new Error('当前任务或范围已变化，说明已保留，请重新打开核对。');
       const task=findTask(state,id);requireRole('acceptance',task);
-      if(task.status!=='pending_acceptance'||!inCurrentScope(task,false))throw new Error('此任务已不在当前待验收范围，不能继续提交；原说明已保留。');
+      if(task.status!=='pending_acceptance'||!inAcceptanceScope(task))throw new Error('此任务已不在当前待验收范围，不能继续提交；原说明已保留。');
       if(task.updatedAt!==latest)return false;
       form.dataset.expected=task.updatedAt;rememberAcceptanceForm();return true;
     });
@@ -1110,7 +1151,7 @@
     return resolveTidRows(text,source).map(row=>{
       let error=row.error;
       if(!error)error=batchRoleError(row.task,'acceptance');
-      if(!error&&!inCurrentScope(row.task,false))error='此 TID 不在当前小组范围，请调整查看小组后重新匹配。';
+      if(!error&&!inAcceptanceScope(row.task))error='此 TID 不在当前筛选范围，请调整或清空筛选后重新匹配。';
       if(!error&&row.task.status!=='pending_acceptance')error=`当前为“${window.WorkbenchFlow.label(row.task)}”，不可登记验收结果。`;
       return{...row,error,outcome:error?'failed':'success',taskId:row.task?.id,expected:row.task?.updatedAt};
     });
@@ -1284,14 +1325,14 @@
     node.textContent=message;
   }
   function exportScopeCurrent(scope) {
-    return JSON.stringify(profile)===scope.identity&&activeMode===scope.mode&&selectedGroup()===scope.groupId&&(scope.range!=='scope'||scopeRangeKey()===scope.rangeKey);
+    return JSON.stringify(profile)===scope.identity&&activeMode===scope.mode&&selectedGroup()===scope.groupId&&(scope.range!=='scope'||scopeRangeKey()===scope.rangeKey)&&(!scope.acceptanceFilters||JSON.stringify(acceptanceFilters())===JSON.stringify(scope.acceptanceFilters));
   }
   async function generateExport(request,source,backup,job) {
     const dependencies=['workflow','data-io','reports'].map(name=>{
       const script=qsa('script[src]').find(node=>new URL(node.src,location.href).pathname.split('/').pop().match(new RegExp('^'+name+'(?:\\.[^/]+)?\\.js$')));
       if(!script)throw new Error('导出组件未加载，请稍后重试。');return script.src;
     });
-    const worker=new Worker(new URL('export-worker.20260923-prod38.js',location.href));job.worker=worker;
+    const worker=new Worker(new URL('export-worker.20260923-prod39.js',location.href));job.worker=worker;
     const result=new Promise((resolve,reject)=>{
       worker.onmessage=event=>{const data=event.data;if(data.type==='progress')setExportStatus(data.text);else if(data.type==='complete')resolve(data);else if(data.type==='error'){job.error=new Error(data.message);reject(job.error);}};
       worker.onerror=()=>{job.error=new Error('导出组件加载或生成失败，填写内容已保留，请重试。');reject(job.error);};
@@ -1321,6 +1362,7 @@
       if(!profile)throw new Error('请先选择作业身份。');
       if(typeof Worker!=='function')throw new Error('当前浏览器不支持后台导出，请使用新版浏览器。填写内容已保留。');
       const scope={identity:JSON.stringify(profile),profile:{...profile},range,rangeKey:scopeRangeKey(),groupId:selectedGroup(),mode:activeMode,...selectedRange()};
+      if(kind==='acceptancePending')scope.acceptanceFilters=acceptanceFilters();
       if(range==='scope'&&!validScopeRange())throw new Error('请修正日期区间后再导出。');
       if(kind==='backup'&&profile.role!=='admin')throw new Error('完整备份仅管理员可下载。普通作业身份只能查看和导出所属范围的数据。');
       job.buttons=qsa('[data-export]').map(button=>({button,disabled:button.disabled}));job.buttons.forEach(({button})=>{button.disabled=true;button.setAttribute('aria-busy','true');});
@@ -1336,7 +1378,7 @@
       if(kind==='legacyPackages'){download(`全部建包记录-${todayString()}.csv`,result.blob);const message=`已导出全部 ${result.rowCount} 个建包批次。`;setExportStatus(message);showToast(message);return;}
       const names={imports:'导入记录',tasks:'任务明细',events:'操作流水',packages:'建包记录',movies:'影片汇总',groups:'小组汇总',daily:'每日统计',personDaily:'个人每日明细',summary:'小组影片综合汇总',acceptancePending:'待验收明细',acceptanceHistory:'验收记录'},dateLabel=range==='scope'?scopeRangeLabel():'全部日期';
       if(kind==='acceptancePending'||kind==='acceptanceHistory'){
-        const group=scope.groupId==='all'?'全部小组':groupLabel(scope.groupId),date=kind==='acceptancePending'?'全部待办':dateLabel;
+        const group=scope.groupId==='all'?'全部小组':groupLabel(scope.groupId),date=kind==='acceptancePending'?(Object.values(scope.acceptanceFilters).some(values=>values.length)?'当前筛选待办':'全部待办'):dateLabel;
         download(`${modeLabel(scope.mode)}-${group}-${names[kind]}-${date}-${todayString()}.csv`,result.blob);
         const message=`已导出${modeLabel(scope.mode)} · ${group}的${names[kind]}，共 ${result.rowCount} 条（${date}）。`;
         setExportStatus(message);showToast(message);return;
@@ -1748,7 +1790,8 @@
     $('taskSearchForm').addEventListener('submit',event=>{event.preventDefault();registerAnnotationTid();});$('taskSearchInput').addEventListener('input',debounceListSearch(renderTaskSearch));
     $('myTaskFilter').addEventListener('change',()=>{refreshState();renderMyTasks();});
     $('recordDateMode').addEventListener('change',()=>{refreshState();renderRecords();});$('recordSearch').addEventListener('input',debounceListSearch(renderRecords));
-    ['recordMovie','recordStatus'].forEach(id=>{const box=$(id);if(!box)return;box.addEventListener('click',event=>{event.stopPropagation();toggleMultiSelect(id);});box.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();toggleMultiSelect(id);}});});
+    ['recordMovie','recordStatus',...ACCEPTANCE_FILTER_IDS].forEach(id=>{const box=$(id);if(!box)return;box.addEventListener('click',event=>{event.stopPropagation();toggleMultiSelect(id);});box.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();toggleMultiSelect(id);}});});
+    $('acceptanceClearFilters').addEventListener('click',()=>{if(acceptanceBusy||mutationDepth)return;ACCEPTANCE_FILTER_IDS.forEach(id=>multiSet(id,[]));invalidateAcceptancePreview();if(refreshState())renderAcceptance();});
     document.addEventListener('click',event=>{
       /* 选项列表会被重建，被点节点可能已脱离 DOM，此时不要当成「点击外部」误关面板 */
       const target=event.target;
@@ -1816,6 +1859,6 @@
     try {state=await store.init();profile=store.profile();const retiredProfile=profile&&!validProfile(profile);initializeControls();initializeWorkflowControls();bindEvents();bindBulkEvents();bindModuleEvents();bindOverviewEvents();bindReassignEvents();if(profile&&!retiredProfile)enterApp();else{profile=null;showIdentity();if(retiredProfile)showToast('组别已更新，请按新的单镜头1—3组或多镜头1—8组重新选择身份。');}}
     catch(error){$('appShell').classList.add('hidden');$('identityGate').classList.remove('hidden');const box=document.createElement('div');box.className='panel';const text=document.createElement('p');text.textContent='共享服务暂时无法连接，云端数据未清空。'+error.message;const button=document.createElement('button');button.type='button';button.className='btn primary';button.textContent='重试连接';button.addEventListener('click',()=>location.reload());box.append(text,button);$('identityGate').replaceChildren(box);}
   }
-  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20260923-prod37',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
+  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20260923-prod39',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
   init();
 })();

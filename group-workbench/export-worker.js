@@ -70,7 +70,12 @@
       const columns = definitions => definitions.map(([key,label]) => ({key,label}));
       let report;
       if (kind === 'acceptancePending') {
-        const pending = tasks.filter(task => task.status === 'pending_acceptance');
+        const selection = scope.acceptanceFilters || {};
+        const filters = [
+          ['movies',task=>String(task.movie || '')],['groupIds',task=>String(task.groupId || '')],
+          ['assignees',task=>String(task.assignee || '')],['rounds',task=>String(task.acceptanceRound || 1)]
+        ].map(([key,value]) => ({selected:new Set(Array.isArray(selection[key])?selection[key].map(String):[]),value}));
+        const pending = tasks.filter(task => task.status === 'pending_acceptance' && filters.every(filter => !filter.selected.size || filter.selected.has(filter.value(task))));
         const detail = Reports.build({...reportInput,tasks:pending,auditTasks:pending,kind:'tasks'}).tasks;
         report = {columns:columns([
           ['tid','TID'],['movie','影片 / 包'],['group','小组'],['mode','类型'],['assignee','标注人'],['qcOperator','质检人'],

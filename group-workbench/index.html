@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="styles.20260922-prod35-cards.css">
   <link rel="stylesheet" href="first-qc-date.css?v=20260923-prod36">
   <link rel="stylesheet" href="pagination.css?v=20260923-prod37">
+  <link rel="stylesheet" href="acceptance-filters.css?v=20260923-prod39">
   <link rel="stylesheet" href="/work-mode-entry.20260910.css">
 </head>
 <body>
@@ -251,13 +252,23 @@
       </section>
       <section id="acceptanceView" class="view hidden" aria-labelledby="acceptanceHeading">
         <div class="section-heading"><div><h2 id="acceptanceHeading">验收台</h2><p>质检通过后直接流入，勾选即可验收，无需建包或领取。</p></div><div class="actions export-actions"><details id="acceptanceExportMenu" class="export-menu"><summary>导出</summary><div class="export-menu-list">
-          <button class="btn small" type="button" data-export="acceptancePending" title="导出当前镜头和小组范围的全部待验收任务，不受日期、分页或勾选限制">待验收明细（全部待办）</button>
+          <button class="btn small" type="button" data-export="acceptancePending" title="导出下方筛选结果的全部待验收任务，包含所有分页，不受勾选或统计日期限制">待验收明细（当前筛选）</button>
           <button class="btn small" type="button" data-export="acceptanceHistory" data-export-range="scope" title="按上方统计日期和小组导出，以验收实际操作日期为准，每次判定一行">验收记录（所选日期）</button>
-          <button class="btn small" type="button" data-export="acceptanceHistory" title="导出当前镜头和小组范围的全部验收通过、不通过及拒绝记录">验收记录（全部日期）</button>
+          <button class="btn small" type="button" data-export="acceptanceHistory" title="导出当前镜头和上方小组范围的全部验收记录，不受下方待验收筛选影响">验收记录（全部日期）</button>
         </div></details></div></div>
         <div class="split-layout acceptance-layout">
           <div class="panel queue-panel">
             <div class="panel-heading"><div><h3>待验收 <span id="acceptanceQueueCount" class="tag neutral">0</span></h3><p id="acceptanceQueueScope">当前模块 · 全部小组 · 全部日期</p></div><button id="acceptanceSelectAllButton" class="btn small" type="button">一键全选</button></div>
+            <div class="acceptance-filter-bar">
+              <div class="acceptance-filter-fields">
+                <div class="field"><span id="acceptanceMovieLabel">影片（多选）</span><div id="acceptanceMovie" class="multi-select" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-labelledby="acceptanceMovieLabel" data-placeholder="全部影片"><span class="multi-select-value">全部影片</span><span class="multi-select-arrow" aria-hidden="true">▾</span></div></div>
+                <div class="field"><span id="acceptanceGroupLabel">小组（多选）</span><div id="acceptanceGroup" class="multi-select" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-labelledby="acceptanceGroupLabel" data-placeholder="全部小组"><span class="multi-select-value">全部小组</span><span class="multi-select-arrow" aria-hidden="true">▾</span></div></div>
+                <div class="field"><span id="acceptanceAssigneeLabel">标注人（多选）</span><div id="acceptanceAssignee" class="multi-select" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-labelledby="acceptanceAssigneeLabel" data-placeholder="全部标注人"><span class="multi-select-value">全部标注人</span><span class="multi-select-arrow" aria-hidden="true">▾</span></div></div>
+                <div class="field"><span id="acceptanceRoundLabel">验收轮次（多选）</span><div id="acceptanceRound" class="multi-select" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-labelledby="acceptanceRoundLabel" data-placeholder="全部轮次"><span class="multi-select-value">全部轮次</span><span class="multi-select-arrow" aria-hidden="true">▾</span></div></div>
+                <button id="acceptanceClearFilters" class="btn small" type="button" disabled>清空筛选</button>
+              </div>
+              <p class="acceptance-filter-hint">全选与待验收导出跟随筛选，包含全部分页。验收记录导出仍按上方小组和日期。</p>
+            </div>
             <div class="bulk-toolbar"><span id="acceptanceSelectionSummary" aria-live="polite">已选 0 条</span><div class="actions"><button id="acceptanceBulkPass" class="btn primary small" type="button" disabled>验收通过</button><button id="acceptanceBulkFail" class="btn small" type="button" disabled>不通过 · 退回质检</button><button id="acceptanceBulkReject" class="btn danger small" type="button" disabled>拒绝 · 结束流转</button></div></div>
             <div id="acceptanceBulkWorkbench" class="bulk-workbench" aria-live="polite"></div>
             <div class="table-wrap"><table><thead><tr><th class="selection-cell"><input id="acceptanceSelectAll" type="checkbox" aria-label="全选当前范围待验收任务"></th><th>TID</th><th>影片</th><th>小组</th><th>标注人</th><th>当前状态</th><th>操作</th></tr></thead><tbody id="acceptanceBody"></tbody></table></div>
@@ -307,6 +318,6 @@
   <script src="shared-store.js?v=20260923-prod37" defer></script>
   <script src="workflow.js?v=workflow.20260922-prod30-release.js" defer></script>
   <script src="reports.js?v=20260923-prod37" defer></script>
-  <script src="app.js?v=20260923-prod38" defer></script>
+  <script src="app.js?v=20260923-prod39" defer></script>
 </body>
 </html>

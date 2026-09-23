@@ -1,0 +1,30 @@
+.acceptance-filter-bar {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--line);
+  background: #f7fbf9;
+}
+.acceptance-filter-fields {
+  display: grid;
+  grid-template-columns: minmax(200px, 2fr) repeat(3, minmax(140px, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
+}
+.acceptance-filter-fields .field { min-width: 0; margin: 0; }
+.acceptance-filter-fields .multi-select { width: 100%; min-width: 0; }
+.acceptance-filter-fields .multi-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.acceptance-filter-fields .multi-select-arrow { flex-shrink: 0; }
+.acceptance-filter-fields [aria-disabled="true"] { opacity: .6; cursor: wait; }
+.acceptance-filter-fields .multi-select:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.acceptance-filter-hint { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+@media (max-width: 1200px) {
+  .acceptance-filter-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .acceptance-filter-fields > button { justify-self: start; }
+}
+@media (max-width: 600px) {
+  .acceptance-filter-bar { padding: 12px; }
+  .acceptance-filter-fields { grid-template-columns: minmax(0, 1fr); }
+}
