@@ -1,0 +1,183 @@
+{
+  "version": "20260923-prod41",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "releasedAt": "2026-09-23T16:11:16.700856+08:00",
+  "baselineVersion": "20260923-prod40",
+  "baselineCommit": "cc2c3dbac78bd05f5724f54948abbe6f8c47c7a0",
+  "feature": {
+    "groupId": "g05",
+    "historicalLabel": "单镜头5组",
+    "retiredInFrontend": true,
+    "activeSingleGroups": [
+      "g01",
+      "g02",
+      "g03",
+      "g04"
+    ],
+    "multiGroupsUnchanged": 12,
+    "removedNewEntrypoints": [
+      "新身份登记",
+      "新导入目标与提交前校验",
+      "普通小组选择器",
+      "小组总览正常行"
+    ],
+    "historyDictionaryPreserved": true,
+    "existingG05ProfilesRemainValid": [
+      "annotation",
+      "qc",
+      "acceptance"
+    ],
+    "oldAnnotationAndQcGroupScopeRemainsLocked": true,
+    "historyAndExportsPreserved": true,
+    "apiRetirementEnforcementAdded": false,
+    "scopeNote": "本次仅停用新前端正常入口。API 及已打开旧页仍按原规则接受 g05 正常作业，不删除、迁移或重置该组任何历史任务。"
+  },
+  "staticFiles": {
+    "app.20260923-prod41.js": {
+      "sha256": "e8ebc53a0f36bf60ec59e1d8b1cc518c9ca2e655a24bf58ed0c7f2ee6c831fbe",
+      "bytes": 209774
+    },
+    "index.html": {
+      "sha256": "9216e7b6bb2327420aa1abfd915d5c4f0b0c781959623ea1a5a55da80758698d",
+      "bytes": 48491
+    }
+  },
+  "sourceHashes": {
+    "group-workbench/index.html": "e691bf0e96a6035474377115e21c578a769ccf97954a8c19ba892c9f5284fcaf",
+    "group-workbench/app.js": "e8ebc53a0f36bf60ec59e1d8b1cc518c9ca2e655a24bf58ed0c7f2ee6c831fbe",
+    "workbench-api/server.cjs": "fdddad59d4c64f44a9737160793e4afb5d2e058009f66d4daff5a21f108807d0",
+    "workbench-api/rules.cjs": "c785ec714fdf90da77596cd061f5c38d100fe94114883daea231989f9495c19d",
+    "workbench-api/record-index.cjs": "406cecfc647d69ba2be927211a1675b2714b56c1e26f60a8e3196521f0da5133",
+    "group-workbench/workflow.js": "79c615269e536ad6e07c018ab6fe7c9c615b8f52cb815d8e4d092ce6b71507ce",
+    "group-workbench/styles.css": "36ae5d3ee0812ee1d90843754014437f9563f03dab49ba7e9843231eea22223e",
+    "group-workbench/styles.20260922-prod31-accept.css": "34b5f2f6a4fd65dc79f6b33a8e20f5d8350f64d94b046759e8e251520b9bbd57",
+    "group-workbench/styles.20260922-prod35-cards.css": "fe7a483f8e707858d528db4a8d597ef6d2787605f650fb6d33e0d10aae8ccba6",
+    "group-workbench/first-qc-date.css": "f97b9ff8de1cc10ea9a282ec2a3425170a559859018cf0f62ef927bd46302975",
+    "group-workbench/pagination.css": "112d8d821d307c5b7d9963f8880d93f5941bc7cfe7b71cda1820765845768a75",
+    "group-workbench/acceptance-filters.css": "5bc693035543137e42df9810149cedaa45db3a6bf63ecece1b0aab0c77f2399d",
+    "group-workbench/data-io.js": "cb1db444edf83733c356c0187460ee208ba579ca7500852f87376a8bea640338",
+    "group-workbench/shared-store.js": "edbe732e31e51f18da5f06bf787e0784490ba5c21a58441fa9da313e406ac7ba",
+    "group-workbench/reports.js": "171133606e5b643e44b66926aa65b6287683360ca162918a78100ed4d6481d8a",
+    "group-workbench/export-worker.js": "ffc694a915e627196955400bd3bbdabc78dfc7b85713b37de14b7077e145a45d"
+  },
+  "preservedAssets": {
+    "acceptance-filters.css": {
+      "reference": "acceptance-filters.20260923-prod39.css",
+      "sha256": "5bc693035543137e42df9810149cedaa45db3a6bf63ecece1b0aab0c77f2399d"
+    },
+    "reports.js": {
+      "reference": "reports.20260923-prod40.js",
+      "sha256": "171133606e5b643e44b66926aa65b6287683360ca162918a78100ed4d6481d8a"
+    },
+    "export-worker.js": {
+      "reference": "export-worker.20260923-prod39.js",
+      "sha256": "ffc694a915e627196955400bd3bbdabc78dfc7b85713b37de14b7077e145a45d"
+    }
+  },
+  "checks": {
+    "workflowAndApiUnchanged": true,
+    "historyAndSessionPreserved": true,
+    "isolatedUi": true,
+    "retiredEntrypoints": true,
+    "bothModes": true
+  },
+  "validation": {
+    "retiredGroupChecks": 37,
+    "retiredGroupCases": [
+      "active single groups are 1 through 4",
+      "all 12 multi groups retain original IDs/order",
+      "full history dictionary retains g05",
+      "historical label remains unchanged",
+      "annotation existing g05 profile remains valid",
+      "qc existing g05 profile remains valid",
+      "acceptance existing g05 profile remains valid",
+      "admin profile remains valid",
+      "admin selector removes g05 and falls back safely",
+      "retired old filter selects all rather than blank",
+      "annotation old g05 session still displays only its group",
+      "annotation old group remains locked",
+      "qc old g05 session still displays only its group",
+      "qc old group remains locked",
+      "multi selector unchanged",
+      "new identity choices omit retired group",
+      "old preferred choice falls back to valid first group",
+      "new multi identity choices unchanged",
+      "multi saved choice retained",
+      "retired new sign-in is stopped before any API call",
+      "active group sign-in continues",
+      "retired preview disables commit",
+      "a previously prepared retired-group import is rejected again at commit",
+      "g04 normal validation still succeeds",
+      "g04 normal preview enables commit",
+      "m12 normal validation still succeeds",
+      "m12 normal preview enables commit",
+      "valid single and multi imports still create their own group transactions",
+      "overview hides g05 with valid date range",
+      "overview hides g05 with invalid date range",
+      "all multi overview rows preserved",
+      "historical daily model retains g05 even though overview row is hidden",
+      "history task export keeps old group name",
+      "history group export retains g05",
+      "input state is not changed by selectors/import preview/overview",
+      "unchanged API accepts an old g05 page claim",
+      "unchanged API accepts the old page submission"
+    ],
+    "firstAcceptanceUiRegressionChecks": 125,
+    "firstAcceptanceUiTimezones": [
+      "UTC",
+      "Asia/Shanghai"
+    ],
+    "firstQcRegressionChecks": 27,
+    "isolatedBrowser": {
+      "singleActiveGroups": "1-4 in login/scope/import/overview",
+      "multiActiveGroups": "1-12 unchanged in login/scope/import/overview",
+      "oldG05Session": "Old prod40 g05 session preserved textarea across local static cutover and submitted successfully, task enters first QC. Manual reload to prod41 retained old g05 identity without login.",
+      "productionApiAccess": false
+    }
+  },
+  "publicFilesMatch": 20,
+  "existingServicesUnchanged": true,
+  "existingServiceCount": 13,
+  "activeApiVersion": "20260923-prod37",
+  "activeApiPort": 3020,
+  "databaseRead": false,
+  "databaseWritten": false,
+  "apiRequestsSent": false,
+  "apiCodeUnchanged": true,
+  "workflowUnchanged": true,
+  "servicesStartedOrStopped": false,
+  "existingFormalAssetsUnchanged": true,
+  "nginxConfigAndMasterUnchanged": true,
+  "currentModeAndDemosUnchanged": true,
+  "oldPageContinuity": {
+    "version": "20260923-prod40",
+    "groupId": "g05",
+    "isolatedSyntheticOnly": true,
+    "oldPageHeld": true,
+    "draftPreserved": true,
+    "submitSucceeded": true,
+    "revisionAfterSubmit": 83,
+    "eventTypes": [
+      "dispatch",
+      "claim",
+      "submit"
+    ],
+    "result": "首轮提交成功后进入首次质检；之后手动刷新到 prod41 仍保留原 g05 身份，无需重新登录。",
+    "productionApiAccess": false,
+    "proof": "outputs/workbench-retire-single5-20260923/continuity.json"
+  },
+  "proofs": {
+    "verification": {
+      "path": "outputs/workbench-retire-single5-20260923/verification.json",
+      "sha256": "5b7039e0701abb269e75969f89210bed93a520dc33c6e50bbe8a117cd0b0c97f"
+    },
+    "unit": "outputs/workbench-retire-single5-20260923/unit-verification.json",
+    "continuity": "outputs/workbench-retire-single5-20260923/continuity.json",
+    "fixture": "outputs/workbench-retire-single5-20260923/g05-fixture.json",
+    "manifest": "outputs/workbench-retire-single5-20260923/release/manifest.json",
+    "activate": "outputs/workbench-retire-single5-20260923/release/activate-2026-09-23T08-11-16.706Z.json",
+    "verify": "outputs/workbench-retire-single5-20260923/release/verify-2026-09-23T08-11-18.324Z.json"
+  },
+  "evidence": "outputs/workbench-retire-single5-20260923",
+  "backup": "/opt/r2v/backups/workbench-retire-single5-20260923/"
+}

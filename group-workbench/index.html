@@ -25,7 +25,7 @@
         <label class="field" for="identityName"><span>中文名</span><input id="identityName" name="name" type="text" placeholder="填写中文名" required maxlength="20" autocomplete="name"></label>
         <label class="field" for="identityMode"><span>先选作业类型</span><select id="identityMode" name="mode" required aria-describedby="identityModeHelp"><option value="single">单镜头</option><option value="multi">多镜头</option></select><small id="identityModeHelp">选择后，下方只显示对应类型的小组。</small></label>
         <div class="form-grid">
-          <label class="field" for="identityGroup"><span>再选所属小组</span><select id="identityGroup" name="group" required aria-describedby="identityGroupHelp"></select><small id="identityGroupHelp">单镜头1—3组；多镜头1—8组。</small></label>
+          <label class="field" for="identityGroup"><span>再选所属小组</span><select id="identityGroup" name="group" required aria-describedby="identityGroupHelp"></select><small id="identityGroupHelp">单镜头1—4组；多镜头1—12组。</small></label>
           <label class="field" for="identityRole"><span>角色</span><select id="identityRole" name="role" required><option value="annotation">标注</option><option value="qc">组长 / 质检</option><option value="acceptance">验收</option></select></label>
         </div>
         <label id="identityRolePinField" class="field hidden" for="identityRolePin"><span>身份校验码</span><input id="identityRolePin" name="rolePin" type="password" inputmode="numeric" autocomplete="off" maxlength="64"></label>
@@ -319,6 +319,6 @@
   <script src="shared-store.js?v=20260923-prod37" defer></script>
   <script src="workflow.js?v=workflow.20260922-prod30-release.js" defer></script>
   <script src="reports.js?v=20260923-prod40" defer></script>
-  <script src="app.js?v=20260923-prod40" defer></script>
+  <script src="app.js?v=20260923-prod41" defer></script>
 </body>
 </html>

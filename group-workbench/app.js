@@ -2,7 +2,7 @@
   'use strict';
 
   const GROUPS = [
-    ...[1,2,3,4,5].map(number=>({id:'g0'+number,name:`单镜头${number}组`,leader:'',defaultMode:'single',members:[]})),
+    ...[1,2,3,4,5].map(number=>({id:'g0'+number,name:`单镜头${number}组`,leader:'',defaultMode:'single',members:[],retired:number===5})),
     ...[1,2,3,4,5,6,7,8,9,10,11,12].map(number=>({id:number<=5?'g'+String(number+5).padStart(2,'0'):'m'+String(number).padStart(2,'0'),name:`多镜头${number}组`,leader:'',defaultMode:'multi',members:[]}))
   ];
   const QC_TAGS = ['命名/ID对齐错误', '分类/标签归属错误', '朝向覆盖缺失（正/侧/背面）', '景别/机位/角度/朝向判定错误', 'AI生成/图片来源异常', 'ID合并/拆分错误', '主体/对象漏标', '图片模糊/清晰度不足', '黑边/裁切不完整', '其他主体混入/画面污染'];
@@ -190,6 +190,9 @@
     return GROUPS.find((group) => group.id === id) || null;
   }
 
+  // Retired groups remain in the history dictionary and existing sessions.
+  function activeGroups() { return GROUPS.filter(group=>!group.retired); }
+
   function groupLabel(id) {
     const group = groupById(id);
     return group ? group.name : '未知小组';
@@ -273,7 +276,7 @@
   function selectedGroup() { return canViewAllGroups()?($('scopeGroup').value||'all'):(profile?.groupId||'all'); }
   function inCurrentScope(task,withDate=true) {return canViewGroup(task.groupId)&&task.mode===activeMode&&(!withDate||inDateRange(task.date))&&(selectedGroup()==='all'||task.groupId===selectedGroup());}
   function configureScopeGroup(selected) {
-    const groups=GROUPS.filter(group=>group.defaultMode===activeMode&&canViewGroup(group.id));
+    const groups=GROUPS.filter(group=>group.defaultMode===activeMode&&canViewGroup(group.id)&&(!group.retired||(!canViewAllGroups()&&group.id===profile?.groupId)));
     const rows=canViewAllGroups()?[{value:'all',label:'全部小组'},...groups.map(group=>({value:group.id,label:group.name}))]:groups.map(group=>({value:group.id,label:group.name}));
     options($('scopeGroup'),rows,canViewAllGroups()?selected:profile?.groupId);
     $('scopeGroup').disabled=!canViewAllGroups();
@@ -477,7 +480,7 @@
     if (isAcceptanceFilter(id)) { invalidateAcceptancePreview(); if (refreshState()) renderAcceptance(); }
   }
   function initializeControls() {
-    const groups = GROUPS.map(group => ({value: group.id, label: group.name}));
+    const groups = activeGroups().map(group => ({value: group.id, label: group.name}));
     configureScopeGroup(state.preferences.scopeGroup || 'all');
     populateIdentityGroups(profile?.mode || groupById(profile?.groupId)?.defaultMode || 'single', profile?.groupId);
     $('scopeDateFrom').value = state.preferences.scopeDateFrom ?? state.preferences.scopeDate ?? todayString();
@@ -492,11 +495,11 @@
     if ($('demoReset')) $('demoReset').remove();
   }
   function populateIdentityGroups(mode, selected) {
-    const selectedMode=mode==='multi'?'multi':'single',groups=GROUPS.filter(group=>group.defaultMode===selectedMode);
+    const selectedMode=mode==='multi'?'multi':'single',groups=activeGroups().filter(group=>group.defaultMode===selectedMode);
     $('identityMode').value=selectedMode;
     options($('identityGroup'),groups.map(group=>({value:group.id,label:group.name})),selected);
-    setText('identityModeHelp',selectedMode==='single'?'单镜头固定5个小组。':'多镜头固定12个小组。');
-    setText('identityGroupHelp',selectedMode==='single'?'请选择：单镜头1组至单镜头5组。':'请选择：多镜头1组至多镜头12组。');
+    setText('identityModeHelp',selectedMode==='single'?'单镜头共4个小组。':'多镜头固定12个小组。');
+    setText('identityGroupHelp',selectedMode==='single'?'请选择：单镜头1组至单镜头4组。':'请选择：多镜头1组至多镜头12组。');
     if(state)populateLegacyIdentity();
   }
   function validWorkerProfile(value) { return value && /^\p{Script=Han}{1,20}$/u.test(value.name) && GROUPS.some(group => group.id === value.groupId && (!value.mode || group.defaultMode === value.mode)) && ['annotation','qc','acceptance'].includes(value.role); }
@@ -520,6 +523,7 @@
     $('identityRolePinField')?.classList.toggle('hidden',!required);if($('identityRolePin')){$('identityRolePin').required=required;$('identityRolePin').value='';}
   }
   async function saveIdentity(next,pin) {
+    if(next.role!=='admin'&&groupById(next.groupId)?.retired){showToast('该小组已停用，请选择当前作业小组。','error');return;}
     const controls=qsa('#identityGate input,#identityGate select,#identityGate button');controls.forEach(control=>control.disabled=true);
     try {const verified=await store.signIn(next,pin);profile=verified;state=store.read();clearTimeout(toastTimer);$('toast').classList.add('hidden');$('identityAdminName').value='';$('identityAdminPin').value='';$('identityRolePin').value='';enterApp();setSharedStatus('ready','已连接共享数据');}
     catch(error){showToast(error.message||'身份验证失败，请核对后重试。','error');}
@@ -640,7 +644,7 @@
   }
   function renderGroupProgress(tasks) {
     const validRange=validScopeRange(),byGroup=groupTaskMap(tasks);
-    const rows=(validRange?groupDailyRows():GROUPS.filter(group=>group.defaultMode===activeMode).map(group=>({groupId:group.id,leader:'',total:null,headcount:null,members:[]}))).filter(row=>selectedGroup()==='all'||row.groupId===selectedGroup());
+    const rows=(validRange?groupDailyRows():GROUPS.filter(group=>group.defaultMode===activeMode).map(group=>({groupId:group.id,leader:'',total:null,headcount:null,members:[]}))).filter(row=>!groupById(row.groupId)?.retired&&(selectedGroup()==='all'||row.groupId===selectedGroup()));
     const expanded=new Set(qsa('#groupProgressBody details[open]').map(details=>details.closest('tr').dataset.groupId));
     setText('groupDailyTotalLabel',singleScopeDate()?'当日总量（手填）':'区间总量（手填）');
     setText('groupDailyAttendanceLabel',singleScopeDate()?'在班人数':'区间在班人天');
@@ -949,6 +953,7 @@
   function dispatchValues() {const f=$('dispatchForm');return{date:f.elements.date.value,groupId:f.elements.group.value,mode:activeMode,movie:f.elements.movie.value.trim(),text:f.elements.tids.value};}
   function evaluateTaskImport(values,source) {
     requireImportAdmin();
+    if(groupById(values.groupId)?.retired)throw new Error('该小组已停用，请选择当前作业小组。');
     if(values.mode!==activeMode||groupById(values.groupId)?.defaultMode!==activeMode)throw new Error('请在对应的单镜头或多镜头模块导入，并选择该业务的小组。');
     if(!/^\d{4}-\d{2}-\d{2}$/.test(values.date)||!groupById(values.groupId))throw new Error('请填写业务日期和小组。');
     if(!values.movie||values.movie.length>200)throw new Error('请单独填写影片名，最长200字。');
@@ -1636,7 +1641,7 @@
         const draft=moduleEditorDrafts.get(id+':'+nextMode);editor.replaceChildren(...(draft?.nodes||[]));editor.classList.toggle('hidden',!draft||draft.hidden);
       }
     }
-    activeMode=nextMode;const groups=GROUPS.filter(group=>group.defaultMode===activeMode),prior=$('scopeGroup').value;
+    activeMode=nextMode;const groups=activeGroups().filter(group=>group.defaultMode===activeMode),prior=$('scopeGroup').value;
     configureScopeGroup(groups.some(group=>group.id===prior)?prior:'all');
     const form=$('dispatchForm'),savedGroup=previousMode!==nextMode?dispatchModuleDrafts.get(nextMode)?.groupId:form.elements.group.value;options(form.elements.group,groups.map(group=>({value:group.id,label:group.name})),groups.some(group=>group.id===savedGroup)?savedGroup:groups.some(group=>group.id===profile?.groupId)?profile.groupId:groups[0].id);form.elements.mode.value=activeMode;setText('dispatchModeLabel',modeLabel(activeMode));
     qsa('[data-mode]').forEach(button=>{button.classList.toggle('active',button.dataset.mode===activeMode);button.setAttribute('aria-pressed',String(button.dataset.mode===activeMode));});setText('currentModeLabel',modeLabel(activeMode));
@@ -1877,9 +1882,9 @@
     document.addEventListener('change',event=>{if(!event.target.matches('#groupDailyForm [name="date"]'))return;const form=event.target.form,date=event.target.value;try{if(!date)throw new Error('请选择具体登记日期。');if(refreshState())showGroupDailyEditor(form.dataset.groupId,'date',date);}catch(error){event.target.value=form.dataset.date;showToast(error.message,'error');}});
   }
   async function init() {
-    try {state=await store.init();profile=store.profile();const retiredProfile=profile&&!validProfile(profile);initializeControls();initializeWorkflowControls();bindEvents();bindBulkEvents();bindModuleEvents();bindOverviewEvents();bindReassignEvents();if(profile&&!retiredProfile)enterApp();else{profile=null;showIdentity();if(retiredProfile)showToast('组别已更新，请按新的单镜头1—3组或多镜头1—8组重新选择身份。');}}
+    try {state=await store.init();profile=store.profile();const retiredProfile=profile&&!validProfile(profile);initializeControls();initializeWorkflowControls();bindEvents();bindBulkEvents();bindModuleEvents();bindOverviewEvents();bindReassignEvents();if(profile&&!retiredProfile)enterApp();else{profile=null;showIdentity();if(retiredProfile)showToast('组别已更新，请选择当前作业类型与小组。');}}
     catch(error){$('appShell').classList.add('hidden');$('identityGate').classList.remove('hidden');const box=document.createElement('div');box.className='panel';const text=document.createElement('p');text.textContent='共享服务暂时无法连接，云端数据未清空。'+error.message;const button=document.createElement('button');button.type='button';button.className='btn primary';button.textContent='重试连接';button.addEventListener('click',()=>location.reload());box.append(text,button);$('identityGate').replaceChildren(box);}
   }
-  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20260923-prod40',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
+  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20260923-prod41',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
   init();
 })();
