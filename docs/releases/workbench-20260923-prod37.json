@@ -1,0 +1,144 @@
+{
+  "status": "deployed",
+  "version": "20260923-prod37",
+  "deployedAt": "2026-09-23T02:57:17.504360+00:00",
+  "sourceFiles": {
+    "group-workbench/index.html": "6ba5ba789026939ad0f82d8ccb5b3c64a3ce7cfc7bd9a69471d72bec16c1dee8",
+    "group-workbench/styles.css": "36ae5d3ee0812ee1d90843754014437f9563f03dab49ba7e9843231eea22223e",
+    "group-workbench/data-io.js": "cb1db444edf83733c356c0187460ee208ba579ca7500852f87376a8bea640338",
+    "group-workbench/workflow.js": "79c615269e536ad6e07c018ab6fe7c9c615b8f52cb815d8e4d092ce6b71507ce",
+    "group-workbench/first-qc-date.css": "f97b9ff8de1cc10ea9a282ec2a3425170a559859018cf0f62ef927bd46302975",
+    "group-workbench/shared-store.js": "edbe732e31e51f18da5f06bf787e0784490ba5c21a58441fa9da313e406ac7ba",
+    "group-workbench/reports.js": "21406543de3bc95346dfbeb54e3c4f9aec7c3e2ed6024ee93c6f2f4faadc0835",
+    "group-workbench/app.js": "e5987cc586610a0fd7fe32f2f88d845c6212b0d77d8775a0c4f09cfc03817976",
+    "group-workbench/export-worker.js": "98d54189062309d3480dbb274ee577f83a84c0214ce95757fb74407ec13055b8",
+    "group-workbench/pagination.css": "112d8d821d307c5b7d9963f8880d93f5941bc7cfe7b71cda1820765845768a75",
+    "workbench-api/server.cjs": "fdddad59d4c64f44a9737160793e4afb5d2e058009f66d4daff5a21f108807d0",
+    "workbench-api/rules.cjs": "c785ec714fdf90da77596cd061f5c38d100fe94114883daea231989f9495c19d",
+    "workbench-api/record-index.cjs": "406cecfc647d69ba2be927211a1675b2714b56c1e26f60a8e3196521f0da5133"
+  },
+  "staticFiles": {
+    "shared-store.20260923-prod37.js": {
+      "sha256": "edbe732e31e51f18da5f06bf787e0784490ba5c21a58441fa9da313e406ac7ba",
+      "bytes": 9286
+    },
+    "reports.20260923-prod37.js": {
+      "sha256": "21406543de3bc95346dfbeb54e3c4f9aec7c3e2ed6024ee93c6f2f4faadc0835",
+      "bytes": 54734
+    },
+    "app.20260923-prod37.js": {
+      "sha256": "e5987cc586610a0fd7fe32f2f88d845c6212b0d77d8775a0c4f09cfc03817976",
+      "bytes": 202803
+    },
+    "export-worker.20260923-prod37.js": {
+      "sha256": "98d54189062309d3480dbb274ee577f83a84c0214ce95757fb74407ec13055b8",
+      "bytes": 9307
+    },
+    "pagination.20260923-prod37.css": {
+      "sha256": "112d8d821d307c5b7d9963f8880d93f5941bc7cfe7b71cda1820765845768a75",
+      "bytes": 643
+    },
+    "index.html": {
+      "sha256": "b973049fe2b40725b218281a922017fc256c9c5c1c3314dbd4db27236f1fdc80",
+      "bytes": 44823
+    }
+  },
+  "apiFiles": {
+    "workbench-api/server.cjs": {
+      "sha256": "fdddad59d4c64f44a9737160793e4afb5d2e058009f66d4daff5a21f108807d0",
+      "bytes": 20144
+    },
+    "workbench-api/rules.cjs": {
+      "sha256": "c785ec714fdf90da77596cd061f5c38d100fe94114883daea231989f9495c19d",
+      "bytes": 22635
+    },
+    "workbench-api/record-index.cjs": {
+      "sha256": "406cecfc647d69ba2be927211a1675b2714b56c1e26f60a8e3196521f0da5133",
+      "bytes": 4259
+    },
+    "group-workbench/workflow.js": {
+      "sha256": "79c615269e536ad6e07c018ab6fe7c9c615b8f52cb815d8e4d092ce6b71507ce",
+      "bytes": 21504
+    }
+  },
+  "verification": {
+    "pagination": true,
+    "scopedSync": true,
+    "transactionCompatibility": true,
+    "exportsPreserved": true,
+    "isolatedUi": true,
+    "node22PinnedRuntime": true,
+    "cleanupGuardsPreserved": true
+  },
+  "public": {
+    "ok": true,
+    "version": "20260923-prod37",
+    "publicFilesMatch": 21,
+    "checkedAt": "2026-09-23T02:57:19.592Z"
+  },
+  "continuity": {
+    "ok": true,
+    "readOnly": true,
+    "mode": "verify",
+    "release": "workbench-performance-20260923",
+    "checkedAt": "2026-09-23T02:57:18.548772+00:00",
+    "beforeUi": "candidate",
+    "afterUi": "candidate",
+    "apiRoute": "candidate3020",
+    "protectedCurrentModeAndDemosUnchanged": true,
+    "existingFormalAssetsUnchanged": true,
+    "existingServicesUnchanged": true,
+    "nginxMasterUnchanged": true,
+    "existingGateAndPrivateEnvUnchanged": true,
+    "candidateHealth": {
+      "ok": true,
+      "service": "r2v-group-workbench",
+      "backup": {
+        "delegated": true,
+        "lastSucceededAt": null
+      },
+      "capabilities": {
+        "importDelete": {
+          "enabled": true
+        }
+      }
+    },
+    "oldApiHealth": {
+      "ok": true,
+      "service": "r2v-group-workbench",
+      "backup": {
+        "delegated": true,
+        "lastSucceededAt": null
+      },
+      "capabilities": {
+        "importDelete": {
+          "enabled": true
+        }
+      }
+    },
+    "backupOwnerHealth": {
+      "ok": true,
+      "service": "r2v-group-workbench",
+      "backup": {
+        "delegated": null,
+        "lastSucceededAt": "2026-09-23T02:28:23.100Z"
+      },
+      "capabilities": {
+        "importDelete": {
+          "enabled": null
+        }
+      }
+    },
+    "productionBusinessWritesSent": false,
+    "drained": true,
+    "remainingOldWorkerPids": [],
+    "oldApiActiveConnections": [],
+    "closedTimeWaitSocketsIgnored": 125
+  },
+  "notes": [
+    "Prior 12 containers retained; prod37 added on3020",
+    "No production business transactions; no schema migration",
+    "DOM pagination, role-scoped incrementals, related validation, Worker exports",
+    "Full current-scope history and legacy API remain for compatibility"
+  ]
+}

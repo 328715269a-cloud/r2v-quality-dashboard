@@ -311,6 +311,8 @@
   }
 
   function build(input) {
+    const requested = input.kind ? new Set(input.kind === 'summary' ? ['groups', 'movies'] : [input.kind]) : null;
+    const wants = kind => !requested || requested.has(kind);
     const state = input.state || {};
     const auditTasks = (input.auditTasks || input.tasks || []).filter(task => !input.mode || task.mode === input.mode);
     const auditMap = new Map(auditTasks.map(task => [task.id, task]));
@@ -327,9 +329,12 @@
     const rawEvents = (state.events || []).filter(event => event.type !== 'group_daily_edit' && ids.has(event.taskId));
     const events = effectiveEvents(rawEvents);
     const conflicts = flow.eventConflicts(rawEvents);
+    const conflictsByTask = new Map();
+    conflicts.forEach(conflict => { if (!conflictsByTask.has(conflict.taskId)) conflictsByTask.set(conflict.taskId, []); conflictsByTask.get(conflict.taskId).push(conflict); });
     const conflictById = new Map(flow.eventConflicts(auditEvents).map(conflict => [conflict.eventId, conflict]));
     const reportGroups = input.groups || unique(tasks.map(task => task.groupId)).map(id => ({ id, name: groupName(id), defaultMode: tasks.find(task => task.groupId === id)?.mode }));
-    const groupModel = groupDailyModel({ ...input, tasks, groups: reportGroups });
+    const groupModel = wants('groups') || wants('daily') || wants('personDaily') || wants('events')
+      ? groupDailyModel({ ...input, tasks, groups: reportGroups }) : {settings:[],groups:[],peopleRows:[]};
     const settingsSet = new Set(groupModel.settings);
     const taskEventsSet = new Set(auditEvents);
     const exportEvents = (state.events || []).filter(event => settingsSet.has(event) || taskEventsSet.has(event));
@@ -343,9 +348,9 @@
       return localDateOf(value, input.localDate);
     }
 
-    const taskRows = tasks.map(task => {
+    const taskRows = (wants('tasks') ? tasks : []).map(task => {
       const rawHistory = histories.get(task.id) || [], history = effectiveEvents(rawHistory);
-      const omitted = conflicts.filter(conflict => conflict.taskId === task.id);
+      const omitted = conflictsByTask.get(task.id) || [];
       const firstClaim = history.find(event => event.type === 'claim' && !isReworkAssignment(event));
       const qcEvents = history.filter(event => ['qc_pass', 'qc_fail', 'qc_reject'].includes(event.type));
       const operator = qcOperator(history);
@@ -399,7 +404,7 @@
       ['qcRepairNote','质检自行返修说明'],['qcRepairedBy','质检自行返修人'],['qcRepairedAt','质检自行返修完成时间'],['batchId','原始导入批次'],['createdBy','导入人'],['createdAt','导入时间'],['lastUpdated','最近更新时间'],['originalTaskJSON','完整原始任务JSON'],['fullTimelineJSON','完整任务流水JSON']
     ]);
 
-    const eventRows = exportEvents.map(event => {
+    const eventRows = (wants('events') ? exportEvents : []).map(event => {
       const current = auditMap.get(event.taskId) || { groupId: event.groupId, mode: event.mode }, raw = auditRawMap.get(event.taskId) || current;
       return {
         eventId: event.id, taskId: event.taskId, currentTid: text(current.tid), atTimeTid: text(event.tidAtEvent ?? raw.tid),
@@ -427,7 +432,7 @@
       ['importedCount','本次导入条数'],['activeCount','有效任务条数'],['recordStatus','导入记录状态'],['createdBy','导入人'],['createdAt','导入时间'],['deletedBy','删除人'],['deletedAt','删除时间'],['deletionReason','删除原因'],
       ['taskIdsJSON','原始任务ID JSON'],['originalTIDsJSON','原始TID JSON'],['currentTIDsJSON','当前TID JSON'],['rawBatchJSON','原始导入批次JSON'],['originalTasksJSON','完整原始任务JSON'],['latestTasksJSON','最新任务含删除状态JSON'],['fullTimelineJSON','完整历史JSON']
     ]);
-    const importRows = (state.batches || []).filter(batch => batch.kind !== 'handoff').map(batch => {
+    const importRows = (wants('imports') ? state.batches || [] : []).filter(batch => batch.kind !== 'handoff').map(batch => {
       const members = auditTasks.filter(task => task.batchId === batch.id || batch.taskIds?.includes(task.id));
       if (!members.length) return null;
       const memberIds = new Set(members.map(task => task.id)), deleted = members.filter(task => task.deleted), last = deleted.at(-1);
@@ -440,7 +445,7 @@
       };
     }).filter(Boolean);
 
-    const packageRecords = (state.batches || []).filter(batch => batch.kind === 'handoff').map(batch => {
+    const packageRecords = (wants('packages') || wants('daily') ? state.batches || [] : []).filter(batch => batch.kind === 'handoff').map(batch => {
       const packageId = batch.packageId || batch.id;
       const packageEvents = events.filter(event => event.packageId === packageId || event.packageId === batch.id);
       const rawPackageEvents = rawEvents.filter(event => event.packageId === packageId || event.packageId === batch.id);
@@ -458,7 +463,7 @@
       return scoped;
     }
 
-    const packageRows = packageRecords.map(record => {
+    const packageRows = (wants('packages') ? packageRecords : []).map(record => {
       const { batch, packageId, packageEvents, members } = record;
       const current = members.map(id => taskMap.get(id));
       const built = new Map(packageEvents.filter(event => event.type === 'package_built').map(event => [event.taskId, event]));
@@ -503,7 +508,7 @@
       subset.forEach(task => { row[`status_${task.status}`] += 1; });
       return row;
     }
-    const movieRows = movieProgress({ tasks, mode: input.mode, groupLabel: groupName, statusMeta: meta }).map(progress => {
+    const movieRows = (wants('movies') ? movieProgress({ tasks, mode: input.mode, groupLabel: groupName, statusMeta: meta }) : []).map(progress => {
       const subset = progress.taskIds.map(id => taskMap.get(id));
       return {
         ...aggregate(subset, { movie: progress.movie }), key: progress.key, modeCode: progress.mode, taskCount: progress.total,
@@ -522,7 +527,7 @@
         efficiencyIssue: row.efficiencyIssue, efficiencyIssueDatesJSON: json(row.efficiencyIssueDates)
       };
     }
-    const groupRows = groupModel.groups.map(group => ({
+    const groupRows = (wants('groups') ? groupModel.groups : []).map(group => ({
       ...aggregate(tasks.filter(task => task.groupId === group.id), { groupId: group.id, group: groupName(group.id) }),
       mode: modeLabel(group.defaultMode || group.mode || input.mode), ...settingFields(groupModel.row(group.id, ''))
     }));
@@ -545,14 +550,14 @@
     }
     const firstByType = new Map();
     function first(type, taskId) { return firstByType.get(`${type}:${taskId}`); }
-    events.forEach(event => {
+    (wants('daily') ? events : []).forEach(event => {
       const qcReject=flow.isQcReject(event),acceptanceReject=flow.isAcceptanceReject(event);
       if (['dispatch', 'submit', 'acceptance_pass', 'reject_confirm'].includes(event.type) && !first(event.type, event.taskId)) firstByType.set(`${event.type}:${event.taskId}`, event);
       if (qcReject&&!first('qc_reject',event.taskId))firstByType.set(`qc_reject:${event.taskId}`,event);
       if (acceptanceReject&&!first('acceptance_reject',event.taskId))firstByType.set(`acceptance_reject:${event.taskId}`,event);
       if ((event.type==='reject_confirm'||qcReject||acceptanceReject) && !first('final_reject', event.taskId)) firstByType.set(`final_reject:${event.taskId}`, event);
     });
-    events.forEach(event => {
+    (wants('daily') ? events : []).forEach(event => {
       const task = taskMap.get(event.taskId);
       const date = dateOf(event.at || task.createdAt);
       if (!date) return;
@@ -575,12 +580,12 @@
       if ((event.type==='reject_confirm'||qcReject||acceptanceReject) && first('final_reject', task.id) === event) row.rejected.add(task.id);
       if (event.type === 'qc_repair_done') row.qcSelfRepairActions += 1;
     });
-    tasks.filter(task => !first('dispatch', task.id)).forEach(task => {
+    (wants('daily') ? tasks : []).filter(task => !first('dispatch', task.id)).forEach(task => {
       const date = dateOf(task.createdAt || task.date);
       if (!date) return;
       const row = dayRow(date, task.groupId); row.modes.add(modeLabel(task.mode)); row.imported.add(task.id); row.active.add(task.id);
     });
-    packageRecords.forEach(record => {
+    (wants('daily') ? packageRecords : []).forEach(record => {
       const date = dateOf(record.batch.createdAt);
       if (!date || !['qc', 'acceptance'].includes(record.batch.stage)) return;
       const packageGroups = unique(record.members.map(id => taskMap.get(id).groupId));
@@ -590,7 +595,7 @@
         row[record.batch.stage === 'qc' ? 'qcPackages' : 'acceptancePackages'].add(record.packageId);
       });
     });
-    groupModel.groups.forEach(group => groupModel.dates.get(group.id).forEach(date => {
+    (wants('daily') ? groupModel.groups : []).forEach(group => groupModel.dates.get(group.id).forEach(date => {
       dayRow(date, group.id).modes.add(modeLabel(group.defaultMode || group.mode || input.mode));
     }));
     const dailyRows = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date) || text(a.groupId).localeCompare(text(b.groupId))).map(row => ({
@@ -606,7 +611,7 @@
       ['qcPassActions','质检通过操作次数'],['qcFailActions','质检打回操作次数'],['qcRejectedTIDs','质检拒绝TID数量'],['completedTIDs','首次验收通过TID数量'],['acceptanceRejectedTIDs','验收拒绝TID数量'],['rejectedTIDs','最终拒绝TID数量'],['acceptanceFailActions','验收不通过操作次数'],['qcSelfRepairActions','质检自行返修完成次数'],
       ['qcPackageCount','新建质检包数'],['acceptancePackageCount','历史新建验收包数'],['activeTIDs','有操作TID数量'],['assignmentActions','代修分配任务次数'],['importedTaskIdsJSON','新增分配任务ID JSON'],['initialTaskIdsJSON','首次标注完成任务ID JSON'],['completedTaskIdsJSON','首次验收通过任务ID JSON'],['rejectedTaskIdsJSON','最终拒绝任务ID JSON']
     ]);
-    const personRows = groupModel.peopleRows.map(row => ({
+    const personRows = (wants('personDaily') ? groupModel.peopleRows : []).map(row => ({
       groupId: row.groupId, group: groupName(row.groupId), mode: modeLabel(row.mode), date: row.date, name: row.name,
       completedTIDs: row.completedTIDs, initialSubmissionTIDs: row.initialSubmissionTIDs,
       reworkSubmissionActions: row.reworkSubmissionActions, submissionActions: row.submissionActions,
@@ -618,7 +623,7 @@
       ['completedTIDs','当日实际提交完成TID（按人去重）'],['initialSubmissionTIDs','首次提交完成TID'],['reworkSubmissionActions','返修提交次数'],['submissionActions','全部提交次数'],
       ['taskIdsJSON','内部任务ID明细JSON'],['tidsJSON','当前TID明细JSON'],['eventIdsJSON','有效提交事件ID JSON'],['rawNamesJSON','原始操作人名称JSON'],['firstSubmittedAt','当日首次提交时间'],['lastSubmittedAt','当日最后提交时间']
     ]);
-    return {
+    const result = {
       imports: { columns: importColumns, rows: importRows },
       tasks: { columns: taskColumns, rows: taskRows }, events: { columns: eventColumns, rows: eventRows }, packages: { columns: packageColumns, rows: packageRows },
       movies: {
@@ -631,6 +636,7 @@
       daily: { columns: dailyColumns.concat(settingColumns), rows: dailyRows },
       personDaily: { columns: personColumns, rows: personRows }
     };
+    return requested ? Object.fromEntries(Object.entries(result).filter(([kind]) => wants(kind))) : result;
   }
 
   return Object.freeze({ build, groupDaily, personDaily, qcOperator, movieTitle, movieProgress, annotationContributors });

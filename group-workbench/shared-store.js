@@ -7,6 +7,7 @@
   function create() {
     const base = '/group-workbench-api/';
     let session = null, state = empty(), revision = -1, queue = Promise.resolve(), syncPromise = null;
+    let recordIndexes = Object.fromEntries(collections.map(name => [name, new Map()]));
     const listeners = new Set();
     const notify = detail => listeners.forEach(listener => listener(detail));
     function unrestricted() { return !session?.profile || ['admin', 'acceptance'].includes(session.profile.role); }
@@ -15,10 +16,11 @@
       if (unrestricted()) return value;
       const groupId = session.profile.groupId;
       const tasks = (value.tasks || []).filter(task => task.groupId === groupId);
-      const ids = new Set([...(includeExisting ? state.tasks : []).map(task => task.id), ...tasks.map(task => task.id)]);
-      const events = (value.events || []).filter(event => event.groupId === groupId || ids.has(event.taskId));
-      const batches = (value.batches || []).filter(batch => batch.groupId === groupId || (batch.taskIds || []).some(id => ids.has(id))).map(batch => {
-        const taskIds = (batch.taskIds || []).filter(id => ids.has(id));
+      const ids = new Set(tasks.map(task => task.id));
+      const contains = id => ids.has(id) || includeExisting && recordIndexes.tasks.has(id);
+      const events = (value.events || []).filter(event => event.groupId === groupId || contains(event.taskId));
+      const batches = (value.batches || []).filter(batch => batch.groupId === groupId || (batch.taskIds || []).some(contains)).map(batch => {
+        const taskIds = (batch.taskIds || []).filter(contains);
         return { ...batch, taskIds };
       });
       return { ...value, tasks, events, batches };
@@ -48,22 +50,30 @@
     function apply(result) {
       if (!Number.isSafeInteger(result.revision) || result.revision < 0) throw new Error('共享数据版本异常，未替换现有数据。');
       if (result.revision < revision) return false;
-      const changed = result.revision !== revision;
+      let changed = result.revision !== revision;
       if (result.state) {
         if (!collections.every(name => Array.isArray(result.state[name]))) throw new Error('共享数据格式不完整，未替换现有数据。');
-        state = { ...scopedPayload(result.state), preferences: {} };
-      } else if (result.delta && changed) {
-        const next = { ...state },delta=scopedPayload(result.delta,true);
-        for (const name of collections) {
-          const records = new Map(state[name].map(row => [row.id, row]));
-          for (const row of delta[name] || []) {
-            const prior = records.get(row.id);
-            if (prior && JSON.stringify(prior) !== JSON.stringify(row)) throw new Error('共享历史记录存在冲突，未覆盖原始数据。');
-            records.set(row.id, clone(row));
-          }
-          next[name] = Array.from(records.values());
-        }
+        const next = { ...scopedPayload(result.state), preferences: {} };
+        recordIndexes = Object.fromEntries(collections.map(name => [name, new Map(next[name].map(row => [row.id, row]))]));
         state = next;
+      } else if (result.delta && changed) {
+        const next = { ...state },delta=scopedPayload(result.delta,true), additions = {};
+        for (const name of collections) {
+          const records = recordIndexes[name], pending = new Map();
+          for (const row of delta[name] || []) {
+            const prior = pending.get(row.id) || records.get(row.id);
+            if (prior && JSON.stringify(prior) !== JSON.stringify(row)) throw new Error('共享历史记录存在冲突，未覆盖原始数据。');
+            if (!prior) pending.set(row.id, row);
+          }
+          additions[name] = pending;
+          next[name] = pending.size ? state[name].concat([...pending.values()]) : state[name];
+        }
+        // Validate every collection before publishing either data or indexes.
+        changed = collections.some(name => additions[name].size > 0);
+        if (changed) {
+          for (const name of collections) for (const [id, row] of additions[name]) recordIndexes[name].set(id, row);
+          state = next;
+        }
       }
       revision = result.revision;
       return changed;
@@ -74,7 +84,9 @@
       const token = session.token;
       syncPromise = (async () => {
         try {
-          const result = await request('state' + (revision >= 0 ? `?after=${revision}` : ''));
+          // Older APIs ignore this opt-in parameter. The local permission filter
+          // remains in place, and identity changes always start a full snapshot.
+          const result = await request('state?scope=role-v1' + (revision >= 0 ? `&after=${revision}` : ''));
           if (session?.token !== token) return false;
           const changed = apply(result);
           notify({ kind: 'sync', changed, revision });
@@ -92,7 +104,7 @@
           saveSession({ token: session.token, profile: value.profile });
           await refresh();
         } catch (error) {
-          if (error.status === 401 || error.status === 403) { saveSession(null); state = empty(); revision = -1; }
+          if (error.status === 401 || error.status === 403) { saveSession(null); state = empty(); recordIndexes = Object.fromEntries(collections.map(name => [name, new Map()])); revision = -1; }
           else throw error;
         }
       }
@@ -104,7 +116,7 @@
       if (!result.token || !result.profile) throw new Error('身份验证未完成，请重试。');
       if (syncPromise) await syncPromise.catch(() => {});
       saveSession({ token: result.token, profile: result.profile });
-      state = empty(); revision = -1;
+      state = empty(); recordIndexes = Object.fromEntries(collections.map(name => [name, new Map()])); revision = -1;
       await refresh();
       return result.profile;
     }

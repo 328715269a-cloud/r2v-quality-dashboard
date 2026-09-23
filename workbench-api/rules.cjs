@@ -35,7 +35,12 @@ function legacyAcceptanceRound(history){
 }
 function rejectNote(value,marker){const note=text(value,2000,true);check(text(note.startsWith(marker)?note.slice(marker.length):note,2000,true),'请填写拒绝原因');return text(note.startsWith(marker)?note:`${marker} ${note}`,2000,true);}
 function snapshot(state,taskId){const raw=state.tasks.find(t=>t.id===taskId);check(raw,'未找到任务');return {...raw,...Flow.project(raw,state.events)};}
-function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled=()=>check(false,'删除功能尚未开放','IMPORT_DELETE_DISABLED',503)}){
+// These operations cannot change a task's TID, its existence, or batch links.
+// All structural/admin edits keep the full-state validator below.
+const RELATED_EVENT_TYPES=new Set(['claim','submit','qc_pass','qc_fail','qc_reject','annotator_reject','reject_confirm','reject_return','acceptance_pass','acceptance_fail','acceptance_reject','acceptance_route','qc_repair_done','admin_reassign']);
+function canNormalizeRelated(input){return object(input)&&Object.keys(input).every(key=>['tasks','events','batches'].includes(key))&&[input.tasks,input.batches].every(rows=>rows==null||Array.isArray(rows)&&rows.length===0)&&Array.isArray(input.events)&&input.events.length>0&&input.events.length<=10000&&input.events.every(event=>object(event)&&RELATED_EVENT_TYPES.has(event.type));}
+function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled=()=>check(false,'删除功能尚未开放','IMPORT_DELETE_DISABLED',503),relatedOnly=false,recordExists,clockEvents}){
+  check(!relatedOnly||(canNormalizeRelated(input)&&typeof recordExists==='function'),'局部校验上下文无效');
   check(object(input),'缺少操作内容');check(Object.keys(input).every(k=>['tasks','events','batches'].includes(k)),'不能覆盖共享存储字段');
   const raw={};for(const kind of ['tasks','events','batches']){raw[kind]=input[kind]??[];check(Array.isArray(raw[kind])&&raw[kind].length<=10000,'批量内容过大');}
   check(raw.tasks.length+raw.events.length+raw.batches.length<=16000,'请减小本次批量');
@@ -70,8 +75,8 @@ function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled
     check(!state.batches.some(item=>item.kind==='handoff'&&item.taskIds?.some(key=>members.has(key))),'本次导入已关联作业包，整批不能删除','BATCH_HAS_ACTIVITY',409);
   }
   const ids=new Set([...state.tasks,...state.events,...state.batches].map(x=>x.id));
-  function fresh(value){check(object(value),'记录格式无效');const key=id(value.id);check(!ids.has(key),'记录 ID 已存在','DUPLICATE_ID',409);ids.add(key);return key;}
-  let clock=Math.max(Date.now(),Date.parse(now)||0,...state.events.slice(-10).map(e=>(Date.parse(e.at)||0)+1));const stamp=()=>new Date(clock++).toISOString();
+  function fresh(value){check(object(value),'记录格式无效');const key=id(value.id);check(!ids.has(key)&&(!recordExists||!recordExists(key)),'记录 ID 已存在','DUPLICATE_ID',409);ids.add(key);return key;}
+  let clock=Math.max(Date.now(),Date.parse(now)||0,...(clockEvents||state.events.slice(-10)).map(e=>(Date.parse(e.at)||0)+1));const stamp=()=>new Date(clock++).toISOString();
   for(const t of raw.tasks){const task={id:fresh(t),tid:tid(t.tid),movie:text(t.movie,200,true),date:date(t.date),groupId:t.groupId,mode:t.mode,batchId:id(t.batchId),createdAt:stamp(),createdBy:profile.name};manager(profile,task);check(!Object.keys(t).some(k=>['status','assignee','round','qcRound','acceptanceRound'].includes(k)),'导入不能预设作业状态');delta.tasks.push(task);working.tasks.push(task);taskMap.set(task.id,task);histories.set(task.id,[]);}
   const newTasks=new Map(delta.tasks.map(t=>[t.id,t]));
   for(const b of raw.batches){const batch={id:fresh(b),date:date(b.date),groupId:b.groupId,mode:b.mode,movie:text(b.movie,200,true),taskIds:b.taskIds,createdAt:stamp(),createdBy:profile.name};manager(profile,batch);check(Array.isArray(batch.taskIds)&&batch.taskIds.length>0&&batch.taskIds.length<=10000&&new Set(batch.taskIds).size===batch.taskIds.length,'批次任务列表无效');batch.taskIds=batch.taskIds.map(id);
@@ -127,7 +132,7 @@ function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled
   }
   for(const t of delta.tasks)check(delta.events.filter(e=>e.taskId===t.id&&e.type==='dispatch').length===1,'每条导入任务需要一条导入记录');
   for(const b of delta.batches.filter(x=>x.kind==='handoff'))for(const taskId of b.taskIds)for(const type of ['package_built','package_claimed'])check(delta.events.filter(e=>e.taskId===taskId&&e.packageId===b.id&&e.type===type).length===1,'建包必须同时登记所有所选任务的建包与领取');
-  const finalTids=new Set();for(const task of working.tasks){const current=view(task.id);if(current.deleted)continue;const value=current.tid.toUpperCase();check(!finalTids.has(value),'TID 已存在，整批未保存','DUPLICATE_TID',409);finalTids.add(value);}
+  if(!relatedOnly){const finalTids=new Set();for(const task of working.tasks){const current=view(task.id);if(current.deleted)continue;const value=current.tid.toUpperCase();check(!finalTids.has(value),'TID 已存在，整批未保存','DUPLICATE_TID',409);finalTids.add(value);}}
   return delta;
 }
-module.exports={ApiError,check,object,text,id,chinese,date,profileInput,normalizeDelta,snapshot,MODES};
+module.exports={ApiError,check,object,text,id,chinese,date,profileInput,normalizeDelta,canNormalizeRelated,snapshot,MODES};

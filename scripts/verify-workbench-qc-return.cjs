@@ -40,7 +40,7 @@ function fixture(statuses){
     const pack=uid('package');event('package_built',{stage:'qc',packageId:pack,packageRound:1,actor:'测试组长',actorRole:'qc'});event('package_claimed',{stage:'qc',packageId:pack,packageRound:1,actor:'测试组长',actorRole:'qc'});
     if(status==='pending_qc')return;
     if(status==='pending_reqc'){
-      event('qc_fail',{actor:'测试组长',actorRole:'qc',qcRound:1,pLevel:'P1',tags:['其他'],note:'首检返修'});event('submit',{round:2,submissionKind:'rework',actorRole:'annotation'});
+      event('qc_fail',{actor:'测试组长',actorRole:'qc',qcRound:1,pLevel:'P1',tags:['主体/对象漏标'],note:'首检返修'});event('submit',{round:2,submissionKind:'rework',actorRole:'annotation'});
       const nextPack=uid('package');event('package_built',{stage:'qc',packageId:nextPack,packageRound:2,actor:'测试组长',actorRole:'qc'});event('package_claimed',{stage:'qc',packageId:nextPack,packageRound:2,actor:'测试组长',actorRole:'qc'});return;
     }
     event('qc_pass',{actor:'测试组长',actorRole:'qc',qcRound:1});
@@ -63,10 +63,11 @@ function harness(initial){
   for(const id of ['scopeGroup','scopeDateFrom','scopeDateTo','changeIdentity'])nodes.set(id,control());
   const context={console,Date,JSON,Map,Set,WeakMap,Object,Number,String,Array,Promise,Error,Math,
     window:{WorkbenchFlow:Flow,crypto:{randomUUID}},profile:clone(defaultProfile),activeMode:'single',state:clone(initial),eventIndexes:new WeakMap(),mutationDepth:0,sharedHasUpdates:false,dirtyForms:new Set(),qcBulkReturnBusy:false,
-    QC_TAGS:['命名/ID错误','补标缺失','景别覆盖缺失','朝向覆盖缺失','图片模糊','黑边/裁切','备注不完整','其他'],
+    QC_TAGS:['命名/ID错误','补标缺失','景别覆盖缺失','朝向覆盖缺失','图片模糊','黑边/裁切','命名/ID对齐错误','主体/对象漏标'],
     document:{activeElement:null},
     $:id=>id==='qcBulkDecisionForm'?form:nodes.get(id),
     qsa:(selector,root)=>{if(selector.includes('qcTask'))return selected.map(row=>({value:row.id,dataset:{expected:row.expected},checked:true,disabled:false}));if(selector.includes('tags'))return(root?.__tags||[]).map(value=>({value,checked:true,disabled:false}));return root?.querySelectorAll(selector)||[];},
+    listDefinitions:{qcTask:{}},listSelection:()=>selected.map(row=>({...row})),listModel:()=>({selected:{delete:id=>{selected=selected.filter(row=>row.id!==id);}}}),
     showToast:(message,kind)=>toasts.push({message,kind}),setSharedStatus:(kind,message)=>{if(kind==='error')errors.push(message);},setText:(id,message)=>{if(nodes.has(id))nodes.get(id).textContent=message;},renderQcQueue:()=>{renders++;},
     store:{read:()=>clone(live),transact:async builder=>{if(beforeBuilder){const callback=beforeBuilder;beforeBuilder=null;callback();}if(transportError)throw transportError;const pending=builder(clone(live));const delta=normalizeDelta(live,clone(pending),clone(context.profile),{now:new Date().toISOString(),checkPin(){throw new Error('unexpected PIN validation');}});live={...live,tasks:[...live.tasks,...delta.tasks],events:[...live.events,...delta.events],batches:[...live.batches,...delta.batches]};revision++;saves++;return clone(live);}}
   };
@@ -88,20 +89,20 @@ async function main(){
   assert(mixedForm.elements.pLevel);assert.deepEqual(clone(mixedForm.__counts),{qc:2,acceptance:1});mixedForm.elements.note.value='本批统一修正';
   const beforeMixed=JSON.stringify(mixed.state);await mixed.save();assert.equal(mixed.saves,0);assert.equal(JSON.stringify(mixed.state),beforeMixed);assert.equal(mixed.form,mixedForm);assert.equal(mixedForm.elements.note.value,'本批统一修正');
   mixedForm.elements.pLevel.value='P1';await mixed.save();assert.equal(mixed.saves,0,'mixed batch still needs a QC error tag');
-  mixedForm.__tags=['其他'];await mixed.save();assert.equal(mixed.saves,1);assert.equal(mixed.task(0).status,'acceptance_rework');assert.equal(mixed.task(1).status,'rework');assert.equal(mixed.task(2).status,'rework');
-  const mixedAdded=mixed.state.events.slice(mixedInitial.events.length);assert.deepEqual(mixedAdded.map(event=>event.type),['acceptance_route','qc_fail','qc_fail']);assert(!Object.hasOwn(mixedAdded[0],'pLevel'));assert(mixedAdded.slice(1).every(event=>event.pLevel==='P1'&&event.tags[0]==='其他'));
+  mixedForm.__tags=['主体/对象漏标'];await mixed.save();assert.equal(mixed.saves,1);assert.equal(mixed.task(0).status,'acceptance_rework');assert.equal(mixed.task(1).status,'rework');assert.equal(mixed.task(2).status,'rework');
+  const mixedAdded=mixed.state.events.slice(mixedInitial.events.length);assert.deepEqual(mixedAdded.map(event=>event.type),['acceptance_route','qc_fail','qc_fail']);assert(!Object.hasOwn(mixedAdded[0],'pLevel'));assert(mixedAdded.slice(1).every(event=>event.pLevel==='P1'&&event.tags[0]==='主体/对象漏标'));
   proofs.push('验收退回+一次/二次待质检混选，真实app分别产出分流与qc_fail；P级/标签缺失整批不保存、草稿保留；补齐后一次原子保存');
 
-  const markerMixed=harness(fixture(['acceptance_return_pending','pending_qc'])),markerForm=markerMixed.open();markerForm.elements.note.value='[质检拒绝] 本意只是转交标注';markerForm.elements.pLevel.value='P1';markerForm.__tags=['其他'];const markerBefore=JSON.stringify(markerMixed.state);await markerMixed.save();assert.equal(markerMixed.saves,0);assert.equal(JSON.stringify(markerMixed.state),markerBefore);assert.equal(markerMixed.form,markerForm);assert(markerMixed.errors.some(message=>/拒绝专用标记/.test(message)));
+  const markerMixed=harness(fixture(['acceptance_return_pending','pending_qc'])),markerForm=markerMixed.open();markerForm.elements.note.value='[质检拒绝] 本意只是转交标注';markerForm.elements.pLevel.value='P1';markerForm.__tags=['主体/对象漏标'];const markerBefore=JSON.stringify(markerMixed.state);await markerMixed.save();assert.equal(markerMixed.saves,0);assert.equal(JSON.stringify(markerMixed.state),markerBefore);assert.equal(markerMixed.form,markerForm);assert(markerMixed.errors.some(message=>/拒绝专用标记/.test(message)));
   const markerPure=harness(fixture(['acceptance_return_pending'])),markerPureForm=markerPure.open();markerPureForm.elements.note.value='[质检拒绝] 转交说明中的原文';await markerPure.save();assert.equal(markerPure.task(0).status,'acceptance_rework');assert.equal(markerPure.state.events.at(-1).type,'acceptance_route');
   proofs.push('普通质检混入拒绝专用marker时整批阻止，避免本意返修却变终态拒绝；纯验收分流仅保留说明、不扩大此限制');
 
-  const ordinary=harness(fixture(['pending_qc'])),ordinaryForm=ordinary.open();ordinaryForm.elements.note.value='普通质检原路径';ordinaryForm.elements.pLevel.value='P2';ordinaryForm.__tags=['备注不完整'];await ordinary.save();assert.equal(ordinary.task(0).status,'rework');assert.equal(ordinary.state.events.at(-1).type,'qc_fail');
+  const ordinary=harness(fixture(['pending_qc'])),ordinaryForm=ordinary.open();ordinaryForm.elements.note.value='普通质检原路径';ordinaryForm.elements.pLevel.value='P2';ordinaryForm.__tags=['命名/ID对齐错误'];await ordinary.save();assert.equal(ordinary.task(0).status,'rework');assert.equal(ordinary.state.events.at(-1).type,'qc_fail');
   const empty=harness(fixture(['acceptance_return_pending'])),emptyForm=empty.open();await empty.save();assert.equal(empty.saves,0);assert.equal(empty.form,emptyForm);
-  for(const disallowed of ['annotation_done','qc_self_rework','accepted','rejection_pending','acceptance_rework']){const invalid=harness(fixture(['acceptance_return_pending',disallowed]));const before=JSON.stringify(invalid.state);invalid.open();assert(invalid.toasts.some(toast=>/本批均未保存/.test(toast.message)));assert.equal(invalid.form,null);assert.equal(JSON.stringify(invalid.state),before);}
-  proofs.push('普通质检打回保持原P级/标签规则；空说明及混入已处理/未建包/自行返修/拒绝待确认等任务整批阻止');
+  for(const disallowed of ['qc_self_rework','accepted','rejection_pending','acceptance_rework']){const invalid=harness(fixture(['acceptance_return_pending',disallowed]));const before=JSON.stringify(invalid.state);invalid.open();assert(invalid.toasts.some(toast=>/本批均未保存/.test(toast.message)));assert.equal(invalid.form,null);assert.equal(JSON.stringify(invalid.state),before);}
+  proofs.push('普通质检打回保持原P级/标签规则；空说明及混入已处理/自行返修/拒绝待确认等任务整批阻止');
 
-  const stale=harness(fixture(['acceptance_return_pending','pending_qc'])),staleForm=stale.open();staleForm.elements.note.value='不要丢掉的返修说明';staleForm.elements.pLevel.value='P0';staleForm.__tags=['其他'];
+  const stale=harness(fixture(['acceptance_return_pending','pending_qc'])),staleForm=stale.open();staleForm.elements.note.value='不要丢掉的返修说明';staleForm.elements.pLevel.value='P0';staleForm.__tags=['主体/对象漏标'];
   const external=stale.state;external.events.push({id:uid('event'),taskId:external.tasks[0].id,type:'metadata_edit',actor:'admin',at:new Date().toISOString(),after:{tid:'CHANGED',movie:'仍保留影片'}});stale.replaceLive(external);
   const beforeStale=JSON.stringify(stale.state);await stale.save();assert.equal(stale.saves,0);assert.equal(JSON.stringify(stale.state),beforeStale);assert.equal(stale.form,staleForm);assert.equal(staleForm.elements.note.value,'不要丢掉的返修说明');
   const selection=harness(fixture(['acceptance_return_pending','pending_qc'])),selectionForm=selection.open();selectionForm.elements.note.value='选中任务有变保留';selection.selected=selection.selected.slice(0,1);await selection.save();assert.equal(selection.saves,0);assert.equal(selection.form,selectionForm);
@@ -119,9 +120,9 @@ async function main(){
 
   const serverFixture=fixture(['acceptance_return_pending','pending_qc']),originalServer=JSON.stringify(serverFixture),returned=serverFixture.tasks[0],pending=serverFixture.tasks[1];
   const realEvent=(task,type,extra={})=>({id:uid('event'),taskId:task.id,type,note:'协议兼容验证',...extra});
-  assert.throws(()=>normalizeDelta(serverFixture,{events:[realEvent(returned,'qc_fail',{pLevel:'P1',tags:['其他']})]},defaultProfile,{checkPin(){}}),error=>error.status===409);
+  assert.throws(()=>normalizeDelta(serverFixture,{events:[realEvent(returned,'qc_fail',{pLevel:'P1',tags:['主体/对象漏标']})]},defaultProfile,{checkPin(){}}),error=>error.status===409);
   assert.throws(()=>normalizeDelta(serverFixture,{events:[realEvent(returned,'acceptance_route',{route:'annotation',expectedUpdatedAt:'stale'})]},defaultProfile,{checkPin(){}}),error=>error.status===409);
-  const compatible=normalizeDelta(serverFixture,{events:[realEvent(returned,'acceptance_route',{route:'annotation'}),realEvent(pending,'qc_fail',{pLevel:'P1',tags:['其他']})]},defaultProfile,{checkPin(){}});
+  const compatible=normalizeDelta(serverFixture,{events:[realEvent(returned,'acceptance_route',{route:'annotation'}),realEvent(pending,'qc_fail',{pLevel:'P1',tags:['主体/对象漏标']})]},defaultProfile,{checkPin(){}});
   assert.equal(compatible.events[0].type,'acceptance_route');assert.equal(compatible.events[1].type,'qc_fail');assert.equal(JSON.stringify(serverFixture),originalServer);
   const projected={...serverFixture,events:[...serverFixture.events,...compatible.events]};assert.equal(snapshot(projected,returned.id).status,'acceptance_rework');assert.equal(snapshot(projected,pending.id).status,'rework');
   assert.throws(()=>normalizeDelta(serverFixture,{events:[realEvent(returned,'acceptance_route',{route:'annotation'})]},{...defaultProfile,groupId:'g02'},{checkPin(){}}),error=>error.status===403);
