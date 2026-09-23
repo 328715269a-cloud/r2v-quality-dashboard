@@ -1,0 +1,137 @@
+{
+  "version": "20260923-prod42",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "releasedAt": "2026-09-23T16:49:22.292848+08:00",
+  "baselineVersion": "20260923-prod41",
+  "baselineCommit": "7c025273a977d0a4c8507719d5b2f7cae02c8195",
+  "feature": {
+    "scope": "单镜头与多镜头的全部任务列表",
+    "behavior": "全部按钮首次展开当前范围全部状态，再次点击收起，再次点击重新展开；从具体状态或轮次点击全部时先清除状态/轮次并展开，下一次点击才收起。",
+    "collapse": "同时隐藏任务明细、分页和只读历史，取消未完成的分批渲染；重新展开回到第一页。",
+    "preserved": [
+      "影片筛选",
+      "搜索文字",
+      "日期条件",
+      "当前任务编辑对象和草稿",
+      "已有历史选择"
+    ],
+    "synchronization": "同一范围的云端同步、重绘和已排队搜索回调不重新打开明确收起的列表。",
+    "scopeAndDrill": "真实筛选或作业范围变化恢复原筛选展开行为；总览状态、小组及整部影片进入明细时可以明确重新展开。",
+    "keyboard": "全部按钮重建后恢复焦点，支持键盘操作。"
+  },
+  "staticFiles": {
+    "app.20260923-prod42.js": {
+      "sha256": "8f0189196e425e62fe143b3a49cdc3fb1b3bc23718f497b62729926288cd9efc",
+      "bytes": 210887
+    },
+    "index.html": {
+      "sha256": "74f97958161f6d2912b175f6d7c6c4d72f35ac4e7c43ab49e8813320782481b8",
+      "bytes": 48507
+    }
+  },
+  "sourceHashes": {
+    "group-workbench/index.html": "7aca97d73b8bc431e837aaf0ba046120f0309cc58b1031c1712246a5312f9f9b",
+    "group-workbench/app.js": "8f0189196e425e62fe143b3a49cdc3fb1b3bc23718f497b62729926288cd9efc",
+    "workbench-api/server.cjs": "fdddad59d4c64f44a9737160793e4afb5d2e058009f66d4daff5a21f108807d0",
+    "workbench-api/rules.cjs": "c785ec714fdf90da77596cd061f5c38d100fe94114883daea231989f9495c19d",
+    "workbench-api/record-index.cjs": "406cecfc647d69ba2be927211a1675b2714b56c1e26f60a8e3196521f0da5133",
+    "group-workbench/workflow.js": "79c615269e536ad6e07c018ab6fe7c9c615b8f52cb815d8e4d092ce6b71507ce",
+    "group-workbench/styles.css": "36ae5d3ee0812ee1d90843754014437f9563f03dab49ba7e9843231eea22223e",
+    "group-workbench/styles.20260922-prod31-accept.css": "34b5f2f6a4fd65dc79f6b33a8e20f5d8350f64d94b046759e8e251520b9bbd57",
+    "group-workbench/styles.20260922-prod35-cards.css": "fe7a483f8e707858d528db4a8d597ef6d2787605f650fb6d33e0d10aae8ccba6",
+    "group-workbench/first-qc-date.css": "f97b9ff8de1cc10ea9a282ec2a3425170a559859018cf0f62ef927bd46302975",
+    "group-workbench/pagination.css": "112d8d821d307c5b7d9963f8880d93f5941bc7cfe7b71cda1820765845768a75",
+    "group-workbench/acceptance-filters.css": "5bc693035543137e42df9810149cedaa45db3a6bf63ecece1b0aab0c77f2399d",
+    "group-workbench/data-io.js": "cb1db444edf83733c356c0187460ee208ba579ca7500852f87376a8bea640338",
+    "group-workbench/shared-store.js": "edbe732e31e51f18da5f06bf787e0784490ba5c21a58441fa9da313e406ac7ba",
+    "group-workbench/reports.js": "171133606e5b643e44b66926aa65b6287683360ca162918a78100ed4d6481d8a",
+    "group-workbench/export-worker.js": "ffc694a915e627196955400bd3bbdabc78dfc7b85713b37de14b7077e145a45d"
+  },
+  "preservedAssets": {
+    "acceptance-filters.css": {
+      "reference": "acceptance-filters.20260923-prod39.css",
+      "sha256": "5bc693035543137e42df9810149cedaa45db3a6bf63ecece1b0aab0c77f2399d"
+    },
+    "reports.js": {
+      "reference": "reports.20260923-prod40.js",
+      "sha256": "171133606e5b643e44b66926aa65b6287683360ca162918a78100ed4d6481d8a"
+    },
+    "export-worker.js": {
+      "reference": "export-worker.20260923-prod39.js",
+      "sha256": "ffc694a915e627196955400bd3bbdabc78dfc7b85713b37de14b7077e145a45d"
+    }
+  },
+  "checks": {
+    "filtersPreserved": true,
+    "isolatedUi": true,
+    "workflowAndApiUnchanged": true,
+    "recordsToggle": true,
+    "bothModes": true
+  },
+  "validation": {
+    "recordsToggleChecks": 59,
+    "paginationRegressionChecks": 10,
+    "firstAcceptanceUiRegressionChecks": 125,
+    "firstQcRegressionChecks": 27,
+    "isolatedBrowser": {
+      "drill": "after explicit collapse click overview single-group1 reopens3",
+      "layout": "table/pager/read-only history hidden together, screenshot reviewed",
+      "multi": "all3 -> collapsed0; search g06-TOGGLE-A opens1",
+      "writes": "none in candidate, isolated synthetic API only",
+      "consoleErrors": 0,
+      "filters": "single film甲2 retained across collapse/reopen; manual refresh stays collapsed; multi search text retained",
+      "status": "specific status -> all opens, next all collapses",
+      "url": "http://127.0.0.1:8995/group-workbench/",
+      "single": "collapsed0 -> all3 -> collapsed0 -> keyboardEnter3"
+    },
+    "allTogglePerformsNoBusinessWrites": true
+  },
+  "publicFilesMatch": 20,
+  "existingServicesUnchanged": true,
+  "existingServiceCount": 13,
+  "activeApiVersion": "20260923-prod37",
+  "activeApiPort": 3020,
+  "databaseRead": false,
+  "databaseWritten": false,
+  "apiRequestsSent": false,
+  "apiCodeUnchanged": true,
+  "workflowUnchanged": true,
+  "servicesStartedOrStopped": false,
+  "existingFormalAssetsUnchanged": true,
+  "nginxConfigAndMasterUnchanged": true,
+  "currentModeAndDemosUnchanged": true,
+  "oldPageContinuity": {
+    "version": "20260923-prod41",
+    "isolatedSyntheticOnly": true,
+    "oldPageHeld": true,
+    "draftPreserved": true,
+    "noReloadOrLogin": true,
+    "submitSucceeded": true,
+    "revisionBefore": 11,
+    "revisionAfter": 12,
+    "eventType": "acceptance_fail",
+    "productionApiAccess": false,
+    "proof": "outputs/workbench-records-toggle-20260923/continuity.json"
+  },
+  "proofs": {
+    "verification": {
+      "path": "outputs/workbench-records-toggle-20260923/verification.json",
+      "sha256": "3ac01dd91781bad931fcf236fe5182daf2a7f386a3cfa6d83afe7abdc8c71c66"
+    },
+    "unit": "outputs/workbench-records-toggle-20260923/unit-verification.json",
+    "continuity": "outputs/workbench-records-toggle-20260923/continuity.json",
+    "manifest": {
+      "path": "outputs/workbench-records-toggle-20260923/release/manifest.json",
+      "sha256": "c667d82456cdbcf955a5ea308006d9f3ec110ed14189d65e850ec8c11e509153"
+    },
+    "activate": "outputs/workbench-records-toggle-20260923/release/activate-2026-09-23T08-49-22.265Z.json",
+    "verify": "outputs/workbench-records-toggle-20260923/release/verify-2026-09-23T08-49-23.515Z.json"
+  },
+  "baselineSha256": "1ee92e8e4f28e5c813baa17cd211001cb3c7867ddd5b5838866fabfb7620f3fa",
+  "releaseToolHashes": {
+    "release.cjs": "584ae1834ebd4180474a7ca3c95ecfbc179fe4559c58015bf34aaaf8ea1a7278",
+    "remote-static.py": "5d2e7b04331ef9213fa9ae965568a9803fe2b19e6a965e890f6932d4a0e47abd"
+  },
+  "evidence": "outputs/workbench-records-toggle-20260923",
+  "backup": "/opt/r2v/backups/workbench-records-toggle-20260923/"
+}

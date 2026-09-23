@@ -557,6 +557,7 @@
     if(view==='dispatch'){try{requireImportAdmin();}catch(error){showToast(error.message,'error');return;}}
     if (!refreshState()) return;
     currentView = view;
+    if(view==='records')recordsCollapsedScope='';
     document.body.dataset.activeView=view;
     placeScopeDateControl();
     qsa('.view').forEach(element => element.classList.toggle('hidden', element.id !== VIEW_META[view].id));
@@ -614,6 +615,7 @@
   }
   function openOverviewBucket(key,groupId) {
     if(!['all','accepted','rejected','rejection_pending','closed'].includes(key)&&!OVERVIEW_BUCKETS[key])return;
+    recordsGateOpen=true;
     if(groupId)$('scopeGroup').value=groupId;
     $('recordDateMode').value='all';$('recordSearch').value='';multiSet('recordMovie',[]);$('recordQcRound').value='all';
     multiSet('recordStatus',[OVERVIEW_BUCKETS[key]?`overview_${key}`:key]);
@@ -1259,6 +1261,21 @@
     if(event.note)parts.push(event.note);return parts.join(' · ')||'已记录';
   }
   let recordsGateOpen=false;
+  let recordsCollapsedScope='';
+  function recordsExpanded() {
+    const scope=listScope('records');
+    if(recordsCollapsedScope===scope)return false;
+    recordsCollapsedScope='';
+    return recordsGateOpen||multiGet('recordStatus').length>0||multiGet('recordMovie').length>0||$('recordQcRound').value!=='all'||$('recordSearch').value.trim().length>0;
+  }
+  function selectRecordState(status,round='all') {
+    const collapse=status==='all'&&recordsExpanded()&&!multiGet('recordStatus').length&&$('recordQcRound').value==='all';
+    recordsGateOpen=!collapse;
+    multiSet('recordStatus',[status]);$('recordQcRound').value=round;
+    recordsCollapsedScope=collapse?listScope('records'):'';
+    if(refreshState())renderRecords();
+    if(status==='all')qs('[data-action="record-state"][data-status="all"]',$('recordStatusBoard'))?.focus({preventScroll:true});
+  }
   function renderRecords() {
     const names=[...new Set(allTasks().filter(task=>inCurrentScope(task,false)).map(task=>task.movie))].sort(),movieOptions=names.map(movie=>({value:movie,label:movie}));
     if(recordWholeMovie){let value=`__whole_movie__:${encodeURIComponent(recordWholeMovie.title)}`;while(names.includes(value))value=`_${value}`;recordWholeMovie.value=value;movieOptions.push({value,label:`整片：${recordWholeMovie.title}`});}
@@ -1266,14 +1283,16 @@
     const dateMode=$('recordDateMode').value;$('recordDateFrom').disabled=dateMode!=='range';$('recordDateTo').disabled=dateMode!=='range';
     let base=[];try{base=recordBaseTasks();}catch(error){setText('recordSummary',error.message);$('recordBody').innerHTML=emptyRow(11,error.message);$('recordStatusBoard').innerHTML='';return;}
     const c=counts(base),statusList=multiGet('recordStatus'),round=$('recordQcRound').value;
-    const gateActive=recordsGateOpen||statusList.length>0||multiGet('recordMovie').length>0||round!=='all'||$('recordSearch').value.trim().length>0;
+    const gateActive=recordsExpanded();
     const rows=base.filter(task=>matchesStatusList(task,statusList)&&matchesQcRound(task,round)).sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)));
-    setText('recordSummary',`${modeLabel(activeMode)} · 筛选范围 ${new Set(base.map(task=>window.WorkbenchReports.movieTitle(task))).size} 部影片 / ${base.length} 条 TID · ${gateActive?`当前显示 ${rows.length} 条。${statusList.length>1?`已选 ${statusList.length} 个状态。` : ''}`:'为避免卡顿，默认不展开全部任务：请先选择影片 / 包或点击状态标签，再列出明细。'}状态均为最新状态。`);
+    setText('recordSummary',`${modeLabel(activeMode)} · 筛选范围 ${new Set(base.map(task=>window.WorkbenchReports.movieTitle(task))).size} 部影片 / ${base.length} 条 TID · ${gateActive?`当前显示 ${rows.length} 条。${statusList.length>1?`已选 ${statusList.length} 个状态。` : ''}`:(recordsCollapsedScope?'明细已收起，点击“全部”或调整筛选可展开。':'为避免卡顿，默认不展开全部任务：请先选择影片 / 包或点击状态标签，再列出明细。')}状态均为最新状态。`);
     const single=statusList.length===1?statusList[0]:'',bucketKey=single.startsWith('overview_')?single.slice(9):'',bucket=bucketKey?OVERVIEW_BUCKETS[bucketKey]:null;
     const bucketChip=bucket?`<button type="button" class="status-count active" data-action="record-state" data-status="${escapeHtml(single)}">${escapeHtml(bucket.label)} <strong>${base.filter(task=>matchesOverviewBucket(task,bucketKey)).length}</strong></button>`:'';
-    $('recordStatusBoard').innerHTML=bucketChip+`<button type="button" class="status-count ${statusList.length===0?'active':''}" data-action="record-state" data-status="all">全部 <strong>${base.length}</strong></button>`+Object.entries(STATUS_META).filter(([key])=>key!=='annotating'&&key!=='qc_pack_unclaimed').map(([key,meta])=>`<button type="button" class="status-count ${single===key?'active':''}" data-action="record-state" data-status="${key}" data-tone="${overviewStateTone(key)}">${escapeHtml(meta.label)} <strong>${key==='unclaimed'?c.annotation:c[key]}</strong></button>`).join('')+`<button type="button" class="status-count" data-action="record-state" data-status="pending_reqc" data-round="2">其中：待二次质检 <strong>${c.qcSecond}</strong></button><button type="button" class="status-count" data-action="record-state" data-status="pending_reqc" data-round="3plus">其中：待三次及以上质检 <strong>${c.qcThirdPlus}</strong></button>`;
+    $('recordStatusBoard').innerHTML=bucketChip+`<button type="button" class="status-count ${gateActive&&statusList.length===0?'active':''}" data-action="record-state" data-status="all" aria-expanded="${gateActive}" aria-controls="recordList" title="${gateActive&&!statusList.length&&round==='all'?'点击收起明细':'点击展开全部状态'}">全部 <strong>${base.length}</strong></button>`+Object.entries(STATUS_META).filter(([key])=>key!=='annotating'&&key!=='qc_pack_unclaimed').map(([key,meta])=>`<button type="button" class="status-count ${single===key?'active':''}" data-action="record-state" data-status="${key}" data-tone="${overviewStateTone(key)}">${escapeHtml(meta.label)} <strong>${key==='unclaimed'?c.annotation:c[key]}</strong></button>`).join('')+`<button type="button" class="status-count" data-action="record-state" data-status="pending_reqc" data-round="2">其中：待二次质检 <strong>${c.qcSecond}</strong></button><button type="button" class="status-count" data-action="record-state" data-status="pending_reqc" data-round="3plus">其中：待三次及以上质检 <strong>${c.qcThirdPlus}</strong></button>`;
     const pageRows=listPage('records',gateActive?rows:[]);renderListPager('records');
-    if(gateActive)renderRowsBatched($('recordBody'),pageRows.map(task=>{const qc=firstEvent(task.id,event=>['qc_pass','qc_fail','qc_reject'].includes(event.type)),operator=window.WorkbenchReports.qcOperator(eventsForTask(task.id)),operatorHint=operator.name?`${eventLabel({type:operator.type})} · ${formatDateTime(operator.at)}`:'尚无质检操作记录';return `<tr><td>${tidMarkup(task)}</td><td>${escapeHtml(task.movie)}</td><td>${groupLabel(task.groupId)}</td><td>${modePill(task.mode)}</td><td>${escapeHtml(task.assignee||'未认领')}</td><td class="records-qc-operator" title="${escapeHtml(operatorHint)}">${escapeHtml(operator.name||'暂无')}</td><td>质检 ${task.qcRound} / 验收 ${task.acceptanceRound}</td><td>${statusPill(task)}</td><td>${qc?(qc.type==='qc_pass'?'通过':window.WorkbenchFlow.isQcReject(qc)?'拒绝':escapeHtml(qc.pLevel||'打回')):'暂无'}</td><td>${formatDateTime(task.updatedAt)}</td><td><div class="row-actions"><button type="button" class="btn ghost small" data-action="timeline" data-task-id="${escapeHtml(task.id)}">查看</button><button type="button" class="btn ghost small" data-action="edit-task" data-task-id="${escapeHtml(task.id)}">修改 TID</button></div></td></tr>`;}),11,'当前筛选没有任务。');else $('recordBody').innerHTML=emptyRow(11,'为避免卡顿，默认不展开全部任务：请先在上方选择影片 / 包、点击状态标签，或输入搜索、质检轮次后再列出。');renderTimeline(selectedTimelineTaskId);
+    $('recordList').classList.toggle('hidden',!gateActive);$('recordBodyPager').classList.toggle('hidden',!gateActive);$('timelinePanel').classList.toggle('hidden',!gateActive);
+    if(gateActive)renderRowsBatched($('recordBody'),pageRows.map(task=>{const qc=firstEvent(task.id,event=>['qc_pass','qc_fail','qc_reject'].includes(event.type)),operator=window.WorkbenchReports.qcOperator(eventsForTask(task.id)),operatorHint=operator.name?`${eventLabel({type:operator.type})} · ${formatDateTime(operator.at)}`:'尚无质检操作记录';return `<tr><td>${tidMarkup(task)}</td><td>${escapeHtml(task.movie)}</td><td>${groupLabel(task.groupId)}</td><td>${modePill(task.mode)}</td><td>${escapeHtml(task.assignee||'未认领')}</td><td class="records-qc-operator" title="${escapeHtml(operatorHint)}">${escapeHtml(operator.name||'暂无')}</td><td>质检 ${task.qcRound} / 验收 ${task.acceptanceRound}</td><td>${statusPill(task)}</td><td>${qc?(qc.type==='qc_pass'?'通过':window.WorkbenchFlow.isQcReject(qc)?'拒绝':escapeHtml(qc.pLevel||'打回')):'暂无'}</td><td>${formatDateTime(task.updatedAt)}</td><td><div class="row-actions"><button type="button" class="btn ghost small" data-action="timeline" data-task-id="${escapeHtml(task.id)}">查看</button><button type="button" class="btn ghost small" data-action="edit-task" data-task-id="${escapeHtml(task.id)}">修改 TID</button></div></td></tr>`;}),11,'当前筛选没有任务。');else {delete $('recordBody').dataset.renderToken;$('recordBody').replaceChildren();}
+    if(gateActive)renderTimeline(selectedTimelineTaskId);
   }
   function renderTimeline(id) {
     if(!id){$('timelinePanel').innerHTML='<div class="empty"><strong>选择任务查看完整流水</strong><span>保留历次提交、质检、拒绝确认、验收和资料修改。</span></div>';return;}
@@ -1766,8 +1785,8 @@
     qsa('[data-mode]').forEach(button=>button.addEventListener('click',()=>applyModule(button.dataset.mode)));
     ['recordDateFrom','recordDateTo'].forEach(id=>$(id).addEventListener('change',()=>{refreshState();renderRecords();}));
     document.addEventListener('click',event=>{const button=event.target.closest('[data-action]');if(!button)return;
-      if(button.dataset.action==='record-state'){recordsGateOpen=true;multiSet('recordStatus',[button.dataset.status]);$('recordQcRound').value=button.dataset.round||'all';refreshState();renderRecords();}
-      if(['group-details','movie-details'].includes(button.dataset.action)){$('scopeGroup').value=button.dataset.groupId||'all';$('recordDateMode').value='all';$('recordSearch').value='';multiSet('recordStatus',[]);$('recordQcRound').value='all';multiSet('recordMovie',[]);activateView('records');if(button.dataset.movie){multiSet('recordMovie',[button.dataset.movie]);renderRecords();}}
+      if(button.dataset.action==='record-state')selectRecordState(button.dataset.status,button.dataset.round||'all');
+      if(['group-details','movie-details'].includes(button.dataset.action)){recordsGateOpen=true;$('scopeGroup').value=button.dataset.groupId||'all';$('recordDateMode').value='all';$('recordSearch').value='';multiSet('recordStatus',[]);$('recordQcRound').value='all';multiSet('recordMovie',[]);activateView('records');if(button.dataset.movie){multiSet('recordMovie',[button.dataset.movie]);renderRecords();}}
     });
   }
 
@@ -1885,6 +1904,6 @@
     try {state=await store.init();profile=store.profile();const retiredProfile=profile&&!validProfile(profile);initializeControls();initializeWorkflowControls();bindEvents();bindBulkEvents();bindModuleEvents();bindOverviewEvents();bindReassignEvents();if(profile&&!retiredProfile)enterApp();else{profile=null;showIdentity();if(retiredProfile)showToast('组别已更新，请选择当前作业类型与小组。');}}
     catch(error){$('appShell').classList.add('hidden');$('identityGate').classList.remove('hidden');const box=document.createElement('div');box.className='panel';const text=document.createElement('p');text.textContent='共享服务暂时无法连接，云端数据未清空。'+error.message;const button=document.createElement('button');button.type='button';button.className='btn primary';button.textContent='重试连接';button.addEventListener('click',()=>location.reload());box.append(text,button);$('identityGate').replaceChildren(box);}
   }
-  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20260923-prod41',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
+  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20260923-prod42',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
   init();
 })();
