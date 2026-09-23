@@ -20,17 +20,23 @@ function browserFunction(name) {
 }
 
 const helperNames = [
-  'localDateString', 'eventDate', 'selectedRange', 'validScopeRange', 'inDateRange',
+  'localDateString', 'eventDate', 'selectedRange', 'validScopeRange', 'singleScopeDate', 'scopeRangeLabel', 'inDateRange',
   'canViewAllGroups', 'canViewGroup', 'selectedGroup', 'inCurrentScope',
   'eventsForTask', 'taskSnapshot', 'taskWithSnapshot', 'taskIndex', 'allTasks', 'firstQcAccuracy'
 ];
+const overviewSource = browserFunction('renderOverview');
+const metricRenderSource = overviewSource.slice(0, overviewSource.indexOf('    const followups=')) + '\n  }';
+assert.ok(metricRenderSource.includes("setText('metricFirstQcDetail'"), 'exercise the real metric renderer through its date detail');
 const makeHarness = new Function('Reports', 'Flow', 'fixture', `
   const window = { WorkbenchReports: Reports, WorkbenchFlow: Flow };
   let state = fixture, activeMode = 'single', profile = {role: 'admin'};
   const eventIndexes = new WeakMap(), snapshotCache = new WeakMap();
   const controls = {scopeDateFrom: {value: ''}, scopeDateTo: {value: ''}, scopeGroup: {value: 'g01'}};
+  const rendered = {}, counts = Flow.counts, countRangeRejected = () => 0;
+  const setText = (id, value) => { rendered[id] = value; };
   const $ = id => controls[id];
   ${helperNames.map(browserFunction).join('\n')}
+  ${metricRenderSource}
   return {
     setScope({dateFrom = '', dateTo = '', groupId = 'g01', mode = 'single', user = {role: 'admin'}} = {}) {
       controls.scopeDateFrom.value = dateFrom; controls.scopeDateTo.value = dateTo;
@@ -38,9 +44,12 @@ const makeHarness = new Function('Reports', 'Flow', 'fixture', `
       // Changing identity starts a fresh snapshot, as happens on a real login.
       state = {...fixture};
     },
+    switchModule(mode, groupId = 'all') { activeMode = mode; controls.scopeGroup.value = groupId; },
+    selectDates({dateFrom = '', dateTo = ''}) { controls.scopeDateFrom.value = dateFrom; controls.scopeDateTo.value = dateTo; },
     scopedTasks() { return allTasks().filter(task => inCurrentScope(task, false)); },
     metric(range) { return firstQcAccuracy(this.scopedTasks(), range); },
     taskMetric(id, range) { return firstQcAccuracy(this.scopedTasks().filter(task => task.id === id), range); },
+    renderMetric() { renderOverview(); return {value: rendered.metricFirstQcAccuracy, detail: rendered.metricFirstQcDetail}; },
     eventDate
   };
 `);
@@ -131,4 +140,52 @@ ui.setScope({...range('2026-09-20'), groupId: 'all', user: {role: 'qc', groupId:
 check('restricted identity stays in its permitted group', ui.metric(), expected(1, 1));
 assert.equal(JSON.stringify(state), original, 'metric calculation must not mutate task/event history');
 
-console.log(JSON.stringify({ok: true, timezone: process.env.TZ, productionHelpers: helperNames, checks: cases.length, cases}, null, 2));
+// One shared state/snapshot cache is reused while switching modules and dates.
+// The single-shot cohort intentionally has a different result from multi-shot.
+const moduleFixture = {tasks: [], events: [], batches: []};
+function copyCohort(fromId, id, mode, groupId) {
+  moduleFixture.tasks.push({...state.tasks.find(task => task.id === fromId), id, tid: id, mode, groupId});
+  moduleFixture.events.push(...state.events.filter(event => event.taskId === fromId).map(event => ({...event, id: `${id}:${event.id}`, taskId: id})));
+}
+copyCohort('pass20', 'multi-pass20', 'multi', 'g06');
+copyCohort('fail21-local-last-ms', 'multi-fail21', 'multi', 'g06');
+copyCohort('explicit-reject20', 'multi-reject20', 'multi', 'g06');
+copyCohort('legacy-reject20', 'multi-legacy-reject20', 'multi', 'g06');
+copyCohort('fail20-repaired21', 'single-fail20', 'single', 'g01');
+const switched = makeHarness(Reports, Flow, moduleFixture), moduleEvidence = [];
+function multiCase(label, dates, wanted, text) {
+  switched.selectDates(dates);
+  check(label, switched.metric(), wanted);
+  const rendered = switched.renderMetric();
+  assert.equal(rendered.value, text, `${label}: real renderer text`);
+  moduleEvidence.push({label, ...dates, result: switched.metric(), rendered});
+}
+switched.setScope({mode: 'multi', groupId: 'all'});
+multiCase('multi-shot day 20 is 100%, including no rejected decisions', range('2026-09-20'), expected(1, 1), '100.0%');
+multiCase('multi-shot day 21 is 0%, using local first-QC date', range('2026-09-21'), expected(0, 1), '0.0%');
+multiCase('multi-shot inclusive two-day range is 50%', range('2026-09-20', '2026-09-21'), expected(1, 2), '50.0%');
+multiCase('multi-shot day with no first QC renders dash', range('2026-09-22'), expected(0, 0), '—');
+assert.equal(switched.renderMetric().detail, '2026-09-22 · 暂无首检记录');
+switched.selectDates(range('2026-09-20'));
+switched.switchModule('single');
+check('cached switch from multi to single uses its own first-QC cohort', switched.metric(), expected(0, 1));
+assert.equal(switched.renderMetric().value, '0.0%');
+switched.switchModule('multi');
+check('cached switch back to multi restores 100% on the same date', switched.metric(), expected(1, 1));
+assert.equal(switched.renderMetric().value, '100.0%');
+switched.switchModule('single');
+switched.selectDates(range('2026-09-21'));
+check('single-shot later repair pass is not a new first QC after mode switches', switched.metric(), expected(0, 0));
+switched.switchModule('multi', 'g06');
+check('multi selected group retains its real first failure after mode switches', switched.metric(), expected(0, 1));
+assert.equal(switched.renderMetric().value, '0.0%');
+
+const html = fs.readFileSync(path.join(__dirname, '../group-workbench/index.html'), 'utf8');
+const cumulativeAt = html.indexOf('class="overview-metrics overview-metrics-cumulative"');
+const dailyAt = html.indexOf('class="overview-metrics overview-metrics-today"');
+const firstQcAt = html.indexOf('id="metricFirstQcAccuracy"');
+assert.equal((html.match(/id="metricFirstQcAccuracy"/g) || []).length, 1, 'there is only one shared first-QC card for both modules');
+assert.ok(cumulativeAt < dailyAt && dailyAt < firstQcAt && firstQcAt < html.indexOf('</section>', dailyAt), 'shared first-QC card belongs to daily/range metrics, outside cumulative metrics');
+assert.ok(!html.slice(cumulativeAt, dailyAt).includes('metricFirstQc'), 'cumulative metrics contain no first-QC card');
+
+console.log(JSON.stringify({ok: true, timezone: process.env.TZ, productionHelpers: helperNames, checks: cases.length, cases, moduleEvidence, sharedCardInDateMetrics: true}, null, 2));
