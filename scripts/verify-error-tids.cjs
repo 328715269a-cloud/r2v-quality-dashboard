@@ -94,13 +94,14 @@ function harness(initial) {
   nodes.get('scopeGroup').value='all';
   const context={console,Date,Intl,Map,Set,WeakMap,Array,Object,JSON,String,Number,Math,Error,encodeURIComponent,decodeURIComponent,
     state:plain(initial),profile:{name:'管理员',role:'admin'},activeMode:'single',eventIndexes:new WeakMap(),snapshotCache:new WeakMap(),
+    overviewComputationCache:{source:null,identity:'',values:new Map(),contributions:new Map()},
     personErrorIndex:{source:null,scope:'',rows:new Map()},personErrorDetail:null,PERSON_ERROR_PAGE_SIZE:20,
     window:{WorkbenchFlow:Flow,WorkbenchReports:{...Reports,annotationContributors(history){stats.contributions++;return Reports.annotationContributors(history);}}},
     $:id=>nodes.get(id),qsa:(selector,root)=>root?.buttons?.filter(button=>selector.includes(button.dataset.action))||[],
     document:{createElement:()=>new Node(),addEventListener:(type,fn)=>handlers.set(`document:${type}`,fn)},groupLabel:id=>({g01:'单镜头1组',g02:'单镜头2组',g06:'多镜头1组'})[id]||id,
     emptyRow:(n,message)=>`<tr><td colspan="${n}">${message}</td></tr>`
   };
-  const helpers=['escapeHtml','localDateString','eventDate','acceptanceEventDate','formatImportTime','canViewAllGroups','canViewGroup','selectedRange','singleScopeDate','validScopeRange','inDateRange','scopeRangeKey','scopeRangeLabel','selectedGroup','inCurrentScope','batchIdentityScope','eventsForTask','liveEvents','taskSnapshot','taskWithSnapshot','taskIndex','allTasks','statusPill','tidMarkup','personErrorScopeKey','addPersonErrorEntry','ensurePersonErrorIndex','personErrorMatches','closePersonErrorDetail','togglePersonErrorDetail','renderPersonErrorDetail','renderPersonStats','bindOverviewEvents'];
+  const helpers=['escapeHtml','localDateString','eventDate','acceptanceEventDate','formatImportTime','canViewAllGroups','canViewGroup','selectedRange','singleScopeDate','validScopeRange','inDateRange','scopeRangeKey','scopeRangeLabel','selectedGroup','inCurrentScope','batchIdentityScope','eventsForTask','liveEvents','overviewCacheForState','overviewContributions','taskSnapshot','taskWithSnapshot','taskIndex','allTasks','statusPill','tidMarkup','personErrorScopeKey','addPersonErrorEntry','ensurePersonErrorIndex','personErrorMatches','closePersonErrorDetail','togglePersonErrorDetail','renderPersonErrorDetail','renderPersonStats','bindOverviewEvents'];
   vm.createContext(context);vm.runInContext(helpers.map(extract).join('\n'),context);
   const realTid=context.tidMarkup;context.tidMarkup=task=>{stats.tidHtml++;return realTid(task);};
   context.bindOverviewEvents();

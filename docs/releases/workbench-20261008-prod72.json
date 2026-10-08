@@ -1,0 +1,355 @@
+{
+  "version": "20261008-prod72",
+  "status": "deployed",
+  "date": "2026-10-08T07:07:36.2386201Z",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "baseline": {
+    "frontend": "prod71",
+    "api": "prod63",
+    "sourceCommit": "210218f"
+  },
+  "scope": [
+    "1 overview builds only requested report kinds",
+    "2 only active overview panel renders; header metrics independent",
+    "3 bounded snapshot and scope caches; shared task contribution analysis"
+  ],
+  "changedFiles": {
+    "index.html": "0104103f5ad860a6c109b044b7116f84e55d1b43bd0ae848706fd59985132b86",
+    "app.20261008-prod72-overview.js": "86bf0580bdcbea67bbd54d012b8d425fdca0659ce308567cbc8b94cce52b208c",
+    "reports.20261008-prod72-overview.js": "bb82e552c47590da5dbfee5f53758deaf3be83a2d5cc9dd93d2ceecc1fb17e66"
+  },
+  "backupIndex": "/opt/r2v/backups/group-workbench/20261008-prod72-overview-0104103f5ad860a6/index.html",
+  "correctness": {
+    "reportOracle": "reports.20260924-prod65-reject-col.js",
+    "reportComparisons": 338,
+    "pageAndCacheAssertions": 118,
+    "errorTagRegressionChecks": 64,
+    "qcVolumeAssertions": 261,
+    "oldProd71ContinuityChecks": 17,
+    "delayedSyncWithDraftsHeaderAndPanelConsistent": true,
+    "historyUnchanged": true,
+    "defaultExportResultsByteIdentical": true
+  },
+  "checks": {
+    "publicFiles": 12,
+    "publicBrowserVersion": "20261008-prod72",
+    "protectedFiles": 296,
+    "protectedServices": 13,
+    "protectedUnchanged": true,
+    "productionBusinessWrites": 0,
+    "apiRedeployed": false,
+    "databaseModified": false,
+    "servicesRestarted": false,
+    "forcedRefresh": false
+  },
+  "performance": {
+    "measurement": "synchronous production render + real DOM updates in one browser; excludes network, fixture transfer and browser startup; each iteration begins with a fresh state identity, subsequent operations keep that state and profile",
+    "tasks": 4500,
+    "events": 22800,
+    "samplesPerOperation": 3,
+    "pairedBeforeFinalGuard": {
+      "sourceHashes": {
+        "app.20261008-prod71-qc-volume.js": "3d0b3a11759523b5a3ab78835671cce641685df078657ff86378167c14eecb5d",
+        "reports.20260924-prod65-reject-col.js": "1bbd10ed8cba742b5fe50c0cbb85478a817e31ea025ec2860dfe518235f2f621",
+        "app.js": "67610f710cd2f636ac22c747e8491d96d239658f85867ff5145255de9ccce4b6",
+        "reports.js": "bb82e552c47590da5dbfee5f53758deaf3be83a2d5cc9dd93d2ceecc1fb17e66"
+      },
+      "baseline": {
+        "initialCold": {
+          "samplesMs": [
+            6848.6,
+            4575.1,
+            5133.1
+          ],
+          "medianMs": 5133.1
+        },
+        "unchangedWarm": {
+          "samplesMs": [
+            6600.3,
+            4182.1,
+            4839.6
+          ],
+          "medianMs": 4839.6
+        },
+        "dateChange": {
+          "samplesMs": [
+            5348.3,
+            5717.9,
+            5219.6
+          ],
+          "medianMs": 5348.3
+        },
+        "dateRepeatWarm": {
+          "samplesMs": [
+            6567,
+            5050.6,
+            5213.3
+          ],
+          "medianMs": 5213.3
+        },
+        "modeSwitch": {
+          "samplesMs": [
+            3049.4,
+            3251.6,
+            3614.8
+          ],
+          "medianMs": 3251.6
+        },
+        "firstMovies": {
+          "samplesMs": [
+            0.7,
+            0.5,
+            0.6
+          ],
+          "medianMs": 0.6
+        },
+        "firstDaily": {
+          "samplesMs": [
+            0.4,
+            0.3,
+            0.3
+          ],
+          "medianMs": 0.3
+        },
+        "firstPeople": {
+          "samplesMs": [
+            0.6,
+            0.3,
+            1.1
+          ],
+          "medianMs": 0.6
+        },
+        "returnGroups": {
+          "samplesMs": [
+            0.6,
+            0.3,
+            0.5
+          ],
+          "medianMs": 0.5
+        },
+        "repeatMovies": {
+          "samplesMs": [
+            0.4,
+            0.2,
+            0.6
+          ],
+          "medianMs": 0.4
+        },
+        "repeatDaily": {
+          "samplesMs": [
+            1,
+            0.3,
+            0.5
+          ],
+          "medianMs": 0.5
+        },
+        "repeatPeople": {
+          "samplesMs": [
+            0.9,
+            0.3,
+            0.2
+          ],
+          "medianMs": 0.3
+        }
+      },
+      "candidate": {
+        "initialCold": {
+          "samplesMs": [
+            1640.6,
+            1389.9,
+            1280.7
+          ],
+          "medianMs": 1389.9
+        },
+        "unchangedWarm": {
+          "samplesMs": [
+            174.2,
+            147.1,
+            144.9
+          ],
+          "medianMs": 147.1
+        },
+        "dateChange": {
+          "samplesMs": [
+            801.7,
+            626.1,
+            477
+          ],
+          "medianMs": 626.1
+        },
+        "dateRepeatWarm": {
+          "samplesMs": [
+            146.9,
+            112.3,
+            113.6
+          ],
+          "medianMs": 113.6
+        },
+        "modeSwitch": {
+          "samplesMs": [
+            767.6,
+            801,
+            650.2
+          ],
+          "medianMs": 767.6
+        },
+        "firstMovies": {
+          "samplesMs": [
+            182.4,
+            157.4,
+            158.7
+          ],
+          "medianMs": 158.7
+        },
+        "firstDaily": {
+          "samplesMs": [
+            41.6,
+            39.9,
+            36.8
+          ],
+          "medianMs": 39.9
+        },
+        "firstPeople": {
+          "samplesMs": [
+            60.9,
+            38.9,
+            37.5
+          ],
+          "medianMs": 38.9
+        },
+        "returnGroups": {
+          "samplesMs": [
+            23.8,
+            20.4,
+            10.3
+          ],
+          "medianMs": 20.4
+        },
+        "repeatMovies": {
+          "samplesMs": [
+            148.2,
+            139.8,
+            151.8
+          ],
+          "medianMs": 148.2
+        },
+        "repeatDaily": {
+          "samplesMs": [
+            49.5,
+            31.7,
+            39.7
+          ],
+          "medianMs": 39.7
+        },
+        "repeatPeople": {
+          "samplesMs": [
+            67.7,
+            33,
+            37.3
+          ],
+          "medianMs": 37.3
+        }
+      }
+    },
+    "finalCandidate": {
+      "initialCold": {
+        "samplesMs": [
+          662.6,
+          502,
+          467.1
+        ],
+        "medianMs": 502
+      },
+      "unchangedWarm": {
+        "samplesMs": [
+          83.1,
+          63.7,
+          42.3
+        ],
+        "medianMs": 63.7
+      },
+      "dateChange": {
+        "samplesMs": [
+          295.3,
+          256.8,
+          194.7
+        ],
+        "medianMs": 256.8
+      },
+      "dateRepeatWarm": {
+        "samplesMs": [
+          61.3,
+          53.8,
+          38.3
+        ],
+        "medianMs": 53.8
+      },
+      "modeSwitch": {
+        "samplesMs": [
+          316.5,
+          267.8,
+          228.4
+        ],
+        "medianMs": 267.8
+      },
+      "firstMovies": {
+        "samplesMs": [
+          65.6,
+          59.7,
+          66.4
+        ],
+        "medianMs": 65.6
+      },
+      "firstDaily": {
+        "samplesMs": [
+          16.9,
+          13.2,
+          18.8
+        ],
+        "medianMs": 16.9
+      },
+      "firstPeople": {
+        "samplesMs": [
+          21.1,
+          15.3,
+          16.7
+        ],
+        "medianMs": 16.7
+      },
+      "returnGroups": {
+        "samplesMs": [
+          9.4,
+          5.3,
+          10
+        ],
+        "medianMs": 9.4
+      },
+      "repeatMovies": {
+        "samplesMs": [
+          69,
+          81.9,
+          47.1
+        ],
+        "medianMs": 69
+      },
+      "repeatDaily": {
+        "samplesMs": [
+          19.1,
+          13.8,
+          13.9
+        ],
+        "medianMs": 13.9
+      },
+      "repeatPeople": {
+        "samplesMs": [
+          19.5,
+          19.1,
+          9.5
+        ],
+        "medianMs": 19.1
+      }
+    },
+    "caveat": "Paired run preceded only the stale-header guard fix. Final candidate was remeasured after all 118 checks; baseline samples were reused after immutable-source/fixture/browser validation. Host load differed; do not attribute the cross-run speed difference to the guard fix. Figures measure local synthetic CPU/DOM work, not production network latency."
+  },
+  "evidenceDirectory": "outputs/workbench-error-tids-20261008/perf123"
+}
