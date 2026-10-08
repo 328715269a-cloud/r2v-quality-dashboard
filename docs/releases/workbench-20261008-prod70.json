@@ -1,0 +1,61 @@
+{
+  "version": "20261008-prod70",
+  "status": "deployed",
+  "date": "2026-10-08T06:09:10.033Z",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "baseline": {
+    "frontend": "prod69",
+    "api": "prod63",
+    "sourceCommit": "cfa3cd8"
+  },
+  "changedFiles": {
+    "index.html": "2961315227465c3b8225cedf780bcec9f71f22736b32d0d4f9d9c4bacf5e5111",
+    "app.20261008-prod70-error-tids.js": "3b207116ff8971e0a02710a26600b28f6fd10105626872882bd2f53f65718792",
+    "error-tids.20261008-prod70.css": "e75f47b536eb800626fcd5785ea6d21704cc1b619e4319c5b462b9a7ccf66135"
+  },
+  "backupIndex": "/opt/r2v/backups/group-workbench/20261008-prod70-error-tids-2961315227465c3b/index.html",
+  "checks": {
+    "unit": 64,
+    "browser": [
+      "unopened detail absent",
+      "tag count45",
+      "20DOMrows",
+      "45matches",
+      "firstQC date/reviewer/note",
+      "notes escaped",
+      "current accepted case remainsfindable",
+      "copy exact TID",
+      "secondpage20",
+      "lastpage5",
+      "sameclickcloses",
+      "keyboard opens",
+      "Escapecloses",
+      "replace tag, one detail",
+      "datechange closesandfilters",
+      "multiscope6",
+      "no singles leak",
+      "groupchangecloses",
+      "drilldown writes no transactions",
+      "oldpage draftretained after newpageload",
+      "oldpage stillsaves",
+      "no browser errors"
+    ],
+    "publicFiles": 19,
+    "protectedFiles": 293,
+    "protectedServices": 13,
+    "protectedUnchanged": true,
+    "oldPageDraftAndSaveVerified": true,
+    "productionBusinessWrites": 0,
+    "apiRedeployed": false,
+    "databaseModified": false,
+    "servicesRestarted": false
+  },
+  "performance": {
+    "syntheticTasks": 10003,
+    "pageSize": 20,
+    "closedDetailRows": 0,
+    "reusesPersonAggregate": true,
+    "paginationRescansHistory": false
+  },
+  "evidenceDirectory": "outputs/workbench-error-tids-20261008"
+}

@@ -1,0 +1,64 @@
+/* First-QC detail is mounted only for the selected person/tag. */
+#overviewPanel-people > .panel > .table-wrap { container-type: inline-size; }
+#personStatsBody > tr > .error-chip-cell {
+  overflow: visible;
+  white-space: normal;
+}
+#personStatsBody .error-chip {
+  max-width: 100%;
+  margin: 2px 0;
+  white-space: normal;
+  text-align: left;
+}
+#personStatsBody .error-chip[aria-expanded="true"] {
+  color: var(--primary-dark);
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+#personStatsBody > .person-error-detail-row > td {
+  padding: 0 14px 14px;
+  background: var(--surface-alt);
+  white-space: normal;
+}
+.person-error-detail {
+  position: sticky;
+  left: 14px;
+  width: calc(100cqw - 28px);
+  max-width: 100%;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 0 0 8px 8px;
+  background: var(--surface);
+}
+.person-error-heading,
+.person-error-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+}
+.person-error-heading { margin-bottom: 14px; }
+.person-error-heading h4 { margin: 0; font-size: 15px; }
+.person-error-heading h4 span { margin-left: 10px; color: var(--primary-dark); font-size: 13px; font-weight: 600; }
+.person-error-heading p,
+.person-error-pagination p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.person-error-table-wrap { max-height: 440px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+.person-error-table { width: 100%; min-width: 900px; font-size: 13px; }
+.person-error-table th { position: sticky; top: 0; z-index: 1; background: var(--surface-alt); }
+.person-error-table th,
+.person-error-table td { padding: 10px 12px; vertical-align: top; }
+.person-error-table td:nth-child(1) { width: 23%; }
+.person-error-table td:nth-child(2) { width: 18%; white-space: normal; overflow-wrap: anywhere; }
+.person-error-table td:nth-child(5) { width: 28%; min-width: 190px; white-space: normal; }
+.person-error-table .tid-cell { align-items: flex-start; }
+.person-error-table .mono { overflow-wrap: anywhere; white-space: normal; }
+.person-error-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.person-error-note { margin-top: 4px; max-height: 100px; overflow: auto; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.person-error-pagination { padding-top: 12px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.person-error-pagination > div { display: flex; align-items: center; gap: 10px; }
+.person-error-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 640px) {
+  #personStatsBody > .person-error-detail-row > td { padding: 0 6px 8px; }
+  .person-error-detail { left: 6px; width: calc(100cqw - 12px); padding: 12px; }
+}
