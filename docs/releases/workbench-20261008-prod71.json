@@ -1,0 +1,51 @@
+{
+  "version": "20261008-prod71",
+  "status": "deployed",
+  "date": "2026-10-08T06:38:33.4553323Z",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "baseline": {
+    "frontend": "prod70",
+    "api": "prod63",
+    "sourceCommit": "c77ecc4"
+  },
+  "change": "Include QC confirmation of annotation rejection in the overview QC volume; retain per-TID date/mode/group deduplication and release boundaries.",
+  "changedFiles": {
+    "index.html": "65c3f1553d76047692c74d6a27347d3890af0a1cddabc996bc7c63a86d32df07",
+    "app.20261008-prod71-qc-volume.js": "3d0b3a11759523b5a3ab78835671cce641685df078657ff86378167c14eecb5d"
+  },
+  "backupIndex": "/opt/r2v/backups/group-workbench/20261008-prod71-qc-volume-65c3f1553d760476/index.html",
+  "checks": {
+    "unitCases": 87,
+    "unitAssertions": 261,
+    "priorErrorTagChecks": 64,
+    "browser": [
+      "old immutable prod70 loaded",
+      "candidate prod71 loaded",
+      "single confirmation-only date counts one",
+      "single acceptance does not gain confirmation",
+      "single application-only adds no QC",
+      "single all dates adds one confirmation TID",
+      "multi confirmation-only date counts one",
+      "multi acceptance does not gain confirmation",
+      "multi application-only adds no QC",
+      "multi all dates adds one confirmation TID",
+      "other group excludes confirmation",
+      "own group includes confirmation",
+      "metric tooltip names both QC rejection paths",
+      "reading statistics sends no transactions",
+      "old prod70 unsaved input and session retained",
+      "old prod70 still submits on unchanged prod63 API",
+      "no browser errors"
+    ],
+    "publicFiles": 11,
+    "protectedFiles": 295,
+    "protectedServices": 13,
+    "protectedUnchanged": true,
+    "oldProd70DraftAndSaveVerified": true,
+    "productionBusinessWrites": 0,
+    "apiRedeployed": false,
+    "databaseModified": false,
+    "servicesRestarted": false
+  },
+  "evidenceDirectory": "outputs/workbench-error-tids-20261008/release-qc-volume"
+}

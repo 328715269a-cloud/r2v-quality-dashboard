@@ -107,7 +107,7 @@
             <div class="overview-metric overview-metric-firstqc" title="所选日期内首检通过的 TID ÷ 所选日期内首检通过或打回的 TID，按首检发生日期统计。质检拒绝不计入，后续返修复检不改变首次结果。"><span>首次质检准确率</span><strong id="metricFirstQcAccuracy">—</strong><small id="metricFirstQcDetail">按首检日期 · 拒绝不计入</small></div>
             <button class="overview-metric overview-metric-today-rejected" type="button" data-action="overview-bucket" data-bucket="rejected" title="统计所选日期内被最终拒绝（质检拒绝 / 验收拒绝 / 标注拒绝确认废弃）的任务条数，按拒绝操作日期计入，可随上方日期筛选。点击查看已拒绝任务列表。"><span>已拒绝</span><strong id="metricRejected">—</strong><small id="metricRejectedHint">当日拒绝（条）</small></button>
             <div class="overview-metric overview-metric-firstqc" title="所选日期内首次验收通过的 TID ÷ 首次验收通过或不通过的 TID，按首次验收的北京时间统计。每个 TID 只取第一次，拒绝和后续复验不计入。"><span>首次验收准确率</span><strong id="metricAcceptanceAccuracy">—</strong><small id="metricAcceptanceAccuracyDetail">按首次验收日期 · 复验不计入</small></div>
-            <div class="overview-metric overview-metric-qc-volume" title="所选日期内质检处理过的 case 数：通过、打回、拒绝都算，按判定发生日期计入，一条 case 只算一次；任务被管理员释放后此前的判定作废不计。"><span>质检量级</span><strong id="metricQcVolume">—</strong><small id="metricQcVolumeDetail">当日质检处理（条）· 去重</small></div>
+            <div class="overview-metric overview-metric-qc-volume" title="所选日期内质检处理过的 TID 数：通过、打回、直接拒绝、确认标注拒绝都算；按质检操作日期计入，同一 TID 只算一次。标注申请拒绝需质检确认后才计入，验收操作不计入。任务被管理员释放后此前的判定作废不计。"><span>质检量级</span><strong id="metricQcVolume">—</strong><small id="metricQcVolumeDetail">当日质检处理（条）· 去重</small></div>
             <div class="overview-metric overview-metric-acc-volume" title="所选日期内验收处理过的 case 数：通过、打回、拒绝都算，按判定发生日期计入，一条 case 只算一次；任务被管理员释放后此前的判定作废不计。"><span>验收量级</span><strong id="metricAcceptanceVolume">—</strong><small id="metricAcceptanceVolumeDetail">当日验收处理（条）· 去重</small></div>
           </div>
         </section>
@@ -326,6 +326,6 @@
   <script src="shared-store.20260923-prod37.js" defer></script>
   <script src="workflow.20260924-prod53-release.js" defer></script>
   <script src="reports.20260924-prod65-reject-col.js" defer></script>
-  <script src="app.20261008-prod70-error-tids.js" defer></script>
+  <script src="app.20261008-prod71-qc-volume.js" defer></script>
 </body>
 </html>
