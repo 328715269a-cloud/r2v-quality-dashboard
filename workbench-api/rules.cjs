@@ -86,7 +86,10 @@ function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled
     delta.batches.push(batch);working.batches.push(batch);
   }
   for(const t of delta.tasks)check(delta.batches.some(b=>b.kind!=='handoff'&&b.id===t.batchId&&b.taskIds.includes(t.id)),'导入任务缺少本次导入批次');
-  const allowed=new Set(['dispatch','claim','submit','package_built','package_claimed','qc_pass','qc_fail','qc_reject','annotator_reject','reject_confirm','reject_return','acceptance_pass','acceptance_fail','acceptance_reject','acceptance_route','qc_repair_done','metadata_edit','admin_reassign','group_daily_edit','task_deleted']);
+  // admin_reassign was replaced by admin_release: handing a case to another
+  // person no longer exists, an administrator releases the case instead so the
+  // whole flow restarts. Historical admin_reassign events stay readable.
+  const allowed=new Set(['dispatch','claim','submit','package_built','package_claimed','qc_pass','qc_fail','qc_reject','annotator_reject','reject_confirm','reject_return','acceptance_pass','acceptance_fail','acceptance_reject','acceptance_route','qc_repair_done','metadata_edit','admin_release','group_daily_edit','task_deleted']);
   for(const e of raw.events){const eventId=fresh(e);check(allowed.has(e.type),'不支持此操作');check(!e.identityAlias&&!e.legacyName&&!e.targetStatus,'正式模式不接受旧演示身份或跳步状态');let task;
     const event={id:eventId,taskId:e.taskId,type:e.type,workflowVersion:e.assignmentKind==='rework_transfer'?4:3,at:stamp(),actor:profile.name,actorRole:profile.role};const note=text(e.note,2000);if(note)event.note=note;
     if(e.type==='group_daily_edit'){
@@ -119,11 +122,24 @@ function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled
         case 'acceptance_route':scope(profile,task,'qc');check(task.status==='acceptance_return_pending','任务不在验收打回待处理环节','STATE_CONFLICT',409);check(['qc','annotation'].includes(e.route),'返修去向无效');event.route=e.route;event.note=text(e.note,2000,true);break;
         case 'qc_repair_done':scope(profile,task,'qc');check(task.status==='qc_self_rework','任务不在质检自行返修环节','STATE_CONFLICT',409);event.note=text(e.note,2000,true);break;
         case 'admin_reassign':{
+          // Superseded by admin_release and no longer accepted by the whitelist.
+          // Kept only so a restored event type cannot write a half-valid record.
           manager(profile,task);checkPin(pin,'admin');
           check(['annotation','qc'].includes(e.toRole),'改派角色无效');
           const next=text(e.assignee,20,true);
           check(next!==(task.assignee||''),'新处理人与当前处理人相同');
           event.toRole=e.toRole;event.assignee=next;event.previousAssignee=task.assignee||'';
+          break;}
+        case 'admin_release':{
+          // An administrator drops the current owner and returns the case to the
+          // shared unclaimed pool. Every recorded result is void, so the next
+          // owner must walk annotation, QC and acceptance again. Closed cases
+          // (accepted / rejected) already booked an outcome and never release.
+          manager(profile,task);checkPin(pin,'admin');
+          check(!['accepted','rejected'].includes(task.status),'已验收通过或已废弃的 case 不能释放，流程已结束','STATE_CONFLICT',409);
+          const reason=text(e.note,2000);
+          check(reason.length>0,'请填写释放原因');
+          event.previousAssignee=task.assignee||'';event.releaseStatus=task.status;event.note=reason;
           break;}
         case 'metadata_edit':manager(profile,task);checkPin(pin,'admin');check(object(e.before)&&object(e.after),'修改内容格式无效');check(e.before.tid===task.tid&&e.before.movie===task.movie,'任务资料已有新修改','STATE_CONFLICT',409);event.before={tid:task.tid,movie:task.movie};event.after={tid:tid(e.after.tid),movie:text(e.after.movie,200,true)};check(!same(event.before,event.after),'内容没有变化');event.note=text(e.note,2000,true);if(e.batchId){const batch=working.batches.find(b=>b.id===e.batchId&&b.kind!=='handoff');check(batch&&batch.taskIds.includes(task.id),'任务不属于该导入批次');event.batchId=batch.id;}break;
       }

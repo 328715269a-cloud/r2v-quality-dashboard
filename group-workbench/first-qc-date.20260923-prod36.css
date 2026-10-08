@@ -1,0 +1,16 @@
+/* Four cumulative metrics; date-dependent first QC belongs in the daily row. */
+.overview-metrics-cumulative { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.overview-metrics-today .overview-metric-firstqc > small { overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .overview-metrics-cumulative { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .overview-metrics-cumulative .overview-metric {
+    display: flex;
+    grid-column: auto;
+    order: initial;
+    margin-top: 0;
+    border-top: 0;
+    border-right: 1px solid var(--line);
+  }
+  .overview-metrics-cumulative .overview-metric:nth-child(even) { border-right: 0; }
+  .overview-metrics-cumulative .overview-metric > small { display: block; }
+}
