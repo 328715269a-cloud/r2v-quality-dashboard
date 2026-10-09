@@ -1,0 +1,84 @@
+{
+  "version": "20261009-prod73",
+  "publishedAt": "2026-10-09T10:29:13.4363052Z",
+  "previousFrontendVersion": "20261008-prod72",
+  "apiVersion": "prod63",
+  "publicUrl": "https://quality.shangyidada.site/group-workbench/",
+  "scope": "Only new-mode overview rejection metric display; static-only deployment",
+  "semantics": {
+    "annotationCompleted": "Existing first submission count; later rejection does not remove completion. A rejection request alone is not completion.",
+    "annotationRejected": "First effective annotator_reject after last admin_release, counted on Beijing date; repeated requests across dates count once.",
+    "qcRejected": "First effective isQcReject or reject_confirm after last admin_release, counted on Beijing date; includes legacy qc_fail rejection marker.",
+    "qcVolume": "Unique tasks with normal qc_pass or non-rejection qc_fail inside date range. Rejection operations are excluded; earlier ordinary QC is retained.",
+    "finalRejected": "Unchanged final rejection counter",
+    "existingReportsAndExport": "Unchanged, exact JSON comparisons pass; new counters are overview cards."
+  },
+  "performance": "Review facts are cached per existing immutable snapshot, profile, shot mode and group; date filters reuse facts; existing bounded LRU retained; no extra API requests.",
+  "deployment": {
+    "ok": true,
+    "action": "activate",
+    "releaseId": "20261009-prod73-rejection-split-74e5ad128fe5aac6",
+    "candidateIndexSha256": "74e5ad128fe5aac645ab3ce3f8763e67e57f2f29f125c65e3342f6814bdac650",
+    "baselineIndexSha256": "0104103f5ad860a6c109b044b7116f84e55d1b43bd0ae848706fd59985132b86",
+    "backupIndex": "/opt/r2v/backups/group-workbench/20261009-prod73-rejection-split-74e5ad128fe5aac6/index.html",
+    "sha256": {
+      "index.html": "74e5ad128fe5aac645ab3ce3f8763e67e57f2f29f125c65e3342f6814bdac650",
+      "app.20261009-prod73-rejection-split.js": "11cff28c791f6a7723bd4c4d9a6abca18f7d47c20dedf30f5212493d333cca7f",
+      "reports.20261008-prod72-overview.js": "bb82e552c47590da5dbfee5f53758deaf3be83a2d5cc9dd93d2ceecc1fb17e66"
+    },
+    "activated": true,
+    "protectedUnchanged": true,
+    "protectedFiles": 298,
+    "existingContainers": 13,
+    "nginxMaster": {
+      "pid": 3662320,
+      "startTicks": "96812640"
+    },
+    "productionBusinessWrites": 0,
+    "restarts": 0,
+    "oldPageAssetsPreserved": true
+  },
+  "validation": {
+    "rejectionAssertions": 963,
+    "rejectionScenarios": 119,
+    "qcVolumeAssertions": 261,
+    "overviewCacheAssertions": 118,
+    "overviewIntentionalChangesExcludedFromBaseline": [
+      "metricAnnotationRejected",
+      "metricAnnotationRejectedHint",
+      "metricQcRejected",
+      "metricQcRejectedHint",
+      "metricQcVolume",
+      "metricQcVolumeDetail"
+    ],
+    "reportsExactComparisons": 338,
+    "errorTagCases": 64,
+    "isolatedChromeChecks": 107,
+    "oldPage": "prod72 unsaved draft retained and submit succeeded against actual isolated prod63 API",
+    "viewports": [
+      1600,
+      1280,
+      768
+    ],
+    "publicFiles": 12,
+    "publicApiHealth": true,
+    "publicBrowser": {
+      "ok": true,
+      "version": "20261009-prod73",
+      "identityGateVisible": true,
+      "errors": [],
+      "productionWrites": 0
+    }
+  },
+  "fileHashes": {
+    "group-workbench/index.html": "74e5ad128fe5aac645ab3ce3f8763e67e57f2f29f125c65e3342f6814bdac650",
+    "group-workbench/app.js": "11cff28c791f6a7723bd4c4d9a6abca18f7d47c20dedf30f5212493d333cca7f",
+    "group-workbench/app.20261009-prod73-rejection-split.js": "11cff28c791f6a7723bd4c4d9a6abca18f7d47c20dedf30f5212493d333cca7f",
+    "group-workbench/reports.js": "bb82e552c47590da5dbfee5f53758deaf3be83a2d5cc9dd93d2ceecc1fb17e66",
+    "scripts/verify-rejection-split.cjs": "218a21c27157d2ecfb0ca2ba84707da225f09195bb6b3f38a832f764e3b694e4",
+    "scripts/verify-qc-volume.cjs": "292416c5d722852562d47d06c9a5efbf9018985f36c766d1caee703673be8b50",
+    "scripts/verify-overview-cache.cjs": "c58e3602292e99de09ee88ea5ede137951452bebe78df30c1108069e545915bf"
+  },
+  "evidenceDirectory": "outputs/workbench-error-tids-20261008/rejection-split",
+  "rollback": "Guarded restore of backed-up index only; all new and old immutable assets remain; no API or database rollback."
+}

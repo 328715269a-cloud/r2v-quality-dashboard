@@ -12,6 +12,10 @@ const root = path.resolve(__dirname, '..');
 const directory = path.join(root, 'group-workbench');
 const baselineApp = 'app.20261008-prod71-qc-volume.js';
 const baselineReports = 'reports.20260924-prod65-reject-col.js';
+// prod73 intentionally adds first-rejection cards and separates rejection from
+// ordinary QC volume. Their exact semantics are covered by verify-rejection-split.
+// Keep every other card, panel, export and cache comparison exact.
+const changedMetricIds = ['metricAnnotationRejected','metricAnnotationRejectedHint','metricQcRejected','metricQcRejectedHint','metricQcVolume','metricQcVolumeDetail'];
 const checks = [];
 const equal = (label, actual, expected) => { assert.deepEqual(actual, expected, label); checks.push(label); };
 const at = (day, hour = '09:00:00') => `2026-10-${String(day).padStart(2, '0')}T${hour}+08:00`;
@@ -125,7 +129,11 @@ async function sandbox(browser, app, reports) {
 }
 
 const call = (page, method, argument) => page.evaluate(({method,argument}) => window.__overviewTest[method](argument), {method,argument});
-const snapshot = (page, tab) => call(page, 'snapshot', tab);
+const snapshot = async (page, tab) => {
+  const value = await call(page, 'snapshot', tab);
+  for (const id of changedMetricIds) delete value.cards[id];
+  return value;
+};
 async function compareTabs(baseline, candidate, label) {
   for (const tab of ['groups','movies','daily','people']) {
     await call(baseline, 'select', tab);await call(candidate, 'select', tab);
@@ -288,7 +296,7 @@ async function main() {
       trace('benchmark candidate');const newTimes=await measure(candidate,large);
       performanceResult={tasks:large.tasks.length,events:large.events.length,samplesPerOperation:3,measurement:'synchronous production render + real DOM updates in the same installed browser; excludes network, fixture transfer and browser startup; each iteration begins with a fresh state identity, subsequent operations keep that state and profile',...(baselineReusedFrom?{baselineReusedFrom}:{}),baseline:oldTimes,candidate:newTimes};
     }
-    const report = {ok:true,assertions:checks.length,tasks:state.tasks.length,events:state.events.length,browser:path.basename(browserPath),network:'blocked; application init and store are never run',initialReportCalls:firstCalls.reports.reduce((acc,call)=>{const key=call.name+(call.kind?':'+call.kind:'');acc[key]=(acc[key]||0)+1;return acc;},{}),sourceHashes:Object.fromEntries([baselineApp,baselineReports,'app.js','reports.js'].map(file=>[file,crypto.createHash('sha256').update(read(file)).digest('hex')])),...(performanceResult?{performance:performanceResult}:{}),checks};
+    const report = {ok:true,assertions:checks.length,tasks:state.tasks.length,events:state.events.length,browser:path.basename(browserPath),intentionalMetricChanges:changedMetricIds,metricRegression:'scripts/verify-rejection-split.cjs',network:'blocked; application init and store are never run',initialReportCalls:firstCalls.reports.reduce((acc,call)=>{const key=call.name+(call.kind?':'+call.kind:'');acc[key]=(acc[key]||0)+1;return acc;},{}),sourceHashes:Object.fromEntries([baselineApp,baselineReports,'app.js','reports.js'].map(file=>[file,crypto.createHash('sha256').update(read(file)).digest('hex')])),...(performanceResult?{performance:performanceResult}:{}),checks};
     if(process.env.RESULT_PATH)fs.writeFileSync(process.env.RESULT_PATH,JSON.stringify(report,null,2)+'\n');
     console.log(JSON.stringify(report,null,2));
   } finally {await browser.close();}

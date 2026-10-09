@@ -23,17 +23,19 @@ function extract(name) {
 
 const overview = extract('renderOverview');
 function metricExpression(name) {
-  const match = new RegExp(`${name}:(validScopeRange\\(\\)\\?countRangeVolume\\(\\[[^\\]]*\\]\\):'—')`).exec(overview);
+  const count = name === 'metricQcVolume' ? 'countRangeQcVolume\\(\\)' : 'countRangeVolume\\(\\[[^\\]]*\\]\\)';
+  const match = new RegExp(`${name}:(validScopeRange\\(\\)\\?${count}:'—')`).exec(overview);
   assert.ok(match, `${name} must use the real overview volume expression`);
   return new vm.Script(match[1], {filename: `${sourceFile}#${name}`});
 }
 const qcMetric = metricExpression('metricQcVolume');
 const acceptanceMetric = metricExpression('metricAcceptanceVolume');
 const helpers = [
-  'localDateString', 'eventDate', 'selectedRange', 'validScopeRange', 'inDateRange',
+  'localDateString', 'eventDate', 'acceptanceEventDate', 'selectedRange', 'validScopeRange', 'inDateRange',
   'canViewAllGroups', 'canViewGroup', 'selectedGroup', 'inCurrentScope',
   'eventsForTask', 'liveEvents', 'taskSnapshot', 'taskWithSnapshot', 'taskIndex',
-  'allTasks', 'countRangeVolume'
+  'allTasks', 'countRangeVolume', 'overviewCacheForState', 'overviewMemo', 'overviewTasks',
+  'overviewReviewFacts', 'countRangeQcVolume'
 ].map(extract).join('\n');
 
 function freeze(value) {
@@ -67,7 +69,8 @@ function harness(state) {
   const controls = {scopeDateFrom: {value: ''}, scopeDateTo: {value: ''}, scopeGroup: {value: 'all'}};
   const context = vm.createContext({
     window: {WorkbenchFlow: Flow}, state, activeMode: 'single', profile: {role: 'admin'},
-    eventIndexes: new WeakMap(), snapshotCache: new WeakMap(), $: id => controls[id]
+    eventIndexes: new WeakMap(), snapshotCache: new WeakMap(), $: id => controls[id],
+    overviewComputationCache: {source: null, identity: '', values: new Map(), contributions: new Map()}
   });
   vm.runInContext(helpers, context, {filename: sourceFile});
   return {
@@ -93,10 +96,10 @@ function harness(state) {
 const cases = [
   {id: 'qc-pass', events: [review('qc_pass')], qc: 1, acceptance: 0},
   {id: 'qc-fail', events: [review('qc_fail', '07', {note: '普通打回'})], qc: 1, acceptance: 0},
-  {id: 'direct-qc-reject', events: [review('qc_reject')], qc: 1, acceptance: 0},
-  {id: 'legacy-qc-reject', events: [review('qc_fail', '07', {note: '[质检拒绝] 无法继续'})], qc: 1, acceptance: 0},
-  {id: 'reject-confirm-only', events: [review('reject_confirm')], qc: 1, acceptance: 0},
-  {id: 'annotation-request-confirmed', events: [review('annotator_reject', '06'), review('reject_confirm')], qc: 1, acceptance: 0},
+  {id: 'direct-qc-reject', events: [review('qc_reject')], qc: 0, acceptance: 0},
+  {id: 'legacy-qc-reject', events: [review('qc_fail', '07', {note: '[质检拒绝] 无法继续'})], qc: 0, acceptance: 0},
+  {id: 'reject-confirm-only', events: [review('reject_confirm')], qc: 0, acceptance: 0},
+  {id: 'annotation-request-confirmed', events: [review('annotator_reject', '06'), review('reject_confirm')], qc: 0, acceptance: 0},
   {id: 'qc-and-confirm-same-tid', events: [review('qc_fail'), review('annotator_reject'), review('reject_confirm')], qc: 1, acceptance: 0},
   {id: 'annotation-request-only', events: [review('annotator_reject')], qc: 0, acceptance: 0},
   {id: 'annotation-request-returned', events: [review('annotator_reject'), review('reject_return')], qc: 0, acceptance: 0},
@@ -129,7 +132,7 @@ for (const mode of ['single', 'multi']) {
     events: [review('qc_fail', '06'), review('annotator_reject', '07'), review('reject_confirm', '08')]}]));
   confirmation.check(`${mode}/first QC date`, 1, 0, {...range('06'), mode});
   confirmation.check(`${mode}/request date alone`, 0, 0, {...range('07'), mode});
-  confirmation.check(`${mode}/confirmation date`, 1, 0, {...range('08'), mode});
+  confirmation.check(`${mode}/confirmation date excluded from ordinary QC`, 0, 0, {...range('08'), mode});
   confirmation.check(`${mode}/QC plus later confirmation deduplicated`, 1, 0, {...range('06', '08'), mode});
 }
 
@@ -140,15 +143,15 @@ const scoped = harness(fixture([
   {id: 'multi-group-7', groupId: 'g07', mode: 'multi', events: [review('reject_confirm'), review('acceptance_fail')]}
 ]));
 for (const [mode, groupId, otherGroup] of [['single', 'g01', 'g02'], ['multi', 'g06', 'g07']]) {
-  scoped.check(`${mode}/admin all groups`, 2, 2, {...range('07'), mode});
-  scoped.check(`${mode}/selected group`, 1, 1, {...range('07'), mode, groupId});
-  scoped.check(`${mode}/other group`, 1, 1, {...range('07'), mode, groupId: otherGroup});
+  scoped.check(`${mode}/admin all groups`, 0, 2, {...range('07'), mode});
+  scoped.check(`${mode}/selected group`, 0, 1, {...range('07'), mode, groupId});
+  scoped.check(`${mode}/other group`, 0, 1, {...range('07'), mode, groupId: otherGroup});
   scoped.check(`${mode}/unknown group`, 0, 0, {...range('07'), mode, groupId: 'missing'});
-  scoped.check(`${mode}/acceptance role all groups`, 2, 2, {...range('07'), mode, user: {role: 'acceptance'}});
+  scoped.check(`${mode}/acceptance role all groups`, 0, 2, {...range('07'), mode, user: {role: 'acceptance'}});
   for (const role of ['qc', 'annotation']) {
-    scoped.check(`${mode}/${role} cannot expand group permission`, 1, 1,
+    scoped.check(`${mode}/${role} cannot expand group permission`, 0, 1,
       {...range('07'), mode, groupId: 'all', user: {role, groupId}});
-    scoped.check(`${mode}/${role} cannot select another group`, 1, 1,
+    scoped.check(`${mode}/${role} cannot select another group`, 0, 1,
       {...range('07'), mode, groupId: otherGroup, user: {role, groupId}});
   }
 }
@@ -156,10 +159,10 @@ scoped.check('restricted single group cannot see multi cases', 0, 0,
   {...range('07'), mode: 'multi', user: {role: 'qc', groupId: 'g01'}});
 
 const midnight = harness(fixture([
-  {id: 'before-local-midnight', events: [{type: 'reject_confirm', at: '2026-10-06T15:59:59.999Z'}]},
-  {id: 'at-local-midnight', events: [{type: 'reject_confirm', at: '2026-10-06T16:00:00.000Z'}]},
-  {id: 'last-local-millisecond', events: [{type: 'reject_confirm', at: '2026-10-07T15:59:59.999Z'}]},
-  {id: 'next-local-midnight', events: [{type: 'reject_confirm', at: '2026-10-07T16:00:00.000Z'}]}
+  {id: 'before-local-midnight', events: [{type: 'qc_pass', at: '2026-10-06T15:59:59.999Z'}]},
+  {id: 'at-local-midnight', events: [{type: 'qc_pass', at: '2026-10-06T16:00:00.000Z'}]},
+  {id: 'last-local-millisecond', events: [{type: 'qc_pass', at: '2026-10-07T15:59:59.999Z'}]},
+  {id: 'next-local-midnight', events: [{type: 'qc_pass', at: '2026-10-07T16:00:00.000Z'}]}
 ]));
 midnight.check('Beijing previous day', 1, 0, range('06'));
 midnight.check('Beijing day inclusive boundaries', 2, 0, range('07'));
@@ -180,18 +183,18 @@ for (const mode of ['single', 'multi']) {
     review('annotator_reject', '07'), review('reject_confirm', '08')]}]));
   resumed.check(`${mode}/old QC day after release`, 0, 0, {...range('04'), mode});
   resumed.check(`${mode}/post-release request alone`, 0, 0, {...range('07'), mode});
-  resumed.check(`${mode}/post-release confirmation counts`, 1, 0, {...range('08'), mode});
-  resumed.check(`${mode}/post-release confirmation over full range`, 1, 0, {...range('04', '08'), mode});
+  resumed.check(`${mode}/post-release confirmation excluded from ordinary QC`, 0, 0, {...range('08'), mode});
+  resumed.check(`${mode}/post-release confirmation over full range excluded`, 0, 0, {...range('04', '08'), mode});
   const rereleased = harness(fixture([{id: 'released-twice', mode, events: [...prior,
     review('qc_fail', '07'), review('admin_release', '08'), review('reject_confirm', '09')]}]));
   rereleased.check(`${mode}/latest release wins`, 0, 0, {...range('04', '08'), mode});
-  rereleased.check(`${mode}/latest release leaves new confirmation`, 1, 0, {...range('09'), mode});
+  rereleased.check(`${mode}/latest release confirmation stays separate`, 0, 0, {...range('09'), mode});
 }
 
 console.log(JSON.stringify({ok: true, assertions, cases: assertions / 3,
   source: 'group-workbench/app.js',
   checks: ['real overview expressions and production helpers in VM',
-    'QC outcomes and rejection confirmation; per-case deduplication',
+    'ordinary QC excludes direct/legacy/confirmed rejections; per-case deduplication',
     'single/multi modes, group selection and permissions',
     'decision dates and Beijing midnight boundaries',
     'latest release, deleted tasks and immutable input histories',

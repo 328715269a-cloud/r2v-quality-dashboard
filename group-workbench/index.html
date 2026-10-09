@@ -96,7 +96,8 @@
             <button class="overview-metric overview-metric-active" type="button" data-action="overview-bucket" data-bucket="active" title="处理中 = 尚未闭环的全部任务 = 待领取 + 流转中。流转中 = 状态已被人员认领、仍在流程里的任务（含标注完成待质检、待返修、待验收等）。"><span>处理中</span><strong id="metricActive">—</strong><small>待领取 <b id="metricActiveUnclaimed">—</b> · 流转中 <b id="metricActiveInFlow">—</b></small></button>
           </div>
           <div class="overview-metrics overview-metrics-today" aria-label="当日作业情况">
-            <div class="overview-metric overview-metric-today-annotation" title="统计所选日期内每个任务的首次标注提交条数；返修提交不计入。范围跟随上方日期与小组筛选。"><span>标注完成</span><strong id="metricTodayAnnotation">—</strong><small id="metricTodayAnnotationHint">首次标完（条）</small></div>
+            <div class="overview-metric overview-metric-today-annotation" title="统计所选日期内每个任务的首次标注提交条数；返修提交和申请拒绝本身不计入。已经提交完成的任务，后续拒绝仍保留原完成记录。范围跟随上方日期与小组筛选。"><span>标注完成</span><strong id="metricTodayAnnotation">—</strong><small id="metricTodayAnnotationHint">首次标完（条）</small></div>
+            <div class="overview-metric overview-metric-today-rework overview-metric-annotation-reject" title="标注首次申请拒绝的任务数，按首次申请的北京时间日期统计；同一任务当天或跨天重复申请只计一次。申请被质检退回也保留本次申请记录，不等同于最终拒绝。管理员释放前的记录不计入。"><span>标注拒绝</span><strong id="metricAnnotationRejected">—</strong><small id="metricAnnotationRejectedHint">首次申请拒绝（条）· 跨天去重</small></div>
             <div class="overview-metric overview-metric-today-qc" title="统计所选日期内质检判定通过的任务条数（同一 TID 当天或跨天多次通过只算一条，按首次通过当天记账）；通过即流转验收，视为闭环。"><span>质检通过</span><strong id="metricTodayQcPass">—</strong><small id="metricTodayQcPassHint">通过并闭环（条）· TID 去重</small></div>
             <div class="overview-metric overview-metric-today-accept" title="统计所选日期内验收通过的任务条数，记在验收通过当天，按 TID 去重，与质检通过同口径；复验不重复计数。"><span>验收通过</span><strong id="metricTodayAccept">—</strong><small id="metricTodayAcceptHint">首验通过（条）</small></div>
             <div class="overview-metric overview-metric-today-rework" title="统计所选日期内有过返修提交的任务去重条数；一个 case 当天返修多次也只算一条（区别于日报「返修提交（次）」）。"><span>返修量</span><strong id="metricTodayRework">—</strong><small id="metricTodayReworkHint">返修任务（条）· 去重</small></div>
@@ -107,7 +108,8 @@
             <div class="overview-metric overview-metric-firstqc" title="所选日期内首检通过的 TID ÷ 所选日期内首检通过或打回的 TID，按首检发生日期统计。质检拒绝不计入，后续返修复检不改变首次结果。"><span>首次质检准确率</span><strong id="metricFirstQcAccuracy">—</strong><small id="metricFirstQcDetail">按首检日期 · 拒绝不计入</small></div>
             <button class="overview-metric overview-metric-today-rejected" type="button" data-action="overview-bucket" data-bucket="rejected" title="统计所选日期内被最终拒绝（质检拒绝 / 验收拒绝 / 标注拒绝确认废弃）的任务条数，按拒绝操作日期计入，可随上方日期筛选。点击查看已拒绝任务列表。"><span>已拒绝</span><strong id="metricRejected">—</strong><small id="metricRejectedHint">当日拒绝（条）</small></button>
             <div class="overview-metric overview-metric-firstqc" title="所选日期内首次验收通过的 TID ÷ 首次验收通过或不通过的 TID，按首次验收的北京时间统计。每个 TID 只取第一次，拒绝和后续复验不计入。"><span>首次验收准确率</span><strong id="metricAcceptanceAccuracy">—</strong><small id="metricAcceptanceAccuracyDetail">按首次验收日期 · 复验不计入</small></div>
-            <div class="overview-metric overview-metric-qc-volume" title="所选日期内质检处理过的 TID 数：通过、打回、直接拒绝、确认标注拒绝都算；按质检操作日期计入，同一 TID 只算一次。标注申请拒绝需质检确认后才计入，验收操作不计入。任务被管理员释放后此前的判定作废不计。"><span>质检量级</span><strong id="metricQcVolume">—</strong><small id="metricQcVolumeDetail">当日质检处理（条）· 去重</small></div>
+            <div class="overview-metric overview-metric-qc-volume" title="所选日期内质检普通通过或打回的任务数，同一任务在区间内只计一次；直接拒绝和确认标注拒绝单列，不计入本项。先做过普通质检、后来拒绝的任务，仍保留之前普通质检的记录。验收操作、管理员释放前的记录不计入。"><span>质检量级</span><strong id="metricQcVolume">—</strong><small id="metricQcVolumeDetail">质检处理（条）· 不含拒绝</small></div>
+            <div class="overview-metric overview-metric-today-rework overview-metric-qc-reject" title="质检直接拒绝或确认标注拒绝的任务数，按两种操作中首次发生的北京时间日期统计；同一任务当天或跨天只计一次。仅申请未确认、验收拒绝不计入。管理员释放前的记录不计入。"><span>质检拒绝</span><strong id="metricQcRejected">—</strong><small id="metricQcRejectedHint">首次质检拒绝（条）· 含确认拒绝</small></div>
             <div class="overview-metric overview-metric-acc-volume" title="所选日期内验收处理过的 case 数：通过、打回、拒绝都算，按判定发生日期计入，一条 case 只算一次；任务被管理员释放后此前的判定作废不计。"><span>验收量级</span><strong id="metricAcceptanceVolume">—</strong><small id="metricAcceptanceVolumeDetail">当日验收处理（条）· 去重</small></div>
           </div>
         </section>
@@ -326,6 +328,6 @@
   <script src="shared-store.20260923-prod37.js" defer></script>
   <script src="workflow.20260924-prod53-release.js" defer></script>
   <script src="reports.20261008-prod72-overview.js" defer></script>
-  <script src="app.20261008-prod72-overview.js" defer></script>
+  <script src="app.20261009-prod73-rejection-split.js" defer></script>
 </body>
 </html>
