@@ -1,0 +1,43 @@
+{
+  "version": "20261020-prod75",
+  "apiVersion": "20261020-prod74",
+  "status": "deployed",
+  "checkedAt": "2026-10-20T09:42:18.768Z",
+  "baseCommit": "37f3c06",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "scope": "Static-only patch: add direct unified batch return to pasted-TID Finder and selection toolbar.",
+  "behavior": {
+    "label": "整批退回，统一复查",
+    "flow": "acceptance_fail, acceptanceInspection=uninspected, shared acceptanceBatchId, per-task expectedUpdatedAt",
+    "quality": "No actual inspection result is inferred; first accuracy excludes these uninspected dispositions, including later reinspection. Existing actual results retain their meaning.",
+    "note": "Default fixed explanation; supplemental note optional, at most 1960 characters.",
+    "guards": "One group, fixed selected tasks, stale updates reject all and retain drafts; unknown/processed TIDs are reported by existing Finder validation."
+  },
+  "deployment": {
+    "existingServicesRestarted": false,
+    "forcedRefresh": false,
+    "databaseWrites": 0,
+    "apiCodeChanged": false,
+    "protectedFiles": 302,
+    "existingContainersUnchanged": 14,
+    "backupIndex": "/opt/r2v/backups/group-workbench/20261020-prod75-batch-return-entry-8215a9c8ca8d8f7f/index.html",
+    "rollback": "Restore backed-up index only. Keep prod74 API and all immutable assets."
+  },
+  "validation": {
+    "packagedBrowserChecks": 22,
+    "browserErrors": [],
+    "publicChecks": 19,
+    "publicFacts": {
+      "version": "20261020-prod75",
+      "option": "整批退回，统一复查",
+      "button": "整批退回，统一复查"
+    },
+    "filterScopeAtomicRegression": true,
+    "firstAcceptanceStatisticsRegression": true
+  },
+  "staticSha256": {
+    "index.html": "8215a9c8ca8d8f7f1ab0de416a1cbee9c66007e489dbc27b85a95636e1b4cc66",
+    "app.20261020-prod75-batch-return-entry.js": "7b243636cbe9400c12f15740badffdddbd5884c60470cdf8fe03dfc604f957e9",
+    "reports.20261020-prod74-acceptance-sampling.js": "76e296bf923357c7aec7a3bf6f02cef3f746ed11197ae30b6e2ef6097ee026d3"
+  }
+}
