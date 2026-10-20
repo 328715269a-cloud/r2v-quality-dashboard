@@ -35,7 +35,7 @@ const helpers = [
   'canViewAllGroups', 'canViewGroup', 'selectedGroup', 'inCurrentScope',
   'eventsForTask', 'liveEvents', 'taskSnapshot', 'taskWithSnapshot', 'taskIndex', 'allTasks',
   'overviewCacheForState', 'overviewMemo', 'overviewTasks', 'overviewReviewFacts',
-  'countFirstRejections', 'countRangeQcVolume', 'countRangeVolume', 'countRangeRejected',
+  'countFirstRejections', 'countRangeQcVolume', 'countRangeVolume', 'countRangeRejected', 'countRangeAcceptance',
   'renderTodayMetrics', 'countDayActors', 'pendingReworkSplit', 'countRangeReworkTasks'
 ].map(extract).join('\n');
 

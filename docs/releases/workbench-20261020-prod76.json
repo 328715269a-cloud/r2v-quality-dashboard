@@ -1,0 +1,52 @@
+{
+  "version": "20261020-prod76",
+  "apiVersion": "20261020-prod74",
+  "status": "deployed",
+  "baseCommit": "263bdab",
+  "checkedAt": "2026-10-20T11:08:13.268Z",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "scope": "Overview acceptance returns next to acceptance passes; both counters deduplicate TIDs across the selected date range.",
+  "behavior": {
+    "returnEvents": "acceptance_fail excluding isAcceptanceReject; includes inspected failures and follow-batch returns.",
+    "dates": "Beijing event dates, then Set<TID> over selected interval. A day counts that day; the multi-day union is not the sum of daily rows.",
+    "passCorrection": "Previous overview summed daily completedTIDs; now uses range-wide TID union, matching the group table.",
+    "independentMetrics": "A TID returned then passed may contribute once to each counter. These are flow activity counts, not disjoint current statuses.",
+    "boundaries": "Scope by mode, group and role; deleted tasks and pre-release events excluded; current projected TID handles corrections.",
+    "unchanged": "Accuracy, QC metrics, daily report rows/exports, workflow, API and task data unchanged.",
+    "cache": "Adds acceptance dates to existing bounded snapshot/identity/mode/group review-facts cache. Date changes reuse facts."
+  },
+  "deployment": {
+    "databaseWrites": 0,
+    "apiCodeChanged": false,
+    "existingServicesRestarted": false,
+    "forcedRefresh": false,
+    "protectedFiles": 303,
+    "containersUnchanged": 14,
+    "backupIndex": "/opt/r2v/backups/group-workbench/20261020-prod76-acceptance-return-metric-0885df9ede235ab0/index.html",
+    "rollback": "Restore saved index with candidate SHA guard. Preserve all immutable assets and API."
+  },
+  "validation": {
+    "offlineMetricChecks": 197,
+    "rejectionRegressionAssertions": 963,
+    "reportComparisons": 338,
+    "packagedBrowserChecks": 35,
+    "browserErrors": [],
+    "publicChecks": 19,
+    "publicFacts": {
+      "version": "20261020-prod76",
+      "label": "验收打回",
+      "previous": "metricTodayAccept"
+    },
+    "viewportWidths": [
+      1540,
+      1100,
+      760
+    ],
+    "acceptanceDraftPreserved": true
+  },
+  "staticSha256": {
+    "index.html": "0885df9ede235ab0db7a690ce51d071885381e691bce0124b7566396dcae40b8",
+    "app.20261020-prod76-acceptance-return-metric.js": "0f83e115063e3371b6febc51bf1f7696a74fcac5baeee66ea4646510466a0bb9",
+    "reports.20261020-prod74-acceptance-sampling.js": "76e296bf923357c7aec7a3bf6f02cef3f746ed11197ae30b6e2ef6097ee026d3"
+  }
+}

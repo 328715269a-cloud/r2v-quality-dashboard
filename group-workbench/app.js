@@ -1999,7 +1999,7 @@
   }
 
   function renderTodayMetrics(rows) {
-    const ids=['metricTodayAnnotation','metricAnnotationRejected','metricQcRejected','metricTodayQcPass','metricTodayAccept','metricTodayRework','metricTodayQcPending','metricTodayReworkPending','metricTodayAnnotators','metricTodayQcUsers','metricRejected'],hints=['metricTodayAnnotationHint','metricAnnotationRejectedHint','metricQcRejectedHint','metricTodayQcPassHint','metricTodayAcceptHint','metricTodayReworkHint','metricTodayQcPendingHint','metricTodayReworkPendingHint','metricTodayAnnotatorsHint','metricTodayQcUsersHint','metricRejectedHint'];
+    const ids=['metricTodayAnnotation','metricAnnotationRejected','metricQcRejected','metricTodayQcPass','metricTodayAccept','metricTodayAcceptReturn','metricTodayRework','metricTodayQcPending','metricTodayReworkPending','metricTodayAnnotators','metricTodayQcUsers','metricRejected'],hints=['metricTodayAnnotationHint','metricAnnotationRejectedHint','metricQcRejectedHint','metricTodayQcPassHint','metricTodayAcceptHint','metricTodayAcceptReturnHint','metricTodayReworkHint','metricTodayQcPendingHint','metricTodayReworkPendingHint','metricTodayAnnotatorsHint','metricTodayQcUsersHint','metricRejectedHint'];
     if(!rows){ids.forEach(id=>setText(id,'—'));hints.forEach(id=>setText(id,'请修正日期区间'));return;}
     const sum=(...keys)=>rows.reduce((total,row)=>total+keys.reduce((value,key)=>value+Number(row[key]||0),0),0);
     const dayWord=singleScopeDate()?'当日':'区间',pending=pendingReworkSplit();
@@ -2007,7 +2007,8 @@
     setText('metricAnnotationRejected',countFirstRejections('annotation'));
     setText('metricQcRejected',countFirstRejections('qc'));
     setText('metricTodayQcPass',sum('qcPassActions'));
-    setText('metricTodayAccept',sum('completedTIDs'));
+    setText('metricTodayAccept',countRangeAcceptance('pass'));
+    setText('metricTodayAcceptReturn',countRangeAcceptance('return'));
     setText('metricTodayRework',countRangeReworkTasks());
     setText('metricTodayQcPending',pending.qcPending);
     setText('metricTodayReworkPending',pending.reworkPending);
@@ -2018,7 +2019,8 @@
     setText('metricAnnotationRejectedHint',`${dayWord}首次申请拒绝（条）· 跨天去重`);
     setText('metricQcRejectedHint',`${dayWord}首次质检拒绝（条）· 含确认拒绝`);
     setText('metricTodayQcPassHint',`${dayWord}质检通过（条）· TID 去重`);
-    setText('metricTodayAcceptHint',`${dayWord}验收通过（条）· TID 去重`);
+    setText('metricTodayAcceptHint',`${dayWord}验收通过（条）· TID 跨天去重`);
+    setText('metricTodayAcceptReturnHint',`${dayWord}验收打回（条）· 含随批，跨天去重`);
     setText('metricTodayReworkHint',`${dayWord}返修任务（条）· 一个 case 一次`);
     setText('metricTodayQcPendingHint',`${dayWord}首交待质检（条）`);
     setText('metricTodayReworkPendingHint',`${dayWord}打回待返修（条）`);
@@ -2096,12 +2098,15 @@
       const history=window.WorkbenchFlow.effectiveEvents(liveEvents(task.id));
       const annotation=history.find(event=>event.type==='annotator_reject');
       const qc=history.find(event=>event.type==='reject_confirm'||window.WorkbenchFlow.isQcReject(event));
-      const qcDates=new Set();
+      const qcDates=new Set(),acceptancePassDates=new Set(),acceptanceReturnDates=new Set();
       for(const event of history){
-        if(event.type!=='qc_pass'&&(event.type!=='qc_fail'||window.WorkbenchFlow.isQcReject(event)))continue;
-        const date=acceptanceEventDate(event);if(date)qcDates.add(date);
+        if(!['qc_pass','qc_fail','acceptance_pass','acceptance_fail'].includes(event.type))continue;
+        const date=acceptanceEventDate(event);if(!date)continue;
+        if(event.type==='qc_pass'||event.type==='qc_fail'&&!window.WorkbenchFlow.isQcReject(event))qcDates.add(date);
+        if(event.type==='acceptance_pass')acceptancePassDates.add(date);
+        if(event.type==='acceptance_fail'&&!window.WorkbenchFlow.isAcceptanceReject(event))acceptanceReturnDates.add(date);
       }
-      return{taskId:task.id,annotationRejectionDate:annotation?acceptanceEventDate(annotation):'',qcRejectionDate:qc?acceptanceEventDate(qc):'',qcDates:Array.from(qcDates)};
+      return{taskId:task.id,tidKey:String(task.tid||task.id).trim()||task.id,annotationRejectionDate:annotation?acceptanceEventDate(annotation):'',qcRejectionDate:qc?acceptanceEventDate(qc):'',qcDates:Array.from(qcDates),acceptancePassDates:Array.from(acceptancePassDates),acceptanceReturnDates:Array.from(acceptanceReturnDates)};
     }));
   }
   function countFirstRejections(stage) {
@@ -2110,6 +2115,14 @@
   }
   function countRangeQcVolume() {
     return overviewReviewFacts().reduce((sum,item)=>sum+(item.qcDates.some(date=>inDateRange(date))?1:0),0);
+  }
+  // Filter event dates first, then deduplicate TIDs across the whole selected
+  // range. A TID may appear once in each metric if it was both returned and
+  // passed during that range; these are flow counts, not current-state buckets.
+  function countRangeAcceptance(stage) {
+    const field=stage==='return'?'acceptanceReturnDates':'acceptancePassDates',tids=new Set();
+    for(const item of overviewReviewFacts())if(item[field].some(date=>inDateRange(date)))tids.add(item.tidKey);
+    return tids.size;
   }
   // 验收量级：所选日期范围内该环节「处理过多少条 case」，通过、打回、拒绝都算，
   // 按判定发生日期计入，一条 case 只算一次（去重口径与其余区间指标一致）；
@@ -2278,6 +2291,6 @@
     try {state=await store.init();profile=store.profile();const retiredProfile=profile&&!validProfile(profile);initializeControls();initializeWorkflowControls();bindEvents();bindBulkEvents();bindModuleEvents();bindOverviewEvents();bindReassignEvents();if(profile&&!retiredProfile)enterApp();else{profile=null;showIdentity();if(retiredProfile)showToast('组别已更新，请选择当前作业类型与小组。');}}
     catch(error){$('appShell').classList.add('hidden');$('identityGate').classList.remove('hidden');const box=document.createElement('div');box.className='panel';const text=document.createElement('p');text.textContent='共享服务暂时无法连接，云端数据未清空。'+error.message;const button=document.createElement('button');button.type='button';button.className='btn primary';button.textContent='重试连接';button.addEventListener('click',()=>location.reload());box.append(text,button);$('identityGate').replaceChildren(box);}
   }
-  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20261020-prod75',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
+  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20261020-prod76',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
   init();
 })();
