@@ -38,6 +38,20 @@
   function isAcceptanceReject(event) { return !!event && (event.type === 'acceptance_reject' || event.type === 'acceptance_fail' && String(event.note || '').startsWith(ACCEPTANCE_REJECT_MARKER)); }
   function rejectReason(event, marker) { return String(event?.note || '').startsWith(marker) ? String(event.note).slice(marker.length).trim() : String(event?.note || '').trim(); }
 
+  // A batch disposition is independent from what the reviewer actually checked.
+  // Missing fields keep the historical pass/fail meaning for existing records
+  // and already-open clients; the number of selected tasks is never evidence.
+  function acceptanceInspection(event) {
+    if (!event || isAcceptanceReject(event) || !['acceptance_pass', 'acceptance_fail'].includes(event.type)) return '';
+    if (Object.hasOwn(event, 'acceptanceInspection')) return ['pass', 'fail', 'uninspected'].includes(event.acceptanceInspection) ? event.acceptanceInspection : '';
+    return event.type === 'acceptance_pass' ? 'pass' : 'fail';
+  }
+
+  function acceptanceFlowAction(event) {
+    if (isAcceptanceReject(event)) return 'reject';
+    return event?.type === 'acceptance_pass' ? 'pass' : event?.type === 'acceptance_fail' ? 'return' : '';
+  }
+
   function isReworkAssignment(event) {
     return !!event && event.type === 'claim' && event.assignmentKind === 'rework_transfer';
   }
@@ -64,6 +78,8 @@
       rejectionReturnReason: '', rejectionReturnedBy: '', rejectionReturnedAt: '',
       finalRejectStage: '', finalRejectReason: '', finalRejectedBy: '', finalRejectedAt: '',
       acceptanceNote: '', acceptanceReviewedBy: '', acceptanceReviewedAt: '',
+      acceptanceInspection: '', acceptanceInspectionRound: 0, acceptanceInspectionBy: '', acceptanceInspectionAt: '', acceptanceInspectionExplicit: false,
+      acceptanceFlowAction: '', acceptanceBatchId: '',
       acceptanceRoute: '', acceptanceRouteNote: '', acceptanceRoutedBy: '', acceptanceRoutedAt: '',
       qcRepairNote: '', qcRepairedBy: '', qcRepairedAt: '',
       reassignedBy: '', reassignedAt: '', reassignReason: '', reassignRole: '',
@@ -223,6 +239,18 @@
           lastAcceptanceReviewRound = s.acceptanceRound;
           s.acceptanceNote = event.note || ''; s.acceptanceReviewedBy = event.actor || '';
           s.acceptanceReviewedAt = event.at || '';
+          {
+            const inspection = acceptanceInspection(event);
+            const preserve = inspection === 'uninspected' && s.acceptanceInspectionRound === s.acceptanceRound && ['pass', 'fail'].includes(s.acceptanceInspection);
+            if (!preserve) {
+              s.acceptanceInspection = inspection; s.acceptanceInspectionRound = s.acceptanceRound;
+              s.acceptanceInspectionExplicit = Object.hasOwn(event, 'acceptanceInspection');
+              s.acceptanceInspectionBy = inspection && inspection !== 'uninspected' ? event.actor || '' : '';
+              s.acceptanceInspectionAt = inspection && inspection !== 'uninspected' ? event.at || '' : '';
+            }
+            s.acceptanceFlowAction = acceptanceFlowAction(event);
+            s.acceptanceBatchId = event.acceptanceBatchId || '';
+          }
           if (event.type === 'acceptance_pass') s.status = 'accepted';
           else if (isAcceptanceReject(event)) {
             s.status = 'rejected'; s.finalRejectStage = 'acceptance'; s.finalRejectReason = rejectReason(event, ACCEPTANCE_REJECT_MARKER);
@@ -282,6 +310,9 @@
           s.rejectionReturnReason = ''; s.rejectionReturnedBy = ''; s.rejectionReturnedAt = '';
           s.finalRejectStage = ''; s.finalRejectReason = ''; s.finalRejectedBy = ''; s.finalRejectedAt = '';
           s.acceptanceNote = ''; s.acceptanceReviewedBy = ''; s.acceptanceReviewedAt = '';
+          s.acceptanceInspection = ''; s.acceptanceInspectionRound = 0; s.acceptanceInspectionBy = ''; s.acceptanceInspectionAt = '';
+          s.acceptanceInspectionExplicit = false;
+          s.acceptanceFlowAction = ''; s.acceptanceBatchId = '';
           s.acceptanceRoute = ''; s.acceptanceRouteNote = ''; s.acceptanceRoutedBy = ''; s.acceptanceRoutedAt = '';
           s.qcRepairNote = ''; s.qcRepairedBy = ''; s.qcRepairedAt = '';
           s.reassignedBy = ''; s.reassignedAt = ''; s.reassignReason = ''; s.reassignRole = '';
@@ -332,6 +363,14 @@
     if (!task) return '未知状态';
     if (task.deleted || task.status === 'deleted') return '已删除';
     if (task.status === 'rejected') return task.finalRejectStage === 'acceptance' ? '验收拒绝·已废弃' : task.finalRejectStage === 'qc' ? '质检拒绝·已废弃' : '标注拒绝·质检确认';
+    if (task.acceptanceInspectionExplicit && ['accepted', 'acceptance_return_pending', 'acceptance_rework', 'qc_self_rework'].includes(task.status)) {
+      const inspection = { pass: '实检合格', fail: '实检不合格', uninspected: '未实检' }[task.acceptanceInspection];
+      const batchReturn = task.acceptanceBatchId && task.acceptanceInspection !== 'fail';
+      const action = task.status === 'accepted' ? (task.acceptanceInspection === 'uninspected' ? '随批放行' : '验收通过')
+        : task.status === 'acceptance_return_pending' ? (batchReturn ? '随批退回' : '退回质检')
+        : `${batchReturn ? '随批退回 · ' : ''}${task.status === 'acceptance_rework' ? '待标注返修' : '质检自行返修'}`;
+      if (inspection) return `${inspection} · ${action}`;
+    }
     if (['pending_qc', 'pending_reqc'].includes(task.status)) {
       const round = positiveRound(task.qcRound) || (task.status === 'pending_qc' ? 1 : 2);
       return round === 1 ? '待一次质检' : round === 2 ? '待二次质检' : `待第 ${round} 次质检`;
@@ -369,5 +408,5 @@
     return false;
   }
 
-  return Object.freeze({ STATUS_META, project, label, counts, canBuild, isReworkAssignment, isQcReject, isAcceptanceReject, eventConflicts, effectiveEvents });
+  return Object.freeze({ STATUS_META, project, label, counts, canBuild, isReworkAssignment, isQcReject, isAcceptanceReject, acceptanceInspection, acceptanceFlowAction, eventConflicts, effectiveEvents });
 }));

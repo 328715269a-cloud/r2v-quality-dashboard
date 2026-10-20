@@ -66,7 +66,8 @@
         if(event.note)parts.push(event.note);return parts.join(' · ')||'已记录';
       };
       progress('正在生成所选报表…');
-      const reportInput = {state:source,tasks,auditTasks,groups:reportGroups,mode:scope.mode,statusMeta,groupLabel,eventLabel,eventDetail,localDate};
+      const reportInput = {state:source,tasks,auditTasks,groups:reportGroups,mode:scope.mode,statusMeta,groupLabel,eventLabel,eventDetail,localDate,
+        ...(scope.range === 'scope' ? {dateFrom:scope.dateFrom || '',dateTo:scope.dateTo || ''} : {})};
       const columns = definitions => definitions.map(([key,label]) => ({key,label}));
       let report;
       if (kind === 'acceptancePending') {
@@ -89,19 +90,26 @@
         const detail = Reports.build({...reportInput,localDate:beijingDate,kind:'events'}).events;
         const rawTasks = new Map(source.tasks.map(task => [task.id,task])), currentTasks = new Map(auditTasks.map(task => [task.id,task]));
         const rawEvents = new Map((source.events || []).map(event => [event.id,event]));
+        const firstDecisions = new Map(auditTasks.map(task => [task.id,Reports.annotationContributors(histories.get(task.id) || []).firstAcceptanceDecision]));
         const positions = new Map();
         for (const [taskId,events] of histories) positions.set(taskId,new Map(events.map((event,index) => [event.id,index])));
         const rows = detail.rows.filter(row => ['acceptance_pass','acceptance_fail','acceptance_reject'].includes(row.type) && !row.excludedFromProgress).map(row => {
           const event = rawEvents.get(row.eventId), raw = rawTasks.get(row.taskId), current = currentTasks.get(row.taskId);
           const atDecision = Flow.project(raw,(histories.get(row.taskId) || []).slice(0,positions.get(row.taskId).get(row.eventId) + 1));
+          const assessment = Reports.acceptanceAssessment(event, firstDecisions.get(row.taskId));
           return {tid:event.tidAtEvent ?? atDecision.tid ?? raw.tid,movie:event.movieAtEvent ?? atDecision.movie ?? raw.movie,
             group:row.group,mode:row.mode,assignee:atDecision.assignee || '',actor:row.actor,
             result:Flow.isAcceptanceReject(event)?'拒绝':event.type === 'acceptance_pass'?'通过':'不通过',acceptanceRound:atDecision.acceptanceRound,
+            inspection:assessment.inspectionLabel,disposition:assessment.flowLabel,
+            firstAcceptanceIncluded:!current.deleted && assessment.included ? '是' : '否',
+            firstAcceptanceReason:current.deleted ? '任务已删除，保留历史' : assessment.reason,
+            acceptanceBatchId:assessment.acceptanceBatchId,
             note:row.note,date:beijingDate(event.at),at:beijingTime(event.at),statusLabel:Flow.label(current),eventId:row.eventId};
         });
         report = {columns:columns([
           ['tid','TID'],['movie','影片 / 包'],['group','小组'],['mode','类型'],['assignee','验收时标注人'],['actor','验收人'],
           ['result','验收结果'],['acceptanceRound','验收轮次'],['note','验收说明'],['date','验收日期（北京时间）'],['at','验收时间（北京时间）'],
+          ['inspection','实际检查结果'],['disposition','任务处置方式'],['firstAcceptanceIncluded','是否计入首次验收准确率'],['firstAcceptanceReason','首验计入口径'],['acceptanceBatchId','验收批次ID'],
           ['statusLabel','当前最新状态'],['eventId','事件ID']
         ]),rows};
       } else {
@@ -111,9 +119,44 @@
           const summaryColumns = new Map([...reports.groups.columns, ...reports.movies.columns].map(column => [column.key, column]));
           report = {columns:[{key:'scope',label:'汇总层级'}, ...summaryColumns.values()],rows:[...reports.groups.rows.map(row=>({...row,scope:'小组'})),...reports.movies.rows.map(row=>({...row,scope:'影片'}))]};
         }
+        if (kind === 'tasks') {
+          // Keep the production prod69 task export contract while adding the
+          // explicit acceptance quality fields. All latest state stays intact.
+          const liveOf = taskId => {
+            const events = histories.get(taskId) || [];
+            for (let index = events.length - 1; index >= 0; index--) if (events[index].type === 'admin_release') return events.slice(index + 1);
+            return events;
+          };
+          const firstQcText = taskId => {
+            const qc = Flow.effectiveEvents(liveOf(taskId)).find(event => ['qc_pass','qc_fail','qc_reject'].includes(event.type));
+            if (!qc) return '暂无';
+            if (qc.type === 'qc_pass') return '通过';
+            if (Flow.isQcReject(qc)) return '拒绝';
+            return qc.pLevel || '打回';
+          };
+          const operatorText = taskId => Reports.qcOperator(liveOf(taskId)).name || '暂无';
+          report = {
+            columns: columns([
+              ['tid','TID'],['movie','影片 / 包'],['group','小组'],['mode','类型'],['assignee','标注人'],['qcOperator','组长 / 质检操作人'],
+              ['rounds','轮次'],['statusLabel','当前状态'],['firstQc','首次质检'],['lastUpdated','最后更新（北京时间）'],
+              ['firstAcceptanceInspection','首轮验收实际检查结果'],['firstAcceptanceDisposition','首轮验收任务处置'],
+              ['firstAcceptanceIncluded','是否计入首次验收准确率'],['firstAcceptanceReason','首验计入口径'],
+              ['firstAcceptanceAt','首轮验收时间（北京时间）'],['firstAcceptanceBatchId','首轮验收批次ID']
+            ]),
+            rows: report.rows.map(row => ({
+              tid: row.tid, movie: row.movie, group: row.group, mode: row.mode,
+              assignee: row.assignee || '未认领', qcOperator: operatorText(row.taskId),
+              rounds: `质检 ${row.qcRound || 0} / 验收 ${row.acceptanceRound || 0}`,
+              statusLabel: row.statusLabel, firstQc: firstQcText(row.taskId), lastUpdated: beijingTime(row.lastUpdated),
+              firstAcceptanceInspection:row.firstAcceptanceInspection,firstAcceptanceDisposition:row.firstAcceptanceDisposition,
+              firstAcceptanceIncluded:row.firstAcceptanceIncluded ? '是' : '否',firstAcceptanceReason:row.firstAcceptanceReason,
+              firstAcceptanceAt:beijingTime(row.firstAcceptanceAt),firstAcceptanceBatchId:row.firstAcceptanceBatchId
+            }))
+          };
+        }
       }
       if (!report) throw new Error('未找到此导出类型。');
-      if (scope.range === 'scope' && kind !== 'acceptancePending') {
+      if (scope.range === 'scope' && !['acceptancePending','groups','movies','summary'].includes(kind)) {
         if (scope.dateFrom && scope.dateTo && scope.dateFrom > scope.dateTo) throw new Error('请修正日期区间后再导出。');
         report = {...report, rows:report.rows.filter(row => {const date=String(row.date);return !!date&&(!scope.dateFrom||date>=scope.dateFrom)&&(!scope.dateTo||date<=scope.dateTo);})};
       }

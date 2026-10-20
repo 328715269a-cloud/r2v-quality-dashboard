@@ -1,0 +1,78 @@
+{
+  "version": "20261020-prod74",
+  "status": "deployed",
+  "checkedAt": "2026-10-20T08:59:40.838Z",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "baseCommit": "e34e9a9",
+  "baselineFrontend": "20261009-prod73",
+  "baselineApi": "prod63",
+  "behavior": {
+    "actualInspection": "acceptanceInspection = pass | fail | uninspected",
+    "flow": "Retains acceptance_pass / acceptance_fail; acceptanceBatchId links fixed selected tasks.",
+    "firstAccuracy": "Only the first effective acceptance decision is eligible; new explicit events additionally require acceptanceRound=1 and an actual pass/fail inspection. A first-round uninspected disposition excludes later reinspection from first accuracy.",
+    "history": "Unmarked historical records and old clients retain their original statistical meaning. No historical reclassification or production business writes.",
+    "example": "100 selected, 10 inspected, 8 pass and 2 fail: return all 100 with first actual inspection accuracy 8/10=80%; 90 uninspected never enter that denominator.",
+    "followPass": "Actually failed TIDs still return; inspected pass and uninspected remainder are released.",
+    "selection": "One group per sampling panel, frozen IDs and expectedUpdatedAt, all-or-none transaction, new arrivals excluded; preview capped at 50 plus full CSV."
+  },
+  "api": {
+    "container": "r2v-group-workbench-api-prod74",
+    "port": 3021,
+    "previousContainerRetained": "r2v-group-workbench-api-prod63",
+    "previousPort": 3020,
+    "codeDirectory": "/home/deploy/releases/group-workbench-api-prod74/api",
+    "database": "/opt/r2v/group-workbench-data/workbench.sqlite",
+    "runtime": "v22.23.2",
+    "sharedSessions": true,
+    "schemaMigrated": false,
+    "backgroundBackup": "delegated to existing prod1 owner"
+  },
+  "deployment": {
+    "backup": "/opt/r2v/backups/group-workbench/20261020-prod74-acceptance-sampling",
+    "protectedFiles": 299,
+    "existingContainersRetained": 13,
+    "nginxMasterRetained": true,
+    "oldNginxWorkersDrained": true,
+    "oldApiConnectionsAfterDrain": 0,
+    "existingServicesRestarted": false,
+    "forcedRefresh": false,
+    "productionBusinessWrites": 0,
+    "note": "First immediate post-reload health still reached a draining old worker; activation stopped before frontend publication. A subsequent check confirmed capability and complete drain, then the new index was activated.",
+    "rollback": "Only restore the prior static index while retaining a field-aware API; never route new marked submissions back to prod63."
+  },
+  "validation": {
+    "realBrowserPackagedChecks": 29,
+    "publicResourceChecks": 20,
+    "publicBrowserVersion": "20261020-prod74",
+    "publicBrowserErrors": [],
+    "sameProductionImageSyntheticWalChecks": 10,
+    "statisticsUiAssertions": 141,
+    "oldReportFieldComparisons": 338,
+    "errorTidChecks": 64,
+    "workerCsvComparisons": 54,
+    "workerStressTasks": 12000,
+    "baselineFailures": "Five legacy API tests reference removed QC packaging/admin_reassign or an old Demo/workflow byte comparison. Reproduced on untouched prod63; not product regressions. Two legacy pagination/toggle harnesses omit an already-existing helper; retained unchanged.",
+    "scope": "Synthetic data only for writes; production verification uses unauthenticated GET/health and protected-file/runtime checks."
+  },
+  "staticSha256": {
+    "acceptance-sampling.20261020-prod74.css": "ca613dd96210538f7cadb5255a981a4f27a9767eea520cbf8774fa6bf1c0e17d",
+    "app.20261020-prod74-acceptance-sampling.js": "63e8b1af098bf7c4723e91f10bff31ebdb392bf7d263db1ee3f227f3459cdb9c",
+    "export-worker.20261020-prod74-acceptance-sampling.js": "4cfc638ec5d3027bc9f8e6597b861400b1344be10e58935114e5d55cbfd53c2c",
+    "index.html": "b89f414e1545b30323c9073205b159cc6f845bb5bd8adcc6441a6b95c8aa5554",
+    "reports.20261020-prod74-acceptance-sampling.js": "76e296bf923357c7aec7a3bf6f02cef3f746ed11197ae30b6e2ef6097ee026d3",
+    "workflow.20261020-prod74-acceptance-sampling.js": "e79b50b37b802e90edec52136b9bb1a6c29154d2155247b646ba38ceaa4219f1"
+  },
+  "apiCodeSha256": {
+    "workbench-api/server.cjs": "c33691a61e75b77569d87aef9f3905b96a3cdadc178312d129c772696f181c4a",
+    "workbench-api/rules.cjs": "f6491dc4996d3a81d7412c6c4260c555032cd679d4c78f133d31309ae73ad109",
+    "workbench-api/record-index.cjs": "8d38db075f3f5075b58dcb46fb9301d3823d5e54b69cf1d304460cde324d33a0",
+    "group-workbench/workflow.js": "e79b50b37b802e90edec52136b9bb1a6c29154d2155247b646ba38ceaa4219f1"
+  },
+  "evidenceDirectory": "outputs/acceptance-sampling-20261020",
+  "commands": [
+    "node workbench-api/verify-acceptance-inspection.cjs --legacy-root <retained-prod63-source>",
+    "node scripts/verify-acceptance-sampling-reports.cjs",
+    "node scripts/verify-acceptance-accuracy-ui.cjs",
+    "SAMPLING_TEST_PACKAGED=1 node scripts/verify-acceptance-sampling-browser.cjs"
+  ]
+}

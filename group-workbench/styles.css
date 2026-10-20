@@ -4075,7 +4075,21 @@ body[data-active-view="overview"] .demo-dot { background: oklch(62% 0.019 255); 
 .overview-metric-today-annotation > strong { color: var(--tone-neutral); }
 .overview-metric-today-qc > strong { color: var(--tone-success); }
 .overview-metric-today-rework > strong { color: var(--tone-danger); }
+/* Acceptance sampling keeps the familiar inline workbench and a fixed member list. */
+.acceptance-sample-form { padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.acceptance-sample-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.acceptance-sample-heading h3 { margin: 0 0 4px; }
+.acceptance-sample-heading p,.acceptance-sample-hint { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.acceptance-sample-inputs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+.acceptance-sample-inputs textarea { font-family: ui-monospace,Consolas,monospace; }
+.acceptance-sample-members summary { cursor: pointer; font-size: 12px; padding: 8px 0; }
+.acceptance-sample-members .table-wrap { max-height: 240px; overflow: auto; }
+.acceptance-sample-preview { padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-alt); font-size: 13px; line-height: 1.7; }
+.acceptance-sample-preview.is-error { color: var(--tone-danger); }
+.acceptance-sample-form textarea:focus-visible,.acceptance-sample-form input:focus-visible,.acceptance-sample-members summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 @media (max-width: 640px) {
+  .acceptance-sample-inputs { grid-template-columns: minmax(0,1fr); }
+  .acceptance-sample-heading { flex-direction: column; gap: 8px; }
   .overview-metrics-today { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .overview-metrics-today .overview-metric { grid-column: span 1; padding: 3px 9px 9px; }
   .overview-metrics-today .overview-metric > strong { font-size: 22px; }

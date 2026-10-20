@@ -4,6 +4,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const {Worker}=require('node:worker_threads');
 const Flow=require('../group-workbench/workflow.js'),Reports=require('../group-workbench/reports.js'),IO=require('../group-workbench/data-io.js');
 const {createExporter}=require('../group-workbench/export-worker.js');
+const productionTaskExporter=require('../group-workbench/export-worker.20260924-prod69-tasks-cols.js').createExporter(Flow,Reports,IO);
 const directory=path.join(__dirname,'../group-workbench'),app=fs.readFileSync(path.join(directory,'app.js'),'utf8');
 const groups=[{id:'g01',name:'单镜头1组',defaultMode:'single',members:[]},{id:'g02',name:'单镜头2组',defaultMode:'single',members:[]},{id:'g06',name:'多镜头1组',defaultMode:'multi',members:[]}];
 function extract(name){const lines=app.split(/\r?\n/),start=lines.findIndex(line=>new RegExp(`^  (?:async )?function ${name}\\(`).test(line));assert(start>=0,name);if(lines[start].trimEnd().endsWith('}'))return lines[start];const end=lines.findIndex((line,i)=>i>start&&/^  }\s*$/.test(line));assert(end>start,name);return lines.slice(start,end+1).join('\n');}
@@ -23,15 +24,28 @@ state.batches.push({id:'package-a',kind:'handoff',stage:'qc',mode:'single',group
 state.events.push({id:'package-claim',taskId:'a',type:'package_claimed',packageId:'package-a',stage:'qc',at:'2026-09-21T02:00:00Z',actor:'包质检'});
 const statusMeta=Flow.STATUS_META,exporter=createExporter(Flow,Reports,IO),original=JSON.stringify(state);
 const request=(kind,scope={})=>({kind,groups,statusMeta,eventLabels:helpers.eventLabels,scope:{profile:{role:'admin',name:'管理员'},mode:'single',groupId:'all',range:'all',dateFrom:'',dateTo:'',...scope}});
-function reference(req){const canView=id=>['admin','acceptance'].includes(req.scope.profile.role)||id===req.scope.profile.groupId;const auditTasks=state.tasks.filter(task=>canView(task.groupId)&&task.mode===req.scope.mode&&(req.scope.groupId==='all'||task.groupId===req.scope.groupId)).map(task=>({...task,...Flow.project(task,state.events.filter(event=>event.taskId===task.id))}));const tasks=auditTasks.filter(task=>!task.deleted).map(task=>({...task,statusLabel:Flow.label(task)}));return Reports.build({state,tasks,auditTasks,groups:groups.filter(group=>canView(group.id)&&group.defaultMode===req.scope.mode&&(req.scope.groupId==='all'||group.id===req.scope.groupId)),mode:req.scope.mode,statusMeta,...helpers,localDate:date});}
-function chosen(reports,kind,scope){let report=reports[kind];if(kind==='summary'){const columns=new Map([...reports.groups.columns,...reports.movies.columns].map(column=>[column.key,column]));report={columns:[{key:'scope',label:'汇总层级'},...columns.values()],rows:[...reports.groups.rows.map(row=>({...row,scope:'小组'})),...reports.movies.rows.map(row=>({...row,scope:'影片'}))]};}if(scope.range==='scope')report={...report,rows:report.rows.filter(row=>{const d=String(row.date);return !!d&&(!scope.dateFrom||d>=scope.dateFrom)&&(!scope.dateTo||d<=scope.dateTo);})};return report;}
+function reference(req){const canView=id=>['admin','acceptance'].includes(req.scope.profile.role)||id===req.scope.profile.groupId;const auditTasks=state.tasks.filter(task=>canView(task.groupId)&&task.mode===req.scope.mode&&(req.scope.groupId==='all'||task.groupId===req.scope.groupId)).map(task=>({...task,...Flow.project(task,state.events.filter(event=>event.taskId===task.id))}));const tasks=auditTasks.filter(task=>!task.deleted).map(task=>({...task,statusLabel:Flow.label(task)}));return Reports.build({state,tasks,auditTasks,groups:groups.filter(group=>canView(group.id)&&group.defaultMode===req.scope.mode&&(req.scope.groupId==='all'||group.id===req.scope.groupId)),mode:req.scope.mode,statusMeta,...helpers,localDate:date,...(req.scope.range==='scope'?{dateFrom:req.scope.dateFrom,dateTo:req.scope.dateTo}:{})});}
+function chosen(reports,kind,scope){let report=reports[kind];if(kind==='summary'){const columns=new Map([...reports.groups.columns,...reports.movies.columns].map(column=>[column.key,column]));report={columns:[{key:'scope',label:'汇总层级'},...columns.values()],rows:[...reports.groups.rows.map(row=>({...row,scope:'小组'})),...reports.movies.rows.map(row=>({...row,scope:'影片'}))]};}if(scope.range==='scope'&&!['groups','movies','summary'].includes(kind))report={...report,rows:report.rows.filter(row=>{const d=String(row.date);return !!d&&(!scope.dateFrom||d>=scope.dateFrom)&&(!scope.dateTo||d<=scope.dateTo);})};return report;}
 
 async function main(){
  let comparisons=0;
  for(const scope of [{},{groupId:'g01'},{mode:'multi'},{profile:{role:'qc',groupId:'g02',name:'组长'}},{range:'scope',dateFrom:'2026-09-21',dateTo:'2026-09-21'},{range:'scope',dateFrom:'2030-01-01',dateTo:'2030-01-02'}]){
   for(const kind of ['imports','tasks','events','packages','movies','groups','daily','personDaily','summary']){
    const req=request(kind,scope),reports=reference(req),expected=chosen(reports,kind,req.scope),actual=exporter.generate(req,state);
-   assert.equal(Buffer.from(await actual.blob.arrayBuffer()).toString('utf8'),IO.csv(expected.columns,expected.rows),`${kind} export bytes and field order`);assert.equal(actual.rowCount,expected.rows.length);comparisons++;
+   if(kind==='tasks'){
+    // The served prod69 worker already customized tasks to ten UI columns.
+    // Compare those exact production values, then allow only the six new
+    // acceptance audit columns exercised by verify-acceptance-sampling-reports.
+    const prior=productionTaskExporter.generate(req,state);
+    const oldRows=IO.parseTable(await prior.blob.text()).records.map(row=>row.cells);
+    const newRows=IO.parseTable(await actual.blob.text()).records.map(row=>row.cells);
+    assert.deepEqual(newRows.map(row=>row.slice(0,10)),oldRows,'all existing prod69 task export values and order');
+    assert.deepEqual(newRows[0].slice(10),['首轮验收实际检查结果','首轮验收任务处置','是否计入首次验收准确率','首验计入口径','首轮验收时间（北京时间）','首轮验收批次ID']);
+    assert.equal(actual.rowCount,prior.rowCount);
+   }else{
+    assert.equal(Buffer.from(await actual.blob.arrayBuffer()).toString('utf8'),IO.csv(expected.columns,expected.rows),`${kind} export bytes and field order`);assert.equal(actual.rowCount,expected.rows.length);
+   }
+   comparisons++;
   }
  }
  const backup={format:'r2v-workbench-shared-backup',version:1,exportedAt:'2026-09-23T00:00:00Z',revision:42,state,transactions:[{id:'tx1',revision:42,profile:{role:'admin'},result:{events:['ev-1']}}]};
@@ -43,7 +57,7 @@ async function main(){
  const projected=state.tasks.map(task=>({...task,...Flow.project(task,state.events.filter(event=>event.taskId===task.id))}));
  const input={state,tasks:projected.filter(task=>!task.deleted),auditTasks:projected,groups,statusMeta,...helpers,localDate:date};
  const full=Reports.build(input);
- for(const kind of Object.keys(full)){const single=Reports.build({...input,kind});assert.deepEqual(Object.keys(single),[kind]);assert.deepEqual(single[kind],full[kind],kind+' optional build retains legacy output');}
+ for(const kind of Object.keys(full)){const single=Reports.build({...input,kind});assert.deepEqual(Object.keys(single),kind==='closure'?['closure']:[kind,'closure']);assert.deepEqual(single[kind],full[kind],kind+' optional build retains legacy output');}
  const cyclic={id:'unused',tid:'unused',groupId:'g01',mode:'single',movie:'懒构建',status:'unclaimed'};cyclic.extra=cyclic;
  assert.doesNotThrow(()=>Reports.build({state:{tasks:[cyclic],events:[],batches:[]},tasks:[cyclic],groups,statusMeta,kind:'movies'}),'selected summary must not serialize unused task timelines');
  await testMainFlow();

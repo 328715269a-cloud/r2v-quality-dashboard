@@ -13,7 +13,7 @@ function setup(){
   state.tasks.forEach((task,index)=>{for(let round=1;round<specs[index].round;round++)for(const [step,type]of ['acceptance_fail','acceptance_route','qc_repair_done'].entries())state.events.push({id:`${task.id}-round-${round}-${type}`,taskId:task.id,type,route:'qc',workflowVersion:3,acceptanceRound:round,at:new Date(Date.UTC(2026,8,22,2,round,step)).toISOString(),actor:'测试验收',actorRole:type==='acceptance_fail'?'acceptance':'qc',note:'前轮处理'});});
   const h=harness(state),c=h.c;c.profile={name:'测试验收',role:'acceptance',groupId:'g01',mode:'single'};
   c.document.addEventListener=()=>{};Object.assign(c,{completeAnnotationBulk(){},showBulkQcFail(){},showBulkQcReject(){},dirtyForms:new Set(),acceptanceSingleDrafts:new Map(),refreshState:()=>true,refreshBatchSource:async()=>{}});
-  vm.runInContext(['bindBulkEvents','showBulkAcceptanceDecision','saveBulkAcceptanceFail'].map(extract).join('\n'),c);c.bindBulkEvents();
+  vm.runInContext(['bindBulkEvents','showBulkAcceptanceDecision','saveBulkAcceptanceFail','showAcceptanceSampleBatch'].map(extract).join('\n'),c);c.bindBulkEvents();
   return {...h,specs};
 }
 function renderedIds(c){return c.listModel('acceptanceTask').rows.map(task=>task.id).sort();}

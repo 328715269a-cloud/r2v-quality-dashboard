@@ -26,7 +26,8 @@ function browserFunction(name) {
 const helpers = [
   'escapeHtml', 'emptyRow', 'localDateString', 'eventDate', 'selectedRange', 'validScopeRange',
   'singleScopeDate', 'scopeRangeLabel', 'inDateRange', 'canViewAllGroups', 'canViewGroup',
-  'selectedGroup', 'inCurrentScope', 'eventsForTask', 'taskSnapshot', 'taskWithSnapshot',
+  'selectedGroup', 'inCurrentScope', 'eventsForTask', 'liveEvents', 'taskSnapshot', 'taskWithSnapshot',
+  'overviewCacheForState', 'overviewMemo', 'overviewTasks', 'overviewContributions',
   'taskIndex', 'allTasks', 'firstQcAccuracy', 'acceptanceEventDate', 'acceptanceAccuracy', 'renderPersonStats'
 ];
 const overviewSource = browserFunction('renderOverview');
@@ -36,8 +37,13 @@ const makeHarness = new Function('Reports', 'Flow', 'fixture', `
   const window = {WorkbenchReports: Reports, WorkbenchFlow: Flow};
   let state = fixture, activeMode = 'single', profile = {role:'admin'};
   const eventIndexes = new WeakMap(), snapshotCache = new WeakMap();
+  let overviewComputationCache={source:null,identity:'',values:new Map(),contributions:new Map()};
+  let personErrorDetail=null,personErrorIndex=null;
+  const personErrorScopeKey=()=>JSON.stringify([activeMode,selectedGroup(),selectedRange()]);
+  const closePersonErrorDetail=()=>{personErrorDetail=null;};
+  const addPersonErrorEntry=()=>{},renderPersonErrorDetail=()=>{};
   const controls = {scopeDateFrom:{value:''},scopeDateTo:{value:''},scopeGroup:{value:'g01'},personStatsBody:{innerHTML:''}};
-  const rendered = {}, counts = Flow.counts, countRangeRejected = () => 0;
+  const rendered = {}, counts = Flow.counts, countRangeRejected = () => 0, countRangeQcVolume=()=>0, countRangeVolume=()=>0;
   const groupLabel = id => id;
   const setText = (id,value) => {rendered[id] = value;};
   const $ = id => controls[id];
@@ -52,8 +58,9 @@ const makeHarness = new Function('Reports', 'Flow', 'fixture', `
     selectDates({dateFrom='',dateTo=''}) {controls.scopeDateFrom.value=dateFrom;controls.scopeDateTo.value=dateTo;},
     switchModule(mode,groupId='all') {activeMode=mode;controls.scopeGroup.value=groupId;},
     tasks() {return allTasks().filter(task=>inCurrentScope(task,false));},
-    metric(range) {return acceptanceAccuracy(this.tasks(),range);},
-    taskMetric(id,range) {return acceptanceAccuracy(this.tasks().filter(task=>task.id===id),range);},
+    metric(range) {const {rows,...metric}=acceptanceAccuracy(this.tasks(),range);return metric;},
+    taskMetric(id,range) {const {rows,...metric}=acceptanceAccuracy(this.tasks().filter(task=>task.id===id),range);return metric;},
+    rows(range) {return acceptanceAccuracy(this.tasks(),range).rows;},
     render() {renderOverview();renderPersonStats();return {value:rendered.metricAcceptanceAccuracy,detail:rendered.metricAcceptanceAccuracyDetail,people:controls.personStatsBody.innerHTML};},
     acceptanceEventDate
   };
@@ -100,9 +107,9 @@ function check(label,actual,wanted) {assert.deepEqual(actual,wanted,label);cases
 function people(markup) {
   return [...markup.matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map(match=>{
     const cells=[...match[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)].map(cell=>cell[1]);
-    if(cells.length!==13)return {empty:true,cells};
-    const decision=/首验 (\d+) 条 · 一次通过 (\d+)/.exec(cells[11]);
-    return {name:cells[0],groupId:cells[1],passed:decision?Number(decision[2]):0,total:decision?Number(decision[1]):0,accuracy:cells[11].replace(/<[^>]+>/g,''),cells};
+    if(cells.length!==14)return {empty:true,cells};
+    const decision=/首轮实检 (\d+) 条 · 合格 (\d+)/.exec(cells[12]);
+    return {name:cells[0],groupId:cells[1],passed:decision?Number(decision[2]):0,total:decision?Number(decision[1]):0,accuracy:cells[12].replace(/<[^>]+>/g,''),cells};
   });
 }
 function assertPersonParity(label,harness=ui) {
@@ -125,32 +132,32 @@ assertPersonParity('single day 20');
 ui.selectDates(range('2026-09-21'));
 check('single day counts first pass/fail verdicts on both inclusive boundaries',ui.metric(),expected(2,3));
 const day21People=assertPersonParity('single day 21');
-check('failed person stays at zero despite other people passing',day21People.find(row=>row.name==='李乙').accuracy,'0.0%首验 1 条 · 一次通过 0');
-check('passing person has independent result',day21People.find(row=>row.name==='张甲').accuracy,'100.0%首验 2 条 · 一次通过 2');
+check('failed person stays at zero despite other people passing',day21People.find(row=>row.name==='李乙').accuracy,'0.0%首轮实检 1 条 · 合格 0');
+check('passing person has independent result',day21People.find(row=>row.name==='张甲').accuracy,'100.0%首轮实检 2 条 · 合格 2');
 ui.selectDates(range('2026-09-20','2026-09-21'));
 check('multi-day accuracy uses weighted totals, not mean daily rates',ui.metric(),expected(3,4));
 assert.notEqual(ui.metric().rate,(100+2/3*100)/2);
 assertPersonParity('weighted interval');
-check('range detail displays summed counts',ui.render().detail,'2026-09-20 至 2026-09-21 · 首验 4 条 · 一次通过 3');
+check('range detail displays summed counts',ui.render().detail,'2026-09-20 至 2026-09-21 · 首轮实检 4 条 · 合格 3');
 ui.selectDates(range('2026-09-22'));
 check('next day contains only next-midnight verdict',ui.metric(),expected(1,1));
 ui.selectDates({});
 check('all dates exclude invalid timestamps, rejection and deleted tasks',ui.metric(),expected(4,5));
 assertPersonParity('all dates');
-check('all-date detail labels range',ui.render().detail,'全部日期 · 首验 5 条 · 一次通过 4');
+check('all-date detail labels range',ui.render().detail,'全部日期 · 首轮实检 5 条 · 合格 4');
 check('open lower date bound',ui.metric({dateFrom:'',dateTo:'2026-09-20'}),expected(1,1));
 check('open upper date bound',ui.metric({dateFrom:'2026-09-21',dateTo:''}),expected(3,4));
 for(const id of ['explicit-reject','legacy-reject','invalid-date','missing-date','no-verdict'])check(`${id} has no denominator`,ui.taskMetric(id),expected(0,0));
 for(const day of ['2026-09-01','2026-09-19','2026-09-30']) {
   ui.selectDates(range(day));check(`${day}: allocation/submission/no-verdict day has no accuracy`,ui.metric(),expected(0,0));
   check(`${day}: no-data card`,ui.render().value,'—');
-  check(`${day}: no-data detail`,ui.render().detail,`${day} · 暂无首次验收记录`);
+  check(`${day}: no-data detail`,ui.render().detail,`${day} · 暂无首轮实检记录`);
   assertPersonParity(`${day}: no-data personal table`);
 }
 ui.selectDates(range('2026-09-22','2026-09-20'));
 check('reversed range has no metric',ui.metric(),expected(0,0));
 check('invalid range card text',ui.render().detail,'请修正日期区间');
-assert.match(ui.render().people,/<td colspan="13"[^>]*>请修正日期区间<\/td>/);
+assert.match(ui.render().people,/<td colspan="14"[^>]*>请修正日期区间<\/td>/);
 check('explicit valid range independent of reversed selected dates',ui.metric(range('2026-09-20')),expected(1,1));
 ui.selectDates(range('2026-09-20'));
 check('explicit reversed range never leaks data',ui.metric(range('2026-09-22','2026-09-20')),expected(0,0));
@@ -185,7 +192,7 @@ ui.setScope({...range('2026-09-20'),groupId:'all',user:{role:'acceptance',groupI
 check('acceptance role may view all selected-mode groups',ui.metric(),expected(1,2));
 ui.setScope({groupId:'nonexistent'});
 check('empty group has no metric',ui.metric(),expected(0,0));
-assert.match(ui.render().people,/<td colspan="13"[^>]*>当前范围还没有人员作业记录。<\/td>/);
+assert.match(ui.render().people,/<td colspan="14"[^>]*>当前范围还没有人员作业记录。<\/td>/);
 assert.equal(JSON.stringify(state),original,'UI calculation/rendering never edits source history');
 
 for(const mode of ['single','multi']) {
@@ -193,9 +200,9 @@ for(const mode of ['single','multi']) {
   rounds.setScope({mode,groupId:'all'});
   check(`${mode}: repeated acceptance counts only the first effective decision`,rounds.metric(),expected(0,1));
   const rows=assertPersonParity(`${mode}: historical-owner totals`,rounds);
-  check(`${mode}: old first failure remains with original annotator after replacement`,rows.find(row=>row.name==='张明').accuracy,'0.0%首验 1 条 · 一次通过 0');
-  check(`${mode}: replacement recheck pass is not first acceptance`,rows.find(row=>row.name==='李明').accuracy,'暂无首验');
-  check(`${mode}: current owner cannot acquire a historical first decision`,rows.find(row=>row.name==='王明').accuracy,'暂无首验');
+  check(`${mode}: old first failure remains with original annotator after replacement`,rows.find(row=>row.name==='张明').accuracy,'0.0%首轮实检 1 条 · 合格 0');
+  check(`${mode}: replacement recheck pass is not first acceptance`,rows.find(row=>row.name==='李明').accuracy,'暂无首轮实检');
+  check(`${mode}: current owner cannot acquire a historical first decision`,rows.find(row=>row.name==='王明').accuracy,'暂无首轮实检');
   check(`${mode}: current status is already accepted`,rounds.tasks()[0].status,'accepted');
   for(const [day,counts] of [['2026-09-20',[0,1]],['2026-09-21',[0,0]],['2026-09-22',[0,0]]]) {
     rounds.selectDates(range(day));check(`${mode}: history on ${day} remains independent of latest status`,rounds.metric(),expected(...counts));
@@ -215,8 +222,39 @@ for(const mode of ['single','multi']) {
   const orphan=makeHarness(Reports,Flow,orphanState);orphan.setScope({...range('2026-09-20'),mode,groupId:'all'});
   check(`${mode}: unknown historical annotator still contributes first acceptance`,orphan.metric(),expected(1,1));
   const rows=assertPersonParity(`${mode}: unknown-owner parity`,orphan);
-  check(`${mode}: missing historical owner has dedicated row`,rows.find(row=>row.name==='未记录标注人').accuracy,'100.0%首验 1 条 · 一次通过 1');
-  check(`${mode}: latest owner does not inherit orphan first result`,rows.find(row=>row.name==='后来标注人').accuracy,'暂无首验');
+  check(`${mode}: missing historical owner has dedicated row`,rows.find(row=>row.name==='未记录标注人').accuracy,'100.0%首轮实检 1 条 · 合格 1');
+  check(`${mode}: latest owner does not inherit orphan first result`,rows.find(row=>row.name==='后来标注人').accuracy,'暂无首轮实检');
+}
+
+for(const mode of ['single','multi']) {
+  const groupId=mode==='single'?'g01':'g06',sampleState={tasks:[],events:[],batches:[]};
+  for(let index=0;index<100;index++) {
+    const id=`sample-${mode}-${index}`;
+    sampleState.tasks.push({id,tid:id,groupId,mode,movie:'抽检整批退回',date:'2026-09-01',createdAt:at('2026-09-01')});
+    [
+      {type:'claim',actor:'标注甲',actorRole:'annotation',assignee:'标注甲'},
+      {type:'submit',actor:'标注甲',actorRole:'annotation'},
+      {type:'qc_pass',actor:'组长',actorRole:'qc'},
+      {type:'acceptance_fail',actor:'验收员',actorRole:'acceptance',acceptanceInspection:index<8?'pass':index<10?'fail':'uninspected',acceptanceRound:1,acceptanceBatchId:'batch-100'}
+    ].forEach((value,position)=>sampleState.events.push({id:`${id}-${position}`,taskId:id,at:at('2026-09-20'),workflowVersion:3,...value}));
+  }
+  const sampled=makeHarness(Reports,Flow,sampleState);sampled.setScope({...range('2026-09-20'),mode,groupId});
+  check(`${mode}: 100 returned with 8 sampled good and 2 bad gives 80%`,sampled.metric(),expected(8,10));
+  assertPersonParity(`${mode}: sampled first-round ownership`,sampled);
+  check(`${mode}: drill denominator contains only inspected first-round TIDs`,sampled.rows().map(row=>row.tid),sampleState.tasks.slice(0,10).map(row=>row.tid));
+  sampleState.tasks.forEach(task=>{
+    for(const [index,value] of [
+      {type:'acceptance_route',route:'qc',actorRole:'qc'},
+      {type:'qc_repair_done',actorRole:'qc'},
+      {type:'acceptance_pass',actorRole:'acceptance',acceptanceInspection:'pass',acceptanceRound:2,acceptanceBatchId:'reinspection'}
+    ].entries())sampleState.events.push({id:`${task.id}-again-${index}`,taskId:task.id,at:at('2026-09-21'),workflowVersion:3,actor:'审核员',...value});
+  });
+  sampled.setScope({mode,groupId});
+  check(`${mode}: all rechecks finish without filling the 90 unsampled first rounds`,sampled.metric(),expected(8,10));
+  assert.equal(sampled.tasks().filter(task=>task.status==='accepted').length,100);
+  sampled.selectDates(range('2026-09-21'));
+  check(`${mode}: reinspection date contributes no first-round denominator`,sampled.metric(),expected(0,0));
+  assertPersonParity(`${mode}: reinspection date personal parity`,sampled);
 }
 
 const cumulativeAt=html.indexOf('class="overview-metrics overview-metrics-cumulative"');
@@ -228,8 +266,8 @@ assert(!html.slice(cumulativeAt,dailyAt).includes('metricAcceptanceAccuracy'),'a
 const bodyAt=html.indexOf('<tbody id="personStatsBody">');
 const table=html.slice(html.lastIndexOf('<thead>',bodyAt),bodyAt);
 const headers=[...table.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)].map(match=>match[1].replace(/<[^>]+>/g,''));
-check('person headers retain existing fields and insert first-acceptance accuracy after first-QC',headers,['人员','小组','首次提交','返修提交','验收通过','首次质检','首检通过','P0','P1','P2','首检准确率','首次验收准确率','常犯错误点标签看分布']);
-assert.match(html.slice(rejectedAt,html.indexOf('</section>',dailyAt)),/>首次验收准确率<\/span>/,'card label is explicit about first acceptance');
+check('person headers retain existing fields and insert first-acceptance accuracy after first-QC',headers,['人员','小组','首次提交','返修提交','标注拒绝','验收通过','首次质检','首检通过','P0','P1','P2','首检准确率','首次验收实检准确率','常犯错误点标签查 TID']);
+assert.match(html.slice(rejectedAt,html.indexOf('</section>',dailyAt)),/>首次验收实检准确率<\/span>/,'card label is explicit about first acceptance inspection');
 
 const sourceHashes=Object.fromEntries(['app.js','index.html','reports.js'].map(file=>[file,crypto.createHash('sha256').update(fs.readFileSync(path.join(root,'group-workbench',file))).digest('hex')]));
 const result={ok:true,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,checks:cases.length,cases,productionHelpers:helpers,realOverviewRenderer:true,realPersonRenderer:true,sourceHashes};

@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="acceptance-finder.20260923-prod44.css">
   <link rel="stylesheet" href="error-tids.20261008-prod70.css">
   <link rel="stylesheet" href="/work-mode-entry.20260910.css">
+  <link rel="stylesheet" href="acceptance-sampling.20261020-prod74.css">
 </head>
 <body>
   <section id="identityGate" class="identity-gate" aria-labelledby="identityHeading">
@@ -107,7 +108,7 @@
             <div class="overview-metric overview-metric-today-qc-people" title="统计所选日期内做过质检判定（通过或打回）的去重人数。范围跟随上方日期与小组筛选。"><span>质检人数</span><strong id="metricTodayQcUsers">—</strong><small id="metricTodayQcUsersHint">有质检判定（人）</small></div>
             <div class="overview-metric overview-metric-firstqc" title="所选日期内首检通过的 TID ÷ 所选日期内首检通过或打回的 TID，按首检发生日期统计。质检拒绝不计入，后续返修复检不改变首次结果。"><span>首次质检准确率</span><strong id="metricFirstQcAccuracy">—</strong><small id="metricFirstQcDetail">按首检日期 · 拒绝不计入</small></div>
             <button class="overview-metric overview-metric-today-rejected" type="button" data-action="overview-bucket" data-bucket="rejected" title="统计所选日期内被最终拒绝（质检拒绝 / 验收拒绝 / 标注拒绝确认废弃）的任务条数，按拒绝操作日期计入，可随上方日期筛选。点击查看已拒绝任务列表。"><span>已拒绝</span><strong id="metricRejected">—</strong><small id="metricRejectedHint">当日拒绝（条）</small></button>
-            <div class="overview-metric overview-metric-firstqc" title="所选日期内首次验收通过的 TID ÷ 首次验收通过或不通过的 TID，按首次验收的北京时间统计。每个 TID 只取第一次，拒绝和后续复验不计入。"><span>首次验收准确率</span><strong id="metricAcceptanceAccuracy">—</strong><small id="metricAcceptanceAccuracyDetail">按首次验收日期 · 复验不计入</small></div>
+            <div class="overview-metric overview-metric-firstqc" title="按首次验收的北京时间统计首轮实检合格 ÷ 首轮实检合格与不合格；未实检随批处理、拒绝和复验不计入。历史首次结果保持原口径。"><span>首次验收实检准确率</span><strong id="metricAcceptanceAccuracy">—</strong><small id="metricAcceptanceAccuracyDetail">按首次验收日期 · 复验不计入</small></div>
             <div class="overview-metric overview-metric-qc-volume" title="所选日期内质检普通通过或打回的任务数，同一任务在区间内只计一次；直接拒绝和确认标注拒绝单列，不计入本项。先做过普通质检、后来拒绝的任务，仍保留之前普通质检的记录。验收操作、管理员释放前的记录不计入。"><span>质检量级</span><strong id="metricQcVolume">—</strong><small id="metricQcVolumeDetail">质检处理（条）· 不含拒绝</small></div>
             <div class="overview-metric overview-metric-today-rework overview-metric-qc-reject" title="质检直接拒绝或确认标注拒绝的任务数，按两种操作中首次发生的北京时间日期统计；同一任务当天或跨天只计一次。仅申请未确认、验收拒绝不计入。管理员释放前的记录不计入。"><span>质检拒绝</span><strong id="metricQcRejected">—</strong><small id="metricQcRejectedHint">首次质检拒绝（条）· 含确认拒绝</small></div>
             <div class="overview-metric overview-metric-acc-volume" title="所选日期内验收处理过的 case 数：通过、打回、拒绝都算，按判定发生日期计入，一条 case 只算一次；任务被管理员释放后此前的判定作废不计。"><span>验收量级</span><strong id="metricAcceptanceVolume">—</strong><small id="metricAcceptanceVolumeDetail">当日验收处理（条）· 去重</small></div>
@@ -168,7 +169,7 @@
           </div>
         </section>
         <section id="overviewPanel-people" class="overview-panel hidden" data-overview-panel="people" role="tabpanel" aria-labelledby="overviewTab-people">
-          <div class="panel"><div class="panel-heading"><div><h3>人员产出与质量</h3><p data-overview-range-label>按统计日期汇总，首次质检与返修分开统计。</p></div></div><details id="errorAnalysisDetails" class="overview-disclosure"><summary>错误标签分析（饼图 · 仅首次质检打回）</summary><div class="error-analysis-controls"><label class="field compact"><span>分析范围</span><select id="errorScope"><option value="all">整体</option></select></label><label class="field compact"><span>错误等级</span><select id="errorLevel"><option value="all">全部等级</option><option>P0</option><option>P1</option><option>P2</option></select></label></div><p class="overview-detail-note">仅统计首次质检打回勾选的错误标签（可多选，各计一次），质检「拒绝，直接废弃」不计入。点击人员表中的错误标签可查看对应 TID；这里可按人员查看完整分布。</p><div id="errorAnalysisBody"></div></details><div class="table-wrap"><table><thead><tr><th>人员</th><th>小组</th><th>首次提交</th><th>返修提交</th><th title="所选日期内该人员发起的标注拒绝次数，拒绝也算工作量；任务被管理员释放后该次拒绝作废不计。">标注拒绝</th><th>验收通过</th><th>首次质检</th><th>首检通过</th><th>P0</th><th>P1</th><th>P2</th><th>首检准确率</th><th title="按首次验收日期统计，一次通过 TID ÷ 首次验收通过或不通过 TID；拒绝、复验不计入，归属首次验收对应的标注人。">首次验收准确率</th><th>常犯错误<small>点标签查 TID</small></th></tr></thead><tbody id="personStatsBody"></tbody></table></div></div>
+          <div class="panel"><div class="panel-heading"><div><h3>人员产出与质量</h3><p data-overview-range-label>按统计日期汇总，首次质检与返修分开统计。</p></div></div><details id="errorAnalysisDetails" class="overview-disclosure"><summary>错误标签分析（饼图 · 仅首次质检打回）</summary><div class="error-analysis-controls"><label class="field compact"><span>分析范围</span><select id="errorScope"><option value="all">整体</option></select></label><label class="field compact"><span>错误等级</span><select id="errorLevel"><option value="all">全部等级</option><option>P0</option><option>P1</option><option>P2</option></select></label></div><p class="overview-detail-note">仅统计首次质检打回勾选的错误标签（可多选，各计一次），质检「拒绝，直接废弃」不计入。点击人员表中的错误标签可查看对应 TID；这里可按人员查看完整分布。</p><div id="errorAnalysisBody"></div></details><div class="table-wrap"><table><thead><tr><th>人员</th><th>小组</th><th>首次提交</th><th>返修提交</th><th title="所选日期内该人员发起的标注拒绝次数，拒绝也算工作量；任务被管理员释放后该次拒绝作废不计。">标注拒绝</th><th>验收通过</th><th>首次质检</th><th>首检通过</th><th>P0</th><th>P1</th><th>P2</th><th>首检准确率</th><th title="按首次验收日期统计首轮实检合格率；随批未实检、拒绝、复验不计入，归属首次验收时的标注人，历史口径保留。">首次验收实检准确率</th><th>常犯错误<small>点标签查 TID</small></th></tr></thead><tbody id="personStatsBody"></tbody></table></div></div>
         </section>
       </section>
 
@@ -256,13 +257,14 @@
         </details>
       </section>
       <section id="acceptanceView" class="view hidden" aria-labelledby="acceptanceHeading">
-        <div class="section-heading"><div><h2 id="acceptanceHeading">验收台</h2><p>质检通过后直接流入，勾选即可验收，无需建包或领取。</p></div><div class="actions export-actions"><details id="acceptanceExportMenu" class="export-menu"><summary>导出</summary><div class="export-menu-list">
+        <div class="section-heading"><div><h2 id="acceptanceHeading">验收台</h2><p>实检合格与不合格均可批量登记；抽检整批处理时，实检结果与流转去向分别保留。</p></div><div class="actions export-actions"><details id="acceptanceExportMenu" class="export-menu"><summary>导出</summary><div class="export-menu-list">
           <button class="btn small" type="button" data-export="acceptancePending" title="导出下方筛选结果的全部待验收任务，包含所有分页，不受勾选或统计日期限制">待验收明细（当前筛选）</button>
+          <button class="btn small" type="button" data-export="acceptanceAccuracy" data-export-range="scope" title="导出当前镜头、小组与统计日期范围内计入首轮实检准确率的 TID">首轮实检准确率明细（所选日期）</button>
           <button class="btn small" type="button" data-export="acceptanceHistory" data-export-range="scope" title="按上方统计日期和小组导出，以验收实际操作日期为准，每次判定一行">验收记录（所选日期）</button>
           <button class="btn small" type="button" data-export="acceptanceHistory" title="导出当前镜头和上方小组范围的全部验收记录，不受下方待验收筛选影响">验收记录（全部日期）</button>
         </div></details></div></div>
         <details id="acceptanceImportDetails" class="panel import-details acceptance-finder">
-          <summary><span><strong>批量查找 · 批量处理</strong><small>粘贴或按片段查找 TID，一次通过 / 不通过 / 拒绝；跟随当前单镜头或多镜头模块</small></span></summary>
+          <summary><span><strong>批量查找 · 批量实检登记</strong><small>粘贴或查找 TID，登记实检合格 / 实检不合格 / 拒绝；整批处理请在下方勾选完整名单</small></span></summary>
           <form id="acceptanceImportForm" class="panel-body import-form">
             <div class="import-template-row"><p>影片自动匹配，无需重复填写。查找范围跟随当前镜头模块与顶部小组，不受下方影片、标注人、轮次筛选限制。</p></div>
             <div class="finder-toolbar">
@@ -273,7 +275,7 @@
             <label class="field" for="acceptanceText"><span>本次验收的 TID（可批量粘贴）</span><textarea id="acceptanceText" rows="4" spellcheck="false" placeholder="TID001&#10;TID002&#10;每行一个，也可用空格、逗号、分号分隔" aria-describedby="acceptanceHelp"></textarea><small id="acceptanceHelp">只粘贴 TID；空格、逗号、分号会自动拆分，重复、未导入或不在待验收状态的会单独提示。</small></label>
             <div class="import-actions"><button id="acceptancePreviewBtn" class="btn" type="button">批量查找</button></div>
             <div id="acceptancePreview" class="preview-box" aria-live="polite">粘贴 TID 或先用上方片段查找，查找结果会显示影片、小组、标注人和当前状态。</div>
-            <fieldset id="acceptanceChoice" class="batch-status-choice"><legend>所选 TID 的验收结果</legend><div class="decision-options"><label><input type="radio" name="acceptanceResult" value="acceptance_pass"> 验收通过</label><label><input type="radio" name="acceptanceResult" value="acceptance_fail"> 不通过，退回质检</label><label><input type="radio" name="acceptanceResult" value="acceptance_reject"> 拒绝，结束流转</label></div></fieldset>
+            <fieldset id="acceptanceChoice" class="batch-status-choice"><legend>所选 TID 的实检结果</legend><div class="decision-options"><label><input type="radio" name="acceptanceResult" value="acceptance_pass"> 实检合格，验收通过</label><label><input type="radio" name="acceptanceResult" value="acceptance_fail"> 实检不合格，退回质检</label><label><input type="radio" name="acceptanceResult" value="acceptance_reject"> 拒绝，结束流转</label></div></fieldset>
             <label class="field" for="acceptanceChoiceNote"><span>说明（不通过或拒绝时必填）</span><textarea id="acceptanceChoiceNote" rows="2" maxlength="2000" placeholder="填写需要修改的问题、拒绝原因或补充说明"></textarea><small>拒绝后不退回质检或标注，任务与历史记录仍保留。</small></label>
             <div class="bulk-entry-actions"><span id="acceptanceChoiceSummary" aria-live="polite">请先校验 TID</span><button id="acceptanceCommitBtn" class="btn primary" type="button" disabled>保存所选 0 条</button></div>
             <div id="acceptanceImportFeedback" class="inline-result" aria-live="polite"></div>
@@ -292,7 +294,7 @@
               </div>
               <p class="acceptance-filter-hint">全选与待验收导出跟随筛选，包含全部分页。验收记录导出仍按上方小组和日期。</p>
             </div>
-            <div class="bulk-toolbar"><span id="acceptanceSelectionSummary" aria-live="polite">已选 0 条</span><div class="actions"><button id="acceptanceBulkPass" class="btn primary small" type="button" disabled>验收通过</button><button id="acceptanceBulkFail" class="btn small" type="button" disabled>不通过 · 退回质检</button><button id="acceptanceBulkReject" class="btn danger small" type="button" disabled>拒绝 · 结束流转</button></div></div>
+            <div class="bulk-toolbar"><span id="acceptanceSelectionSummary" aria-live="polite">已选 0 条</span><div class="actions"><button id="acceptanceBulkPass" class="btn primary small" type="button" disabled>实检合格</button><button id="acceptanceBulkFail" class="btn small" type="button" disabled>实检不合格</button><button id="acceptanceBulkReject" class="btn danger small" type="button" disabled>拒绝 · 结束流转</button><button id="acceptanceSampleBatch" class="btn small" type="button" disabled>抽检后整批处理</button></div></div>
             <div id="acceptanceBulkWorkbench" class="bulk-workbench" aria-live="polite"></div>
             <div class="table-wrap"><table><thead><tr><th class="selection-cell"><input id="acceptanceSelectAll" type="checkbox" aria-label="全选当前范围待验收任务"></th><th>TID</th><th>影片</th><th>小组</th><th>标注人</th><th>当前状态</th><th>操作</th></tr></thead><tbody id="acceptanceBody"></tbody></table></div>
           </div>
@@ -326,8 +328,8 @@
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
   <script src="data-io.20260920-prod8.js" defer></script>
   <script src="shared-store.20260923-prod37.js" defer></script>
-  <script src="workflow.20260924-prod53-release.js" defer></script>
-  <script src="reports.20261008-prod72-overview.js" defer></script>
-  <script src="app.20261009-prod73-rejection-split.js" defer></script>
+  <script src="workflow.20261020-prod74-acceptance-sampling.js" defer></script>
+  <script src="reports.20261020-prod74-acceptance-sampling.js" defer></script>
+  <script src="app.20261020-prod74-acceptance-sampling.js" defer></script>
 </body>
 </html>

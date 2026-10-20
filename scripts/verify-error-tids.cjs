@@ -102,6 +102,7 @@ function harness(initial) {
     emptyRow:(n,message)=>`<tr><td colspan="${n}">${message}</td></tr>`
   };
   const helpers=['escapeHtml','localDateString','eventDate','acceptanceEventDate','formatImportTime','canViewAllGroups','canViewGroup','selectedRange','singleScopeDate','validScopeRange','inDateRange','scopeRangeKey','scopeRangeLabel','selectedGroup','inCurrentScope','batchIdentityScope','eventsForTask','liveEvents','overviewCacheForState','overviewContributions','taskSnapshot','taskWithSnapshot','taskIndex','allTasks','statusPill','tidMarkup','personErrorScopeKey','addPersonErrorEntry','ensurePersonErrorIndex','personErrorMatches','closePersonErrorDetail','togglePersonErrorDetail','renderPersonErrorDetail','renderPersonStats','bindOverviewEvents'];
+  helpers.push('acceptanceAccuracy');
   vm.createContext(context);vm.runInContext(helpers.map(extract).join('\n'),context);
   const realTid=context.tidMarkup;context.tidMarkup=task=>{stats.tidHtml++;return realTid(task);};
   context.bindOverviewEvents();

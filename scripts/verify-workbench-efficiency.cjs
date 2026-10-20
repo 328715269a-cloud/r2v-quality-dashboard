@@ -94,7 +94,7 @@ const midnightInput={...input,tasks:[midnightTask],state:{tasks:[midnightTask],e
 assert.equal(Reports.personDaily(midnightInput)[0].date,day2);assert.equal(groupRow(midnightInput,day1).completedTIDs,0);assert.equal(groupRow(midnightInput,day2).completedTIDs,1);
 
 const report=Reports.build({...input,statusMeta:Flow.STATUS_META,groupLabel:id=>`小组${id}`});
-for(const [name,sheet] of Object.entries(report)){
+for(const [name,sheet] of Object.entries(report).filter(([,value])=>Array.isArray(value.columns))){
   assert.equal(new Set(sheet.columns.map(column=>column.key)).size,sheet.columns.length,`${name} column keys must be unique`);
   for(const row of sheet.rows)assert(sheet.columns.every(column=>Object.hasOwn(row,column.key)),`${name} every export column must have a defined row field`);
 }

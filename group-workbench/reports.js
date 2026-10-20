@@ -81,10 +81,82 @@
       if (['acceptance_pass', 'acceptance_fail', 'acceptance_reject'].includes(event.type) && !result.firstAcceptanceDecision) {
         const owner = lastSubmit || firstClaim || { name: '', rawName: '' };
         result.firstAcceptanceDecision = { name: owner.name, rawName: owner.rawName, at: text(event.at), eventId: text(event.id), type: flow.isAcceptanceReject(event) ? 'acceptance_reject' : event.type };
+        // The first disposition occupies the first round even when this TID was
+        // not sampled. A later inspection must never fill that empty sample.
+        if (Object.hasOwn(event, 'acceptanceInspection')) Object.assign(result.firstAcceptanceDecision, {
+          acceptanceInspection: event.acceptanceInspection, acceptanceRound: event.acceptanceRound,
+          acceptanceBatchId: text(event.acceptanceBatchId)
+        });
       }
     });
     result.rework = Array.from(rework.values());
     return result;
+  }
+
+  function acceptanceDate(value) {
+    const timestamp = Date.parse(value);
+    return Number.isFinite(timestamp) ? new Date(timestamp + 8 * 60 * 60 * 1000).toISOString().slice(0, 10) : '';
+  }
+
+  // Quality and disposition are independent: a sampled pass can travel back
+  // with its batch. Legacy events keep their original meaning and first-event
+  // rule; only explicitly classified events require canonical round one.
+  function acceptanceAssessment(event, firstDecision = null) {
+    event = event || {};
+    const legacy = !Object.hasOwn(event, 'acceptanceInspection');
+    const inspection = flow.acceptanceInspection(event), flowAction = flow.acceptanceFlowAction(event);
+    const date = acceptanceDate(event.at), eventId = text(event.id || event.eventId);
+    const firstId = text(firstDecision?.eventId || firstDecision?.id);
+    let reason = '';
+    if (!flowAction) reason = '非验收决定';
+    else if (flowAction === 'reject') reason = '验收拒绝不计首验';
+    else if (!firstId || eventId !== firstId) reason = '后续复验或已释放的记录';
+    else if (!legacy && !['pass', 'fail', 'uninspected'].includes(event.acceptanceInspection)) reason = '检查标记无效';
+    else if (!legacy && event.acceptanceRound !== 1) reason = '不是首轮实检';
+    else if (inspection === 'uninspected') reason = '首轮未实检';
+    else if (!['pass', 'fail'].includes(inspection)) reason = '没有实检结果';
+    else if (!date) reason = '首验时间无效';
+    const inspectionLabel = flowAction === 'reject' ? '拒绝（不计实检）'
+      : legacy ? (inspection === 'pass' ? '历史通过（原口径）' : inspection === 'fail' ? '历史不通过（原口径）' : '')
+        : ({pass:'实检合格', fail:'实检不合格', uninspected:'未实检'}[inspection] || '检查标记无效');
+    const flowLabel = flowAction === 'reject' ? '拒绝结束'
+      : flowAction === 'pass' ? (inspection === 'uninspected' ? '随批放行' : '放行')
+        : flowAction === 'return' ? (!legacy && inspection !== 'fail' ? '随批退回质检' : '退回质检') : '';
+    return {
+      inspection, flowAction, inspectionLabel, flowLabel, legacy, date,
+      included: !reason, reason: reason || (legacy ? '历史首验（原口径）' : '首轮实际检查'),
+      passed: !reason && inspection === 'pass', acceptanceBatchId: text(event.acceptanceBatchId)
+    };
+  }
+
+  function acceptanceAccuracy(input = {}) {
+    const dateFrom = text(input.dateFrom), dateTo = text(input.dateTo);
+    if (dateFrom && dateTo && dateFrom > dateTo) return {passed:0, total:0, rate:null, rows:[]};
+    const histories = new Map();
+    if (typeof input.contributionForTask !== 'function') {
+      (input.events || input.state?.events || []).forEach(event => {
+        if (!histories.has(event.taskId)) histories.set(event.taskId, []);
+        histories.get(event.taskId).push(event);
+      });
+    }
+    const rows = [];
+    (input.tasks || []).forEach(task => {
+      if (task.deleted || (input.mode && task.mode !== input.mode)
+        || (input.groupId && input.groupId !== 'all' && task.groupId !== input.groupId)) return;
+      const contribution = typeof input.contributionForTask === 'function'
+        ? input.contributionForTask(task) : annotationContributors(histories.get(task.id) || []);
+      const first = contribution?.firstAcceptanceDecision;
+      if (!first) return;
+      const assessment = acceptanceAssessment(first, first);
+      if (!assessment.included || (dateFrom && assessment.date < dateFrom) || (dateTo && assessment.date > dateTo)) return;
+      rows.push({
+        ...first, ...assessment, taskId:task.id, tid:text(task.tid), movie:text(task.movie),
+        groupId:text(task.groupId), mode:text(task.mode), acceptanceRound:first.acceptanceRound ?? '',
+        name:first.name || '未记录标注人', rawName:first.rawName || ''
+      });
+    });
+    const passed = rows.filter(row => row.passed).length, total = rows.length;
+    return {passed, total, rate:total ? passed / total * 100 : null, rows};
   }
 
   function movieTitle(task) {
@@ -472,6 +544,22 @@
     // The overview only needs these stage counts. Keep the original calculation,
     // but do not construct export indexes, histories, columns or daily models.
     if (input.kind === 'closure') return { closure: closure() };
+    if (input.kind === 'acceptanceAccuracy') {
+      const metric = acceptanceAccuracy({...input, tasks});
+      return {acceptanceAccuracy:{
+        columns:columns([
+          ['tid','TID'],['movie','影片 / 包'],['group','小组'],['modeLabel','作业类型'],['name','首验时标注人'],
+          ['inspectionLabel','实际检查结果'],['flowLabel','任务处置方式'],['includedLabel','是否计入首次验收准确率'],
+          ['reason','计入口径'],['date','首次验收日期（北京时间）'],['at','首次验收时间'],['acceptanceRound','验收轮次'],
+          ['acceptanceBatchId','验收批次ID'],['eventId','首验事件ID'],['taskId','内部任务ID']
+        ]),
+        rows:metric.rows.map(row => ({...row,group:groupName(row.groupId),modeLabel:modeLabel(row.mode),includedLabel:'是'})),
+        passed:metric.passed,total:metric.total,rate:metric.rate
+      }};
+    }
+    const quality = wants('tasks') || wants('groups') || wants('movies') || wants('daily')
+      ? acceptanceAccuracy({...input, tasks}) : {rows:[]};
+    const qualityByTask = new Map(quality.rows.map(row => [row.taskId, row]));
     const needsAudit = wants('events') || wants('imports');
     const auditTasks = needsAudit ? (input.auditTasks || input.tasks || []).filter(task => !input.mode || task.mode === input.mode) : [];
     const auditMap = new Map(auditTasks.map(task => [task.id, task]));
@@ -510,6 +598,8 @@
       const qcEvents = history.filter(event => ['qc_pass', 'qc_fail', 'qc_reject'].includes(event.type));
       const operator = qcOperator(history);
       const contributors = annotationContributors(history), assignments = history.filter(isReworkAssignment), assignment = assignments.at(-1);
+      const firstQuality = contributors.firstAcceptanceDecision
+        ? acceptanceAssessment(contributors.firstAcceptanceDecision, contributors.firstAcceptanceDecision) : null;
       // Keep the existing export JSON schema while the UI uses the first acceptance decision.
       const contributionHistory = { initial: contributors.initial, submissions: contributors.submissions, rework: contributors.rework, firstQc: contributors.firstQc, firstAcceptance: contributors.firstAcceptance };
       const row = {
@@ -527,6 +617,14 @@
         lastUpdated: task.updatedAt || '', originalTaskJSON: json(rawMap.get(task.id) || task), fullTimelineJSON: json(rawHistory),
         excludedEventCount: omitted.length, excludedEventsJSON: json(omitted)
       };
+      Object.assign(row, {
+        firstAcceptanceInspection: firstQuality?.inspectionLabel || '',
+        firstAcceptanceDisposition: firstQuality?.flowLabel || '',
+        firstAcceptanceIncluded: firstQuality?.included || false,
+        firstAcceptanceReason: firstQuality?.reason || '尚无验收决定',
+        firstAcceptanceAt: contributors.firstAcceptanceDecision?.at || '',
+        firstAcceptanceBatchId: firstQuality?.acceptanceBatchId || ''
+      });
       for (const prefix of ['qc', 'acceptance']) {
         for (const suffix of ['PackageId', 'PackageName', 'PackageRound', 'PackageBuilder', 'PackageBuiltAt', 'PackageClaimer', 'PackageClaimedAt']) row[`${prefix}${suffix}`] = task[`${prefix}${suffix}`] ?? '';
       }
@@ -551,6 +649,8 @@
       ['excludedEventCount','未计入进度的记录数'],['excludedEventsJSON','未计入进度的记录与原因JSON'],
       ['submitRound','标注提交次数'],['qcRound','当前质检轮次'],['acceptanceRound','当前验收轮次'],['claimedAt','首次认领时间'],['submittedAt','最近标注提交时间'],['reviewedAt','最近质检时间'],
       ['firstQcDecision','首次质检结果'],['firstQcPLevel','首次质检P等级'],['firstQcTagsJSON','首次质检错误标签JSON'],['firstQcNote','首次质检说明'],['firstQcActor','首次质检人'],['firstQcAt','首次质检时间'],
+      ['firstAcceptanceInspection','首轮验收实际检查结果'],['firstAcceptanceDisposition','首轮验收任务处置'],
+      ['firstAcceptanceIncluded','是否计入首次验收准确率'],['firstAcceptanceReason','首验计入口径'],['firstAcceptanceAt','首轮验收时间'],['firstAcceptanceBatchId','首轮验收批次ID'],
       ['latestQcDecision','最近质检结果'],['latestQcPLevel','最近质检P等级'],['latestQcTagsJSON','最近质检错误标签JSON'],['latestQcNote','最近质检说明'],['latestQcActor','最近质检人'],['latestQcAt','最近质检时间'],
       ['qcPackageId','质检包ID'],['qcPackageName','质检包名'],['qcPackageRound','质检包轮次'],['qcPackageBuilder','质检建包人'],['qcPackageBuiltAt','质检建包时间'],['qcPackageClaimer','质检包认领人'],['qcPackageClaimedAt','质检包认领时间'],
       ['acceptancePackageId','验收包ID'],['acceptancePackageName','验收包名'],['acceptancePackageRound','验收包轮次'],['acceptancePackageBuilder','验收建包人'],['acceptancePackageBuiltAt','验收建包时间'],['acceptancePackageClaimer','验收包认领人'],['acceptancePackageClaimedAt','验收包认领时间'],
@@ -561,14 +661,28 @@
       ['qcRepairNote','质检自行返修说明'],['qcRepairedBy','质检自行返修人'],['qcRepairedAt','质检自行返修完成时间'],['batchId','原始导入批次'],['createdBy','导入人'],['createdAt','导入时间'],['lastUpdated','最近更新时间'],['originalTaskJSON','完整原始任务JSON'],['fullTimelineJSON','完整任务流水JSON']
     ]);
 
+    const auditHistories = new Map(), auditFirstDecisions = new Map();
+    if (wants('events')) {
+      auditEvents.forEach(event => {
+        if (!auditHistories.has(event.taskId)) auditHistories.set(event.taskId, []);
+        auditHistories.get(event.taskId).push(event);
+      });
+      auditHistories.forEach((history, taskId) => auditFirstDecisions.set(taskId, annotationContributors(history).firstAcceptanceDecision));
+    }
     const eventRows = (wants('events') ? exportEvents : []).map(event => {
       const current = auditMap.get(event.taskId) || { groupId: event.groupId, mode: event.mode }, raw = auditRawMap.get(event.taskId) || current;
+      const assessment = acceptanceAssessment(event, auditFirstDecisions.get(event.taskId));
       return {
         eventId: event.id, taskId: event.taskId, currentTid: text(current.tid), atTimeTid: text(event.tidAtEvent ?? raw.tid),
         currentMovie: text(current.movie), atTimeMovie: text(event.movieAtEvent ?? raw.movie),
         groupId: current.groupId || '', group: groupName(current.groupId), mode: modeLabel(current.mode),
         actor: event.actor || '', actorRole: event.actorRole || '', at: event.at || '', localDate: dateOf(event.at),
         submitRound: event.round ?? '', qcRound: event.qcRound ?? '', acceptanceRound: event.acceptanceRound ?? '',
+        acceptanceInspection: event.acceptanceInspection ?? '', acceptanceBatchId: event.acceptanceBatchId || '',
+        acceptanceInspectionLabel: assessment.inspectionLabel, acceptanceDisposition: assessment.flowLabel,
+        acceptanceFirstIncluded:!current.deleted && !conflictById.has(event.id) && assessment.included,
+        acceptanceFirstReason:!assessment.flowAction ? '' : current.deleted ? '任务已删除，保留历史'
+          : conflictById.has(event.id) ? '冲突记录未计入进度' : assessment.reason,
         type: event.type, label: eventName(event), note: event.note || '', detail: eventDescription(event), pLevel: event.pLevel || '', tagsJSON: json(event.tags || []),
         stage: event.stage || '', packageId: event.packageId || '', packageName: event.packageName || '', packageRound: event.packageRound ?? '',
         assignee: event.assignee || '', previousAssignee: event.previousAssignee || '', settingDate: event.type === 'group_daily_edit' ? event.date : '', beforeJSON: json(event.before), afterJSON: json(event.after), rawJSON: json(event),
@@ -579,6 +693,8 @@
     const eventColumns = columns([
       ['eventId','事件ID'],['taskId','内部任务ID'],['currentTid','当前TID'],['atTimeTid','当时TID'],['currentMovie','当前影片包'],['atTimeMovie','当时影片包'],['groupId','小组ID'],['group','小组'],['mode','作业类型'],
       ['actor','操作人'],['actorRole','操作角色'],['at','实际操作时间'],['localDate','实际操作日期'],['submitRound','标注提交轮次'],['qcRound','质检轮次'],['acceptanceRound','验收轮次'],['type','操作编码'],['label','操作'],['pLevel','质检P等级'],['tagsJSON','质检错误标签JSON'],['note','说明'],['detail','完整说明'],
+      ['acceptanceInspection','验收检查标记'],['acceptanceInspectionLabel','验收实际检查结果'],['acceptanceDisposition','验收任务处置'],['acceptanceBatchId','验收批次ID'],
+      ['acceptanceFirstIncluded','是否计入首次验收准确率'],['acceptanceFirstReason','首验计入口径'],
       ['stage','建包阶段'],['packageId','流转包ID'],['packageName','流转包名'],['packageRound','流转包轮次'],['assignee','标注人'],['previousAssignee','接续前标注人'],['settingDate','小组记录业务日期'],['beforeJSON','修改前JSON'],['afterJSON','修改后JSON'],['rawJSON','完整原始事件JSON'],
       ['assignmentKind','人员分配类型'],['fromAssignee','转出标注人'],['assignmentStatus','分配时返修状态'],['identityAlias','是否同一人身份接续'],
       ['excludedFromProgress','是否未计入进度'],['excludedReason','未计入进度的原因']
@@ -661,6 +777,10 @@
       row.closedTIDs = row.acceptedTIDs + row.rejectedTIDs;
       row.completionRate = subset.length ? `${(row.acceptedTIDs / subset.length * 100).toFixed(1)}%` : '0.0%';
       row.closureRate = subset.length ? `${(row.closedTIDs / subset.length * 100).toFixed(1)}%` : '0.0%';
+      const firstInspections = subset.map(task => qualityByTask.get(task.id)).filter(Boolean);
+      row.firstAcceptanceInspectedTIDs = firstInspections.length;
+      row.firstAcceptancePassedTIDs = firstInspections.filter(item => item.passed).length;
+      row.firstAcceptanceAccuracy = firstInspections.length ? `${(row.firstAcceptancePassedTIDs / firstInspections.length * 100).toFixed(1)}%` : '';
       statusKeys.forEach(key => { row[`status_${key}`] = 0; });
       subset.forEach(task => { row[`status_${task.status}`] += 1; });
       return row;
@@ -680,7 +800,8 @@
         headcountSource: row.headcountSource, membersJSON: json(row.members), latestEditId: row.latestEditId,
         settingsHistoryJSON: json(row.history), isAggregate: row.isAggregate,
         annotationCompletedTIDs: row.completedTIDs, initialSubmissionTIDs: row.initialSubmissionTIDs,
-        reworkSubmissionActions: row.reworkSubmissionActions, personDayEfficiency: row.personDayEfficiency,
+        reworkSubmissionActions: row.reworkSubmissionActions, qcPassTIDs:row.qcPassTIDs ?? 0,
+        acceptancePassTIDs:row.acceptancePassTIDs ?? 0, personDayEfficiency: row.personDayEfficiency,
         efficiencyIssue: row.efficiencyIssue, efficiencyIssueDatesJSON: json(row.efficiencyIssueDates)
       };
     }
@@ -694,7 +815,9 @@
     ]);
     const summaryColumns = columns([
       ['mode','作业类型'],['totalTIDs','累计分配TID数量'],['movieCount','累计影片数量'],['groupCount','参与小组数'],['groups','参与小组'],['moviesJSON','影片明细JSON'],['firstAllocationDate','最早分配业务日期'],['lastAllocationDate','最近分配业务日期'],['acceptedTIDs','验收通过TID数量'],['rejectedTIDs','最终拒绝TID数量'],['closedTIDs','已闭环TID数量'],['completionRate','验收通过率'],['closureRate','闭环率（通过+拒绝）']
-    ]).concat(statusColumns, columns([['taskIdsJSON','内部任务ID明细JSON'],['currentTIDsJSON','当前TID明细JSON']]));
+    ]).concat(columns([
+      ['firstAcceptanceInspectedTIDs','首轮实检TID（历史沿用原口径）'],['firstAcceptancePassedTIDs','首轮实检合格TID'],['firstAcceptanceAccuracy','首次验收准确率']
+    ]), statusColumns, columns([['taskIdsJSON','内部任务ID明细JSON'],['currentTIDsJSON','当前TID明细JSON']]));
 
     const dailyMap = new Map();
     function dayRow(date, groupId) {
@@ -702,6 +825,8 @@
       if (!dailyMap.has(key)) dailyMap.set(key, {
         date, groupId, group: groupName(groupId), modes: new Set(), imported: new Set(), initial: new Set(), completed: new Set(), rejected: new Set(), active: new Set(),
         annotationReworkActions: 0, qcPassed: new Set(), qcPassActions: 0, qcFailActions: 0, qcRejected: new Set(), acceptanceFailActions: 0, acceptanceRejected: new Set(), qcSelfRepairActions: 0, assignmentActions: 0, qcPackages: new Set(), acceptancePackages: new Set(), taskActions: new Map(),
+        acceptanceInspectedPassActions:0, acceptanceInspectedFailActions:0, acceptanceBatchReturnActions:0, acceptanceBatchPassActions:0,
+        firstAcceptanceInspectedTIDs:0, firstAcceptancePassedTIDs:0,
         // 条数型指标（质检通过 / 验收通过）按 TID 去重：同一 TID 的多条重复任务记录只算一条。
         qcPassedTids: new Set(), completedTids: new Set(), qcPassOwners: new Map(), completedOwners: new Map(),
         // 整体去重：一条 case 只算一次，只记第一次达成的那一天
@@ -787,6 +912,13 @@
         addTid(row.uniqueCompletedTids, row.uniqueCompletedOwners, tidKey(task), task.id);
       }
       if (event.type === 'acceptance_fail'&&!acceptanceReject) bump(row, 'acceptanceFailActions', task.id);
+      if (Object.hasOwn(event, 'acceptanceInspection') && !acceptanceReject) {
+        const inspection = flow.acceptanceInspection(event), action = flow.acceptanceFlowAction(event);
+        if (inspection === 'pass') bump(row, 'acceptanceInspectedPassActions', task.id);
+        if (inspection === 'fail') bump(row, 'acceptanceInspectedFailActions', task.id);
+        if (action === 'return' && ['pass','uninspected'].includes(inspection)) bump(row, 'acceptanceBatchReturnActions', task.id);
+        if (action === 'pass' && inspection === 'uninspected') bump(row, 'acceptanceBatchPassActions', task.id);
+      }
       if (acceptanceReject && first('acceptance_reject', task.id) === event) row.acceptanceRejected.add(task.id);
       if ((event.type==='reject_confirm'||qcReject||acceptanceReject) && first('final_reject', task.id) === event) row.rejected.add(task.id);
       if (event.type === 'qc_repair_done') bump(row, 'qcSelfRepairActions', task.id);
@@ -809,10 +941,19 @@
     (wants('daily') ? groupModel.groups : []).forEach(group => groupModel.dates.get(group.id).forEach(date => {
       dayRow(date, group.id).modes.add(modeLabel(group.defaultMode || group.mode || input.mode));
     }));
+    if (wants('daily')) quality.rows.forEach(item => {
+      const row = dayRow(item.date, item.groupId); row.modes.add(modeLabel(item.mode));
+      row.firstAcceptanceInspectedTIDs += 1;
+      if (item.passed) row.firstAcceptancePassedTIDs += 1;
+    });
     const dailyRows = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date) || text(a.groupId).localeCompare(text(b.groupId))).map(row => ({
       date: row.date, groupId: row.groupId, group: row.group, mode: Array.from(row.modes).join('、'),
       importedTIDs: row.imported.size, initialAnnotationTIDs: row.initial.size, annotationReworkActions: row.annotationReworkActions,
       qcPassActions: row.qcPassedTids.size, qcFailActions: row.qcFailActions, qcRejectedTIDs: row.qcRejected.size, completedTIDs: row.completedTids.size, acceptanceFailActions: row.acceptanceFailActions, acceptanceRejectedTIDs: row.acceptanceRejected.size,
+      acceptanceInspectedPassActions:row.acceptanceInspectedPassActions, acceptanceInspectedFailActions:row.acceptanceInspectedFailActions,
+      acceptanceBatchReturnActions:row.acceptanceBatchReturnActions, acceptanceBatchPassActions:row.acceptanceBatchPassActions,
+      firstAcceptanceInspectedTIDs:row.firstAcceptanceInspectedTIDs, firstAcceptancePassedTIDs:row.firstAcceptancePassedTIDs,
+      firstAcceptanceAccuracy:row.firstAcceptanceInspectedTIDs ? `${(row.firstAcceptancePassedTIDs / row.firstAcceptanceInspectedTIDs * 100).toFixed(1)}%` : '',
       uniqueInitialTIDs: row.initial.size, uniqueQcPassTIDs: row.uniqueQcTids.size, uniqueAcceptanceTIDs: row.uniqueCompletedTids.size,
       rejectedTIDs: row.rejected.size, qcSelfRepairActions: row.qcSelfRepairActions, qcPackageCount: row.qcPackages.size, acceptancePackageCount: row.acceptancePackages.size,
       activeTIDs: row.active.size, assignmentActions: row.assignmentActions, importedTaskIdsJSON: json(Array.from(row.imported)), initialTaskIdsJSON: json(Array.from(row.initial)), completedTaskIdsJSON: json(Array.from(row.completed)), rejectedTaskIdsJSON: json(Array.from(row.rejected)),
@@ -820,7 +961,10 @@
     }));
     const dailyColumns = columns([
       ['date','实际操作日期'],['groupId','小组ID'],['group','小组'],['mode','作业类型'],['importedTIDs','新增分配TID数量'],['initialAnnotationTIDs','首次标注完成TID数量'],['annotationReworkActions','标注返修提交次数'],
-      ['qcPassActions','质检通过TID数量（当日·TID去重）'],['qcFailActions','质检打回操作次数'],['qcRejectedTIDs','质检拒绝TID数量'],['completedTIDs','验收通过TID数量（当日·TID去重）'],['acceptanceRejectedTIDs','验收拒绝TID数量'],['rejectedTIDs','最终拒绝TID数量'],['acceptanceFailActions','验收不通过操作次数'],['qcSelfRepairActions','质检自行返修完成次数'],
+      ['qcPassActions','质检通过TID数量（当日·TID去重）'],['qcFailActions','质检打回操作次数'],['qcRejectedTIDs','质检拒绝TID数量'],['completedTIDs','验收通过TID数量（当日·TID去重）'],['acceptanceRejectedTIDs','验收拒绝TID数量'],['rejectedTIDs','最终拒绝TID数量'],['acceptanceFailActions','验收退回操作次数（含随批）'],['qcSelfRepairActions','质检自行返修完成次数'],
+      ['acceptanceInspectedPassActions','实检合格次数（明确标记）'],['acceptanceInspectedFailActions','实检不合格次数（明确标记）'],
+      ['acceptanceBatchReturnActions','随批退回次数（非实际缺陷）'],['acceptanceBatchPassActions','未实检随批放行次数'],
+      ['firstAcceptanceInspectedTIDs','首轮实检TID（历史沿用原口径）'],['firstAcceptancePassedTIDs','首轮实检合格TID'],['firstAcceptanceAccuracy','首次验收准确率'],
       ['uniqueInitialTIDs','首次标完TID数量（所选范围去重）'],['uniqueQcPassTIDs','质检通过TID数量（所选范围去重）'],['uniqueAcceptanceTIDs','验收通过TID数量（所选范围去重）'],
       ['qcPackageCount','新建质检包数'],['acceptancePackageCount','历史新建验收包数'],['activeTIDs','有操作TID数量'],['assignmentActions','代修分配任务次数'],['importedTaskIdsJSON','新增分配任务ID JSON'],['initialTaskIdsJSON','首次标注完成任务ID JSON'],['completedTaskIdsJSON','首次验收通过任务ID JSON'],['rejectedTaskIdsJSON','最终拒绝任务ID JSON']
     ]);
@@ -853,5 +997,5 @@
     return requested ? Object.fromEntries(Object.entries(result).filter(([kind]) => kind === 'closure' || wants(kind))) : result;
   }
 
-  return Object.freeze({ build, groupDaily, personDaily, qcOperator, movieTitle, movieProgress, annotationContributors });
+  return Object.freeze({ build, groupDaily, personDaily, qcOperator, movieTitle, movieProgress, annotationContributors, acceptanceDate, acceptanceAssessment, acceptanceAccuracy });
 }));

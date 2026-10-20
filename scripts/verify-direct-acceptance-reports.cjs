@@ -10,7 +10,7 @@ const repaired=task('REPAIR',[{type:'acceptance_fail',note:'需要修改',accept
 const historical=task('HISTORY',[{type:'package_built',stage:'acceptance',packageId:'old-package',packageName:'历史包',packageRound:1}]);
 assert.equal(accepted.status,'accepted');assert.equal(returned.status,'acceptance_return_pending');assert.equal(rejected.status,'rejected');assert.equal(rejected.finalRejectStage,'acceptance');assert.equal(repaired.status,'pending_acceptance');assert.equal(repaired.acceptanceRound,2);assert.equal(historical.status,'pending_acceptance');assert.equal(historical.acceptancePackageName,'历史包');
 const tasks=[accepted,returned,rejected,repaired,historical],report=R.build({state,tasks,statusMeta:F.STATUS_META});
-for(const [name,sheet] of Object.entries(report))assert.equal(new Set(sheet.columns.map(c=>c.key)).size,sheet.columns.length,`${name} columns must be unique`);
+for(const [name,sheet] of Object.entries(report).filter(([,value])=>Array.isArray(value.columns)))assert.equal(new Set(sheet.columns.map(c=>c.key)).size,sheet.columns.length,`${name} columns must be unique`);
 const sum=k=>report.daily.rows.reduce((s,r)=>s+r[k],0);
 assert.equal(sum('acceptanceFailActions'),2);assert.equal(sum('acceptanceRejectedTIDs'),1);assert.equal(sum('rejectedTIDs'),1);assert.equal(sum('completedTIDs'),1);assert.equal(sum('qcSelfRepairActions'),1);
 assert.equal(report.events.rows.length,state.events.length);assert.equal(report.tasks.rows.length,5);assert.equal(report.movies.rows[0].closedTIDs,2);assert.equal(report.movies.rows[0].activeTIDs,3);
