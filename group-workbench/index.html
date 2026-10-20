@@ -99,7 +99,7 @@
           <div class="overview-metrics overview-metrics-today" aria-label="当日作业情况">
             <div class="overview-metric overview-metric-today-annotation" title="统计所选日期内每个任务的首次标注提交条数；返修提交和申请拒绝本身不计入。已经提交完成的任务，后续拒绝仍保留原完成记录。范围跟随上方日期与小组筛选。"><span>标注完成</span><strong id="metricTodayAnnotation">—</strong><small id="metricTodayAnnotationHint">首次标完（条）</small></div>
             <div class="overview-metric overview-metric-today-rework overview-metric-annotation-reject" title="标注首次申请拒绝的任务数，按首次申请的北京时间日期统计；同一任务当天或跨天重复申请只计一次。申请被质检退回也保留本次申请记录，不等同于最终拒绝。管理员释放前的记录不计入。"><span>标注拒绝</span><strong id="metricAnnotationRejected">—</strong><small id="metricAnnotationRejectedHint">首次申请拒绝（条）· 跨天去重</small></div>
-            <div class="overview-metric overview-metric-today-qc" title="统计所选日期内质检判定通过的任务条数（同一 TID 当天或跨天多次通过只算一条，按首次通过当天记账）；通过即流转验收，视为闭环。"><span>质检通过</span><strong id="metricTodayQcPass">—</strong><small id="metricTodayQcPassHint">通过并闭环（条）· TID 去重</small></div>
+            <div class="overview-metric overview-metric-today-qc" title="统计所选日期内通过过质检的 TID 数；同一 TID 当天或跨天多次通过，在所选区间合计只算 1 条。按质检通过日期筛选，不含打回和拒绝操作；之后返修或拒绝仍保留之前的通过记录，不代表当前状态或任务已闭环。"><span>质检通过</span><strong id="metricTodayQcPass">—</strong><small id="metricTodayQcPassHint">质检通过（条）· TID 跨天去重</small></div>
             <div class="overview-metric overview-metric-today-accept" title="统计所选日期内通过过验收的 TID 数；同一 TID 当天或跨天多次通过，在所选区间合计只算 1 条。按验收通过日期筛选，与打回分别去重，不代表当前状态。"><span>验收通过</span><strong id="metricTodayAccept">—</strong><small id="metricTodayAcceptHint">验收通过（条）· TID 跨天去重</small></div>
             <div class="overview-metric overview-metric-today-rework" title="统计所选日期内被验收打回的 TID 数，包含实检不合格和随批退回，不含拒绝。按打回发生日期筛选，同一 TID 当天或跨天多次打回，在所选区间合计只算 1 条；后来通过仍保留打回记录。"><span>验收打回</span><strong id="metricTodayAcceptReturn">—</strong><small id="metricTodayAcceptReturnHint">验收打回（条）· 含随批，跨天去重</small></div>
             <div class="overview-metric overview-metric-today-rework" title="统计所选日期内有过返修提交的任务去重条数；一个 case 当天返修多次也只算一条（区别于日报「返修提交（次）」）。"><span>返修量</span><strong id="metricTodayRework">—</strong><small id="metricTodayReworkHint">返修任务（条）· 去重</small></div>
@@ -331,6 +331,6 @@
   <script src="shared-store.20260923-prod37.js" defer></script>
   <script src="workflow.20261020-prod74-acceptance-sampling.js" defer></script>
   <script src="reports.20261020-prod74-acceptance-sampling.js" defer></script>
-  <script src="app.20261020-prod76-acceptance-return-metric.js" defer></script>
+  <script src="app.20261020-prod77-qc-pass-range.js" defer></script>
 </body>
 </html>

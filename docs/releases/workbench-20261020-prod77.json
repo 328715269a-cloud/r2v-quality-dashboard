@@ -1,0 +1,48 @@
+{
+  "version": "20261020-prod77",
+  "apiVersion": "20261020-prod74",
+  "status": "deployed",
+  "baseCommit": "55af09c",
+  "checkedAt": "2026-10-20T11:18:23.791Z",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "scope": "Overview QC pass count now deduplicates TIDs across the selected date range, matching acceptance flow counters and group table.",
+  "behavior": {
+    "events": "qc_pass only; include any pass date in the selected interval, then Set of current projected TID.",
+    "example": "A TID passed on two different days counts once on each individual day and once across the combined range.",
+    "annotation": "Unchanged: first effective submission only; rework does not increase initial completion.",
+    "unchanged": "Acceptance counters, first QC/acceptance accuracy, rejection counts, volume counts, workflow, daily rows/exports, API and business data.",
+    "cache": "Add qcPassDates to existing bounded review-facts cache; date changes reuse facts; snapshot and role changes invalidate."
+  },
+  "deployment": {
+    "databaseWrites": 0,
+    "apiCodeChanged": false,
+    "existingServicesRestarted": false,
+    "forcedRefresh": false,
+    "protectedFiles": 304,
+    "containersUnchanged": 14,
+    "backupIndex": "/opt/r2v/backups/group-workbench/20261020-prod77-qc-pass-range-bce5324c6d3024ea/index.html",
+    "rollback": "Restore backed-up index with candidate SHA guard; keep versioned assets."
+  },
+  "validation": {
+    "qcPassChecks": 154,
+    "acceptanceRegressionChecks": 197,
+    "rejectionRegressionAssertions": 963,
+    "packagedBrowserChecks": 62,
+    "groupTableMatches": true,
+    "nonTargetMetricsComparedToProd76": true,
+    "acceptanceDraftPreserved": true,
+    "browserErrors": [],
+    "publicChecks": 19,
+    "publicFacts": {
+      "version": "20261020-prod77",
+      "label": "验收打回",
+      "previous": "metricTodayAccept",
+      "qcHint": "质检通过（条）· TID 跨天去重"
+    }
+  },
+  "staticSha256": {
+    "index.html": "bce5324c6d3024ead8f04b4f518f2ac145fe47b9abd71c81d9c682b4c8d1f7d1",
+    "app.20261020-prod77-qc-pass-range.js": "2ad5a37e7d35c82254d9c68eac75aa1692acce70aeef7e60ba267b63aacd5bee",
+    "reports.20261020-prod74-acceptance-sampling.js": "76e296bf923357c7aec7a3bf6f02cef3f746ed11197ae30b6e2ef6097ee026d3"
+  }
+}

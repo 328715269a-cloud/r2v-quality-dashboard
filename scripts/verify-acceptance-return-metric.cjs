@@ -31,7 +31,7 @@ const helpers = [
   'inDateRange', 'singleScopeDate', 'canViewAllGroups', 'canViewGroup', 'selectedGroup',
   'inCurrentScope', 'eventsForTask', 'liveEvents', 'taskSnapshot', 'taskWithSnapshot',
   'taskIndex', 'allTasks', 'overviewCacheForState', 'overviewMemo', 'overviewTasks',
-  'overviewReviewFacts', 'countRangeAcceptance', 'renderTodayMetrics'
+  'overviewReviewFacts', 'countRangeAcceptance', 'countRangeQcPass', 'renderTodayMetrics'
 ].map(extract).join('\n');
 const at = (day, time = '09:00:00') => `2026-10-${day}T${time}+08:00`;
 const event = (type, day = 20, extra = {}) => ({type, at: at(day), ...extra});
