@@ -273,7 +273,7 @@
               <button id="acceptanceCopySelected" class="btn ghost small" type="button" title="复制已勾选的待验收 TID">复制已勾选 TID</button>
               <span class="finder-keyword-field"><label class="field" for="acceptanceKeyword"><span>片段查找</span><input id="acceptanceKeyword" type="search" spellcheck="false" placeholder="TID / 影片 / 标注人片段"></label><button id="acceptanceKeywordBtn" class="btn small" type="button">查找待验收</button></span>
             </div>
-            <label class="field" for="acceptanceText"><span>本次验收的 TID（可批量粘贴）</span><textarea id="acceptanceText" rows="4" spellcheck="false" placeholder="TID001&#10;TID002&#10;每行一个，也可用空格、逗号、分号分隔" aria-describedby="acceptanceHelp"></textarea><small id="acceptanceHelp">只粘贴 TID；空格、逗号、分号会自动拆分，重复、未导入或不在待验收状态的会单独提示。</small></label>
+            <label class="field" for="acceptanceText"><span>本次验收的 TID（可批量粘贴）</span><textarea id="acceptanceText" rows="4" spellcheck="false" placeholder="TID001&#10;TID002&#10;每行一个，也可用空格、逗号、分号分隔" aria-describedby="acceptanceHelp"></textarea><small id="acceptanceHelp">只粘贴 TID，重复、未导入或不在待验收状态的会单独提示。支持同一镜头内跨组退回；跨组时顶部选择“全部小组”。</small></label>
             <div class="import-actions"><button id="acceptancePreviewBtn" class="btn" type="button">批量查找</button></div>
             <div id="acceptancePreview" class="preview-box" aria-live="polite">粘贴 TID 或先用上方片段查找，查找结果会显示影片、小组、标注人和当前状态。</div>
             <fieldset id="acceptanceChoice" class="batch-status-choice"><legend>所选 TID 的处理方式</legend><div class="decision-options"><label><input type="radio" name="acceptanceResult" value="acceptance_pass"> 实检合格，验收通过</label><label><input type="radio" name="acceptanceResult" value="acceptance_fail"> 实检不合格，退回质检</label><label><input type="radio" name="acceptanceResult" value="acceptance_reject"> 拒绝，结束流转</label><label><input type="radio" name="acceptanceResult" value="acceptance_batch_return"> 整批退回，统一复查</label></div></fieldset>
@@ -331,6 +331,6 @@
   <script src="shared-store.20260923-prod37.js" defer></script>
   <script src="workflow.20261020-prod74-acceptance-sampling.js" defer></script>
   <script src="reports.20261020-prod74-acceptance-sampling.js" defer></script>
-  <script src="app.20261020-prod77-qc-pass-range.js" defer></script>
+  <script src="app.20261022-prod78-cross-group-return.js" defer></script>
 </body>
 </html>

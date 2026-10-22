@@ -1337,9 +1337,14 @@
   }
   function acceptanceBatchReturnEvents(source,selected,note,batchId,options={}) {
     const tasks=selected.map(row=>{const task=findTask(source,row.id);assertFresh(task,row.expected);return task;});
-    if(!tasks.length||new Set(tasks.map(task=>task.groupId)).size!==1)throw new Error('整批退回每次只处理一个小组，请核对并选择同一小组的 TID。本批未保存。');
+    if(!tasks.length)throw new Error('请先选择待验收的 TID。本批未保存。');
     if(note.length>1960)throw new Error('统一复查的补充说明请控制在 1960 字以内，本批未保存。');
     return tasks.map(task=>acceptanceEvent(source,task,'acceptance_fail',`[随批退回] 整批退回，统一复查${note?`；${note}`:''}`,{acceptanceInspection:'uninspected',acceptanceBatchId:batchId,...(options.ignoreFilters?{source:'acceptance_import'}:{})},options));
+  }
+  function acceptanceReturnGroups(tasks) {
+    const groups=new Map();
+    tasks.forEach(task=>groups.set(task.groupId,(groups.get(task.groupId)||0)+1));
+    return `${groups.size} 个小组（${[...groups].map(([id,count])=>`${groupLabel(id)} ${count} 条`).join('；')}），分别退回所属小组质检`;
   }
   let acceptanceCapabilityAt=0;
   async function requireAcceptanceInspectionSupport() {
@@ -1414,8 +1419,10 @@
     $('acceptanceChoiceNote').maxLength=batchReturn?1960:2000;
     $('acceptanceCommitBtn').disabled=acceptanceBusy||!current||blocked||!selected||!type||(noteRequired&&!note);
     $('acceptanceCommitBtn').textContent=acceptanceBusy?'正在保存…':batchReturn?`确认整批退回 ${selected} 条`:`保存所选 ${selected} 条`;
-    setText('acceptanceChoiceHelp',batchReturn?'所选 TID 将统一退回质检，显示“随批退回”；不记录实检合格或不合格，不计入首次验收实检准确率。可补充说明。':'实检结果用于准确率；拒绝后结束流转。需要统一复查时，选择“整批退回，统一复查”。');
-    setText('acceptanceChoiceSummary',current?`已选 ${selected} 条${blocked?' · 请先修正多列内容':''}`:'请先校验 TID');
+    setText('acceptanceChoiceHelp',batchReturn?'支持不同小组，分别退回各自小组质检，显示“随批退回”；不记录实检合格或不合格，不计入首次验收实检准确率。可补充说明。':'实检结果用于准确率；拒绝后结束流转。需要统一复查时，选择“整批退回，统一复查”。');
+    const selectedIds=new Set(inputs.filter(input=>input.checked&&!input.disabled).map(input=>input.value));
+    const groupSummary=current&&batchReturn&&selected?` · ${acceptanceReturnGroups(acceptanceDraft.rows.filter(row=>row.outcome==='success'&&selectedIds.has(row.taskId)).map(row=>row.task))}`:'';
+    setText('acceptanceChoiceSummary',current?`已选 ${selected} 条${groupSummary}${blocked?' · 请先修正多列内容':''}`:'请先校验 TID');
     const selectAll=$('acceptanceImportSelectAll');if(selectAll){const enabled=inputs.filter(input=>!input.disabled);selectAll.disabled=acceptanceBusy||!enabled.length||blocked;selectAll.checked=!!enabled.length&&selected===enabled.length;selectAll.indeterminate=selected>0&&selected<enabled.length;}
   }
   function renderAcceptancePreview(selectedIds) {
@@ -1910,8 +1917,8 @@
     if($('acceptanceBulkDecisionForm')||$('acceptanceSampleForm')){showToast('请先保存或取消当前批量处理，已填写的说明保留。','error');return;}
     const selected=checkedAcceptanceTasks();if(!selected.length){showToast('请先勾选待验收任务。','error');return;}
     const reject=type==='acceptance_reject',batchReturn=type==='acceptance_batch_return',target=$('acceptanceBulkWorkbench');
-    if(batchReturn&&new Set(selected.map(row=>findTask(state,row.id).groupId)).size!==1){showToast('整批退回每次只处理一个小组，请选择同一小组的 TID。','error');return;}
-    target.innerHTML=`<form id="acceptanceBulkDecisionForm" class="workbench-form" data-decision="${type}" data-scope="${escapeHtml(acceptanceScopeKey())}" data-batch-id="${escapeHtml(uid('acceptance_batch'))}"><h3>${batchReturn?'整批退回，统一复查':reject?'拒绝并结束流转':'实检不合格，退回质检'} · ${selected.length} 条</h3><p>${batchReturn?'名单已固定，所选任务统一退回质检并显示“随批退回”。不记录实检合格或不合格，不计入首次验收实检准确率。':reject?'拒绝后不退回质检或标注，任务与历史记录仍保留。':'任务退回质检处理；质检可自行修改，或交给标注返修。'}</p><label class="field"><span>${batchReturn?'补充说明（选填）':`${reject?'拒绝原因':'实检不合格的原因'}（适用于全部勾选任务）`}</span><textarea name="note" ${batchReturn?'placeholder="统一说明：整批退回，统一复查"':'required'} maxlength="2000"></textarea></label><div class="row-actions"><button type="submit" class="btn ${reject?'danger':'primary'}">${batchReturn?`确认整批退回 ${selected.length} 条`:reject?'确认拒绝并结束流转':'确认退回质检'}</button><button type="button" class="btn ghost" data-action="cancel-bulk-acceptance">取消</button></div></form>`;
+    const groupSummary=batchReturn?acceptanceReturnGroups(selected.map(row=>findTask(state,row.id))):'';
+    target.innerHTML=`<form id="acceptanceBulkDecisionForm" class="workbench-form" data-decision="${type}" data-scope="${escapeHtml(acceptanceScopeKey())}" data-batch-id="${escapeHtml(uid('acceptance_batch'))}"><h3>${batchReturn?'整批退回，统一复查':reject?'拒绝并结束流转':'实检不合格，退回质检'} · ${selected.length} 条</h3><p>${batchReturn?'名单已固定，所选任务分别退回各自小组质检并显示“随批退回”。不记录实检合格或不合格，不计入首次验收实检准确率。':reject?'拒绝后不退回质检或标注，任务与历史记录仍保留。':'任务退回质检处理；质检可自行修改，或交给标注返修。'}</p>${batchReturn?`<p class="muted">${escapeHtml(groupSummary)}</p>`:''}<label class="field"><span>${batchReturn?'补充说明（选填）':`${reject?'拒绝原因':'实检不合格的原因'}（适用于全部勾选任务）`}</span><textarea name="note" ${batchReturn?'placeholder="统一说明：整批退回，统一复查"':'required'} maxlength="${batchReturn?1960:2000}"></textarea></label><div class="row-actions"><button type="submit" class="btn ${reject?'danger':'primary'}">${batchReturn?`确认整批退回 ${selected.length} 条`:reject?'确认拒绝并结束流转':'确认退回质检'}</button><button type="button" class="btn ghost" data-action="cancel-bulk-acceptance">取消</button></div></form>`;
     target.firstElementChild.__selected=selected;dirtyForms.add(target.firstElementChild);syncAcceptanceSelection();target.scrollIntoView({block:'nearest'});
   }
 
@@ -2297,6 +2304,6 @@
     try {state=await store.init();profile=store.profile();const retiredProfile=profile&&!validProfile(profile);initializeControls();initializeWorkflowControls();bindEvents();bindBulkEvents();bindModuleEvents();bindOverviewEvents();bindReassignEvents();if(profile&&!retiredProfile)enterApp();else{profile=null;showIdentity();if(retiredProfile)showToast('组别已更新，请选择当前作业类型与小组。');}}
     catch(error){$('appShell').classList.add('hidden');$('identityGate').classList.remove('hidden');const box=document.createElement('div');box.className='panel';const text=document.createElement('p');text.textContent='共享服务暂时无法连接，云端数据未清空。'+error.message;const button=document.createElement('button');button.type='button';button.className='btn primary';button.textContent='重试连接';button.addEventListener('click',()=>location.reload());box.append(text,button);$('identityGate').replaceChildren(box);}
   }
-  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20261020-prod77',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
+  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20261022-prod78',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
   init();
 })();
