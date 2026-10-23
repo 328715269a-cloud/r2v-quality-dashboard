@@ -276,8 +276,8 @@
             <label class="field" for="acceptanceText"><span>本次验收的 TID（可批量粘贴）</span><textarea id="acceptanceText" rows="4" spellcheck="false" placeholder="TID001&#10;TID002&#10;每行一个，也可用空格、逗号、分号分隔" aria-describedby="acceptanceHelp"></textarea><small id="acceptanceHelp">只粘贴 TID，重复、未导入或不在待验收状态的会单独提示。支持同一镜头内跨组退回；跨组时顶部选择“全部小组”。</small></label>
             <div class="import-actions"><button id="acceptancePreviewBtn" class="btn" type="button">批量查找</button></div>
             <div id="acceptancePreview" class="preview-box" aria-live="polite">粘贴 TID 或先用上方片段查找，查找结果会显示影片、小组、标注人和当前状态。</div>
-            <fieldset id="acceptanceChoice" class="batch-status-choice"><legend>所选 TID 的处理方式</legend><div class="decision-options"><label><input type="radio" name="acceptanceResult" value="acceptance_pass"> 实检合格，验收通过</label><label><input type="radio" name="acceptanceResult" value="acceptance_fail"> 实检不合格，退回质检</label><label><input type="radio" name="acceptanceResult" value="acceptance_reject"> 拒绝，结束流转</label><label><input type="radio" name="acceptanceResult" value="acceptance_batch_return"> 整批退回，统一复查</label></div></fieldset>
-            <label class="field" for="acceptanceChoiceNote"><span>说明（实检不合格或拒绝时必填，统一复查时选填）</span><textarea id="acceptanceChoiceNote" rows="2" maxlength="2000" placeholder="填写需要修改的问题、拒绝原因或补充说明"></textarea><small id="acceptanceChoiceHelp" aria-live="polite">实检结果用于准确率；拒绝后结束流转。需要统一复查时，选择“整批退回，统一复查”。</small></label>
+            <fieldset id="acceptanceChoice" class="batch-status-choice"><legend>所选 TID 的处理方式</legend><div class="decision-options"><label><input type="radio" name="acceptanceResult" value="acceptance_pass"> 实检合格，验收通过</label><label><input type="radio" name="acceptanceResult" value="acceptance_batch_pass"> 未实检，随批通过</label><label><input type="radio" name="acceptanceResult" value="acceptance_fail"> 实检不合格，退回质检</label><label><input type="radio" name="acceptanceResult" value="acceptance_reject"> 拒绝，结束流转</label><label><input type="radio" name="acceptanceResult" value="acceptance_batch_return"> 整批退回，统一复查</label></div></fieldset>
+            <label class="field" for="acceptanceChoiceNote"><span>说明（实检不合格或拒绝时必填，其余选填）</span><textarea id="acceptanceChoiceNote" rows="2" maxlength="2000" placeholder="填写需要修改的问题、拒绝原因或补充说明"></textarea><small id="acceptanceChoiceHelp" aria-live="polite">实际检查合格才选“实检合格”；未检查的随批放行请选“未实检，随批通过”。实检不合格与拒绝需填写原因。</small></label>
             <div class="bulk-entry-actions"><span id="acceptanceChoiceSummary" aria-live="polite">请先校验 TID</span><button id="acceptanceCommitBtn" class="btn primary" type="button" disabled>保存所选 0 条</button></div>
             <div id="acceptanceImportFeedback" class="inline-result" aria-live="polite"></div>
           </form>
@@ -295,7 +295,7 @@
               </div>
               <p class="acceptance-filter-hint">全选与待验收导出跟随筛选，包含全部分页。验收记录导出仍按上方小组和日期。</p>
             </div>
-            <div class="bulk-toolbar"><span id="acceptanceSelectionSummary" aria-live="polite">已选 0 条</span><div class="actions"><button id="acceptanceBulkPass" class="btn primary small" type="button" disabled>实检合格</button><button id="acceptanceBulkFail" class="btn small" type="button" disabled>实检不合格</button><button id="acceptanceBulkReject" class="btn danger small" type="button" disabled>拒绝 · 结束流转</button><button id="acceptanceBulkReturn" class="btn small" type="button" disabled>整批退回，统一复查</button><button id="acceptanceSampleBatch" class="btn small" type="button" disabled>抽检后整批处理</button></div></div>
+            <div class="bulk-toolbar"><span id="acceptanceSelectionSummary" aria-live="polite">已选 0 条</span><div class="actions"><button id="acceptanceBulkPass" class="btn primary small" type="button" disabled title="实际检查合格，计入实检准确率">实检合格，验收通过</button><button id="acceptanceBulkUninspectedPass" class="btn small" type="button" disabled title="未实际检查，只计验收通过量和闭环，不计实检准确率">未实检，随批通过</button><button id="acceptanceBulkFail" class="btn small" type="button" disabled>实检不合格</button><button id="acceptanceBulkReject" class="btn danger small" type="button" disabled>拒绝 · 结束流转</button><button id="acceptanceBulkReturn" class="btn small" type="button" disabled>整批退回，统一复查</button><button id="acceptanceSampleBatch" class="btn small" type="button" disabled>抽检后整批处理</button></div></div>
             <div id="acceptanceBulkWorkbench" class="bulk-workbench" aria-live="polite"></div>
             <div class="table-wrap"><table><thead><tr><th class="selection-cell"><input id="acceptanceSelectAll" type="checkbox" aria-label="全选当前范围待验收任务"></th><th>TID</th><th>影片</th><th>小组</th><th>标注人</th><th>当前状态</th><th>操作</th></tr></thead><tbody id="acceptanceBody"></tbody></table></div>
           </div>
@@ -331,6 +331,6 @@
   <script src="shared-store.20260923-prod37.js" defer></script>
   <script src="workflow.20261020-prod74-acceptance-sampling.js" defer></script>
   <script src="reports.20261020-prod74-acceptance-sampling.js" defer></script>
-  <script src="app.20261022-prod78-cross-group-return.js" defer></script>
+  <script src="app.20261023-prod79-uninspected-pass.js" defer></script>
 </body>
 </html>

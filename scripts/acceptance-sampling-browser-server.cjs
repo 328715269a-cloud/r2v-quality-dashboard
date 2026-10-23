@@ -23,7 +23,8 @@ function ready(prefix,count,movie,groupId='g01',mode='single',finish=false){
   if(finish)tx(mode==='single'?profiles.single:profiles.multi,{events:tasks.map(task=>event(task,'acceptance_pass',{acceptanceRound:1}))});
   return tasks;
 }
-ready('RETURN',100,'整批退回测试');ready('PASS',100,'随批放行测试');ready('DRAFT',3,'草稿冲突测试');
+const compact=process.env.SAMPLING_TEST_COMPACT==='1';
+ready('RETURN',compact?12:100,'整批退回测试');ready('PASS',compact?12:100,'随批放行测试');ready('DRAFT',3,'草稿冲突测试');
 ready('MULTI',10,'多镜头抽检测试','g06','multi');ready('DONE',1,'已完成隔离保护','g01','single',true);
 ready('LEGACY',2,'旧验收页兼容');
 const annotationBatch={id:uid('batch'),date:'2026-10-20',groupId:'g01',mode:'single',movie:'旧标注页兼容'};
