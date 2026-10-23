@@ -1,5 +1,18 @@
 # 正式新作业模式接手记录
 
+## 2026-10-23：待质检包含返修重新提交（prod80）
+
+单、多镜头小组总览“待质检”改为：当前仍为 pending_qc / pending_reqc，且本轮最近一次有效提交的日期在所选范围内；按当前 TID 去重。首次提交、二次及以上返修提交、验收退回标注后重新提交均计入。已通过、已拒绝、尚未重新提交的返修不计入。
+
+- 原算法只筛首次提交，再看最后质检结果，导致返修重提仍留在待返修或被历史质检通过排除。现在直接复用工作流投影的 submittedAt / status，不另扫每条历史；释放、旧页冲突、删除及组别权限沿用既有投影规则。
+- “待返修”仅增加当前状态约束，移出已重新提交或离开返修的任务；原首交日期范围与最后质检条件保留，未扩大该指标日期口径。
+- 已排查质检台、全部任务、组别/影片状态、Flow.counts、Reports 与导出 Worker：这些当前状态入口原已包含待复检，不需要改 API、状态机或导出结构。仅更新统计日卡及提示。
+- 专项合成测试与最终静态包浏览器 110 项通过；质检通过 154 项、验收通过/打回 197 项回归通过。公网验证 19 项资源及页面提示通过。
+- 只新增 app.20261023-prod80-qc-pending.js 并原子切换 index；307 个既有保护文件（授权 index 除外）、14 个容器和 Nginx 主进程保持；无重启、强制刷新、历史改写或生产测试写入。
+
+证据：docs/releases/workbench-20261023-prod80.json；脚本 scripts/verify-qc-pending-range.cjs、scripts/verify-qc-pending-range-browser.cjs；发布/回退工具 outputs/acceptance-sampling-20261020/qc-pending-range/。
+
+
 ## 2026-10-23：验收通过区分实检与未实检随批通过（prod79）
 
 单、多镜头的粘贴 TID、列表批量和单条验收入口均区分“实检合格，验收通过”与新增的“未实检，随批通过”。前者保持原逻辑；后者保存 acceptance_pass + acceptanceInspection=uninspected + acceptanceBatchId，说明带“[随批通过] 未实检，随批通过”。

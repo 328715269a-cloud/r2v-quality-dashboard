@@ -104,7 +104,7 @@
             <div class="overview-metric overview-metric-today-rework" title="统计所选日期内被验收打回的 TID 数，包含实检不合格和随批退回，不含拒绝。按打回发生日期筛选，同一 TID 当天或跨天多次打回，在所选区间合计只算 1 条；后来通过仍保留打回记录。"><span>验收打回</span><strong id="metricTodayAcceptReturn">—</strong><small id="metricTodayAcceptReturnHint">验收打回（条）· 含随批，跨天去重</small></div>
             <div class="overview-metric overview-metric-today-rework" title="统计所选日期内有过返修提交的任务去重条数；一个 case 当天返修多次也只算一条（区别于日报「返修提交（次）」）。"><span>返修量</span><strong id="metricTodayRework">—</strong><small id="metricTodayReworkHint">返修任务（条）· 去重</small></div>
             <div class="overview-metric overview-metric-today-rework-pending" title="统计所选日期内首次标完、且最后一次质检判定为打回、截至此刻还没通过的条数。"><span>待返修</span><strong id="metricTodayReworkPending">—</strong><small id="metricTodayReworkPendingHint">打回待返修（条）</small></div>
-            <div class="overview-metric overview-metric-today-qc-pending" title="统计所选日期内首次标完、但截至此刻还没有质检判定的条数。"><span>待质检</span><strong id="metricTodayQcPending">—</strong><small id="metricTodayQcPendingHint">首交待质检（条）</small></div>
+            <div class="overview-metric overview-metric-today-qc-pending" title="按本轮提交日期筛选，统计当前仍待首次或再次质检的 TID，包含返修重提；同一 TID 只计一次。"><span>待质检</span><strong id="metricTodayQcPending">—</strong><small id="metricTodayQcPendingHint">提交待质检（条）· 含返修，TID 去重</small></div>
             <div class="overview-metric overview-metric-today-ann-people" title="统计所选日期内有过标注提交（含返修重交）的去重人数。范围跟随上方日期与小组筛选。"><span>标注人数</span><strong id="metricTodayAnnotators">—</strong><small id="metricTodayAnnotatorsHint">有标注提交（人）</small></div>
             <div class="overview-metric overview-metric-today-qc-people" title="统计所选日期内做过质检判定（通过或打回）的去重人数。范围跟随上方日期与小组筛选。"><span>质检人数</span><strong id="metricTodayQcUsers">—</strong><small id="metricTodayQcUsersHint">有质检判定（人）</small></div>
             <div class="overview-metric overview-metric-firstqc" title="所选日期内首检通过的 TID ÷ 所选日期内首检通过或打回的 TID，按首检发生日期统计。质检拒绝不计入，后续返修复检不改变首次结果。"><span>首次质检准确率</span><strong id="metricFirstQcAccuracy">—</strong><small id="metricFirstQcDetail">按首检日期 · 拒绝不计入</small></div>
@@ -331,6 +331,6 @@
   <script src="shared-store.20260923-prod37.js" defer></script>
   <script src="workflow.20261020-prod74-acceptance-sampling.js" defer></script>
   <script src="reports.20261020-prod74-acceptance-sampling.js" defer></script>
-  <script src="app.20261023-prod79-uninspected-pass.js" defer></script>
+  <script src="app.20261023-prod80-qc-pending.js" defer></script>
 </body>
 </html>

@@ -2044,7 +2044,7 @@
     setText('metricTodayAcceptHint',`${dayWord}验收通过（条）· TID 跨天去重`);
     setText('metricTodayAcceptReturnHint',`${dayWord}验收打回（条）· 含随批，跨天去重`);
     setText('metricTodayReworkHint',`${dayWord}返修任务（条）· 一个 case 一次`);
-    setText('metricTodayQcPendingHint',`${dayWord}首交待质检（条）`);
+    setText('metricTodayQcPendingHint',`${dayWord}提交待质检（条）· 含返修，TID 去重`);
     setText('metricTodayReworkPendingHint',`${dayWord}打回待返修（条）`);
     setText('metricTodayAnnotatorsHint',`${dayWord}有标注提交（人）· 含返修`);
     setText('metricTodayQcUsersHint',`${dayWord}有质检判定（人）· 通过/打回`);
@@ -2066,22 +2066,29 @@
     return set.size;
   }
 
-  /* 未闭环拆分：所选日期内首交的任务，按当前最后一条质检判定分流 —— 待质检（还没质检）/ 待返修（最后被打回） */
+  // 待质检按当前这一轮的有效提交日期筛选，包含返修后重提。
+  // submittedAt 来自已缓存的工作流投影，不重复扫描历史，也不计被忽略的旧页面操作。
+  // 待返修保留原首交日期范围，但已重提或已离开返修状态的任务不再留在其中。
   function pendingReworkSplit() {
     const groupId=selectedGroup();
-    let qcPending=0,reworkPending=0;
+    const qcPending=new Set();let reworkPending=0;
     for(const task of allTasks()){
       if(task.mode!==activeMode)continue;
       if(groupId!=='all'&&task.groupId!==groupId)continue;
+      if(['pending_qc','pending_reqc'].includes(task.status)){
+        const submittedDate=acceptanceEventDate({at:task.submittedAt});
+        if(submittedDate&&inDateRange(submittedDate))qcPending.add(String(task.tid||task.id).trim()||task.id);
+        continue;
+      }
+      if(!['rework','acceptance_rework'].includes(task.status))continue;
       const events=liveEvents(task.id).slice().sort((a,b)=>String(a.at).localeCompare(String(b.at)));
       const first=events.find(event=>event.type==='submit');
       if(!first||!inDateRange(localDateString(new Date(first.at))))continue;
       let last=null;
       for(const event of events)if(event.type==='qc_pass'||event.type==='qc_fail')last=event.type;
-      if(last==='qc_pass')continue;
-      if(last==='qc_fail')reworkPending+=1;else qcPending+=1;
+      if(last==='qc_fail')reworkPending+=1;
     }
-    return {qcPending,reworkPending};
+    return {qcPending:qcPending.size,reworkPending};
   }
   /* 返修量：所选日期内有过返修提交的任务去重条数 —— 一个 case 多次返修只算一条（区别于「返修提交（次）」） */
   function countRangeReworkTasks() {
@@ -2319,6 +2326,6 @@
     try {state=await store.init();profile=store.profile();const retiredProfile=profile&&!validProfile(profile);initializeControls();initializeWorkflowControls();bindEvents();bindBulkEvents();bindModuleEvents();bindOverviewEvents();bindReassignEvents();if(profile&&!retiredProfile)enterApp();else{profile=null;showIdentity();if(retiredProfile)showToast('组别已更新，请选择当前作业类型与小组。');}}
     catch(error){$('appShell').classList.add('hidden');$('identityGate').classList.remove('hidden');const box=document.createElement('div');box.className='panel';const text=document.createElement('p');text.textContent='共享服务暂时无法连接，云端数据未清空。'+error.message;const button=document.createElement('button');button.type='button';button.className='btn primary';button.textContent='重试连接';button.addEventListener('click',()=>location.reload());box.append(text,button);$('identityGate').replaceChildren(box);}
   }
-  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20261023-prod79',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
+  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20261023-prod80',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
   init();
 })();
