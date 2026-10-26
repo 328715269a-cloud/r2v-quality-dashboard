@@ -1,0 +1,234 @@
+{
+  "version": "20261026-prod81",
+  "status": "deployed",
+  "baseCommit": "adc9857",
+  "checkedAt": "2026-10-26T08:51:13.262Z",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "change": {
+    "groupId": "m_newcomer",
+    "name": "多镜头新人组",
+    "mode": "multi",
+    "peerTo": "Existing multi groups 1–12",
+    "activeMultiGroups": 13,
+    "frontend": "Added shared group dictionary entry and identity hints; login, dispatch, group filters, group overview, assignment and export reuse existing group-scoped logic.",
+    "backend": "Added one MODES allowlist mapping; original 18 API mappings, permission rules, workflows, reports and storage schema unchanged.",
+    "existingData": "No task/member moves, history rewrites, task resets, or production test writes. Leader, daily total and headcount use the existing group settings."
+  },
+  "deployment": {
+    "apiContainer": "r2v-group-workbench-api-prod81",
+    "apiPort": 3022,
+    "apiCodeDirectory": "/home/deploy/releases/group-workbench-api-prod81/api",
+    "retainedApi": "r2v-group-workbench-api-prod74",
+    "retainedApiPort": 3021,
+    "database": "/opt/r2v/group-workbench-data/workbench.sqlite",
+    "databaseMigration": false,
+    "backupOwnerUnchanged": true,
+    "productionBusinessWrites": 0,
+    "oldServicesRestarted": false,
+    "forcedRefresh": false,
+    "protectedExistingFiles": 308,
+    "existingContainers": 14,
+    "nginxMasterUnchanged": true,
+    "oldWorkersDrained": true,
+    "backup": "/opt/r2v/backups/group-workbench/20261026-prod81-newcomer-group",
+    "sequence": "Prepare isolated compatible API using existing DB only, delegated backups, read-only code; validate; graceful Nginx reload; drain old workers/connections; atomic static index switch.",
+    "rollback": "Do not return to API74 or the original prod80 frontend after exposing the new group, even when no current tasks/sessions exist: already-open prod81 pages may register later. Keep m_newcomer compatibility in both layers and use a guarded forward fix. Database is never rolled back."
+  },
+  "validation": {
+    "runtime": {
+      "ok": true,
+      "runtime": "v22.23.2",
+      "checkedAt": "2026-10-26T08:45:47.783Z",
+      "legacySourceVerified": true,
+      "legacySourceSha256": {
+        "workbench-api/server.cjs": "c33691a61e75b77569d87aef9f3905b96a3cdadc178312d129c772696f181c4a",
+        "workbench-api/rules.cjs": "f6491dc4996d3a81d7412c6c4260c555032cd679d4c78f133d31309ae73ad109",
+        "workbench-api/record-index.cjs": "8d38db075f3f5075b58dcb46fb9301d3823d5e54b69cf1d304460cde324d33a0",
+        "group-workbench/workflow.js": "e79b50b37b802e90edec52136b9bb1a6c29154d2155247b646ba38ceaa4219f1"
+      },
+      "sourceSha256": {
+        "workbench-api/server.cjs": "c33691a61e75b77569d87aef9f3905b96a3cdadc178312d129c772696f181c4a",
+        "workbench-api/rules.cjs": "732131246e61469a649fe57a24f9bdc5c43c10c204c95d349c8f84c631e551a8",
+        "workbench-api/record-index.cjs": "8d38db075f3f5075b58dcb46fb9301d3823d5e54b69cf1d304460cde324d33a0",
+        "group-workbench/workflow.js": "e79b50b37b802e90edec52136b9bb1a6c29154d2155247b646ba38ceaa4219f1"
+      },
+      "testDependencySha256": {
+        "group-workbench/reports.js": "76e296bf923357c7aec7a3bf6f02cef3f746ed11197ae30b6e2ef6097ee026d3"
+      },
+      "independentProcesses": true,
+      "productionDataAccessed": false,
+      "groupId": "m_newcomer",
+      "existingGroupCount": 18,
+      "transactions": 35,
+      "tasks": 17,
+      "events": 55,
+      "proofs": [
+        "候选与 prod74 为独立进程，共享合成 WAL；候选启动不改旧状态，原管理员/单多镜标注/质检/验收会话全部直接可用",
+        "原有18组映射精确不变；m_newcomer 仅允许多镜，三种作业身份可登记，错模块/未知组/错口令与非管理员导入均拒绝",
+        "新人组完成导入→认领→提交→质检返修→重提→验收退回→标注/质检两条返修路径→通过；跨组标注/质检和单镜验收原子拒绝，多镜验收可按原权限处理",
+        "group:m_newcomer 组日设置、半人天人数与原乐观冲突规则可用；角色完整/增量同步按原组隔离，不泄漏其他组任务或组日记录",
+        "新组记录存在后，旧会话在候选与 prod74 两侧继续完成原单/多镜组保存；旧 API 全量校验及组日编辑正常；prod74 无新组写权限，切换后不能作为新组流量回退目标",
+        "两独立进程并发写同 WAL 仅一方版本成功、另一方409；同步后重试成功；跨进程同请求重复点击只提交一次，过期任务零写入",
+        "新人组任务/事件/小组/日报导出保留独立ID及中文组名，单镜导出不混入；通过/闭环与组日配置可见；旧任务和旧事件原文不变、无重复备份、SQLite完整性正常"
+      ]
+    },
+    "productionContainersUnchangedDuringTest": true,
+    "browserChecks": [
+      "login has newcomer alongside all 12 existing multi groups",
+      "newcomer can be selected for worker entry",
+      "multi login help names newcomer group",
+      "single login retains four active groups and excludes newcomer",
+      "prod81 candidate is loaded",
+      "admin multi import offers all 13 groups",
+      "newcomer import preview resolves correct mode and group",
+      "multi overview lists newcomer as a peer row",
+      "multi filter includes newcomer once",
+      "newcomer overview counts only its three TIDs",
+      "newcomer overview keeps only selected group row",
+      "all-task filter shows newcomer name and excludes other groups",
+      "real Reports tasks and groups label newcomer correctly",
+      "single admin scope excludes multi newcomer",
+      "single import does not offer newcomer",
+      "mode switching preserves newcomer import draft",
+      "annotation: newcomer identity is accepted",
+      "annotation: own newcomer group is locked",
+      "annotation: admin import and mode switch remain hidden",
+      "annotation: own pending task visible without same-name other-group tasks",
+      "annotation: cross-group TID claim rejected before any transaction",
+      "annotation: forged group selector cannot expose other-group totals",
+      "annotation: reports remain own-group despite forged scope",
+      "qc: newcomer identity is accepted",
+      "qc: own newcomer group is locked",
+      "qc: admin import and mode switch remain hidden",
+      "QC: review queue contains only newcomer submitted task",
+      "qc: forged group selector cannot expose other-group totals",
+      "qc: reports remain own-group despite forged scope",
+      "existing group QC session stays valid and cannot see newcomer tasks",
+      "admin: actual export worker tasks resolves newcomer label without leaking original group",
+      "admin: actual export worker groups resolves newcomer label without leaking original group",
+      "admin: actual export worker daily resolves newcomer label without leaking original group",
+      "admin: actual export worker personDaily resolves newcomer label without leaking original group",
+      "qc: actual export worker tasks resolves newcomer label without leaking original group",
+      "qc: actual export worker groups resolves newcomer label without leaking original group",
+      "qc: actual export worker daily resolves newcomer label without leaking original group",
+      "qc: actual export worker personDaily resolves newcomer label without leaking original group",
+      "synthetic source is not mutated",
+      "no production request or business mutation",
+      "frozen source hashes remain exact"
+    ],
+    "browserErrors": [],
+    "public": {
+      "ok": true,
+      "at": "2026-10-26T08:51:13.262Z",
+      "hashes": {
+        "ok": true,
+        "checks": [
+          "index",
+          "styles.20260922-prod25-today.css",
+          "styles.20260922-prod31-accept.css",
+          "styles.20260922-prod35-cards.css",
+          "first-qc-date.20260923-prod36.css",
+          "pagination.20260923-prod37.css",
+          "acceptance-filters.20260923-prod39.css",
+          "acceptance-finder.20260923-prod44.css",
+          "error-tids.20261008-prod70.css",
+          "/work-mode-entry.20260910.css",
+          "acceptance-sampling.20261020-prod74.css",
+          "data-io.20260920-prod8.js",
+          "shared-store.20260923-prod37.js",
+          "workflow.20261020-prod74-acceptance-sampling.js",
+          "reports.20261020-prod74-acceptance-sampling.js",
+          "app.20261026-prod81-newcomer-group.js",
+          "/",
+          "/group-beta/",
+          "/group-workbench-beta/"
+        ],
+        "health": {
+          "ok": true,
+          "backupDelegated": true
+        }
+      },
+      "facts": {
+        "version": "20261026-prod81",
+        "multi": [
+          {
+            "id": "g06",
+            "label": "多镜头1组"
+          },
+          {
+            "id": "g07",
+            "label": "多镜头2组"
+          },
+          {
+            "id": "g08",
+            "label": "多镜头3组"
+          },
+          {
+            "id": "g09",
+            "label": "多镜头4组"
+          },
+          {
+            "id": "g10",
+            "label": "多镜头5组"
+          },
+          {
+            "id": "m06",
+            "label": "多镜头6组"
+          },
+          {
+            "id": "m07",
+            "label": "多镜头7组"
+          },
+          {
+            "id": "m08",
+            "label": "多镜头8组"
+          },
+          {
+            "id": "m09",
+            "label": "多镜头9组"
+          },
+          {
+            "id": "m10",
+            "label": "多镜头10组"
+          },
+          {
+            "id": "m11",
+            "label": "多镜头11组"
+          },
+          {
+            "id": "m12",
+            "label": "多镜头12组"
+          },
+          {
+            "id": "m_newcomer",
+            "label": "多镜头新人组"
+          }
+        ],
+        "single": [
+          "g01",
+          "g02",
+          "g03",
+          "g04"
+        ],
+        "productionBusinessWrites": 0
+      },
+      "errors": []
+    }
+  },
+  "sourceSha256": {
+    "static": {
+      "index.html": "27ccc99a2551b95435848520eb1fb786e2ed2c95687cdcfb7d6fa4ac688ea2c4",
+      "app.20261026-prod81-newcomer-group.js": "09d27a036e0b22094de8119b14c7f35aeb8617a8f924f4f28cbca5ccebdeea8a",
+      "reports.20261020-prod74-acceptance-sampling.js": "76e296bf923357c7aec7a3bf6f02cef3f746ed11197ae30b6e2ef6097ee026d3",
+      "workflow.20261020-prod74-acceptance-sampling.js": "e79b50b37b802e90edec52136b9bb1a6c29154d2155247b646ba38ceaa4219f1",
+      "export-worker.20261020-prod74-acceptance-sampling.js": "4cfc638ec5d3027bc9f8e6597b861400b1344be10e58935114e5d55cbfd53c2c",
+      "acceptance-sampling.20261020-prod74.css": "ca613dd96210538f7cadb5255a981a4f27a9767eea520cbf8774fa6bf1c0e17d"
+    },
+    "api": {
+      "workbench-api/server.cjs": "c33691a61e75b77569d87aef9f3905b96a3cdadc178312d129c772696f181c4a",
+      "workbench-api/rules.cjs": "732131246e61469a649fe57a24f9bdc5c43c10c204c95d349c8f84c631e551a8",
+      "workbench-api/record-index.cjs": "8d38db075f3f5075b58dcb46fb9301d3823d5e54b69cf1d304460cde324d33a0",
+      "group-workbench/workflow.js": "e79b50b37b802e90edec52136b9bb1a6c29154d2155247b646ba38ceaa4219f1"
+    }
+  }
+}

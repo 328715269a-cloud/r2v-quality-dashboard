@@ -3,7 +3,8 @@
 
   const GROUPS = [
     ...[1,2,3,4,5].map(number=>({id:'g0'+number,name:`单镜头${number}组`,leader:'',defaultMode:'single',members:[],retired:number===5})),
-    ...[1,2,3,4,5,6,7,8,9,10,11,12].map(number=>({id:number<=5?'g'+String(number+5).padStart(2,'0'):'m'+String(number).padStart(2,'0'),name:`多镜头${number}组`,leader:'',defaultMode:'multi',members:[]}))
+    ...[1,2,3,4,5,6,7,8,9,10,11,12].map(number=>({id:number<=5?'g'+String(number+5).padStart(2,'0'):'m'+String(number).padStart(2,'0'),name:`多镜头${number}组`,leader:'',defaultMode:'multi',members:[]})),
+    {id:'m_newcomer',name:'多镜头新人组',leader:'',defaultMode:'multi',members:[]}
   ];
   const QC_TAGS = ['命名/ID对齐错误', '分类/标签归属错误', '朝向覆盖缺失（正/侧/背面）', '景别/机位/角度/朝向判定错误', 'AI生成/图片来源异常', 'ID合并/拆分错误', '主体/对象漏标', '图片模糊/清晰度不足', '黑边/裁切不完整', '其他主体混入/画面污染'];
   const QC_TAG_COLORS = ['#e4574c', '#e8913a', '#c9a227', '#7fae4e', '#3fa17b', '#3f8fae', '#5a6fd0', '#9a5fd0', '#c95893', '#8a8f98'];
@@ -539,8 +540,8 @@
     const selectedMode=mode==='multi'?'multi':'single',groups=activeGroups().filter(group=>group.defaultMode===selectedMode);
     $('identityMode').value=selectedMode;
     options($('identityGroup'),groups.map(group=>({value:group.id,label:group.name})),selected);
-    setText('identityModeHelp',selectedMode==='single'?'单镜头共4个小组。':'多镜头固定12个小组。');
-    setText('identityGroupHelp',selectedMode==='single'?'请选择：单镜头1组至单镜头4组。':'请选择：多镜头1组至多镜头12组。');
+    setText('identityModeHelp',selectedMode==='single'?'单镜头共4个小组。':'多镜头共13个小组，含新人组。');
+    setText('identityGroupHelp',selectedMode==='single'?'请选择：单镜头1组至单镜头4组。':'请选择：多镜头1组至多镜头12组，或多镜头新人组。');
     if(state)populateLegacyIdentity();
   }
   function validWorkerProfile(value) { return value && /^\p{Script=Han}{1,20}$/u.test(value.name) && GROUPS.some(group => group.id === value.groupId && (!value.mode || group.defaultMode === value.mode)) && ['annotation','qc','acceptance'].includes(value.role); }
@@ -2326,6 +2327,6 @@
     try {state=await store.init();profile=store.profile();const retiredProfile=profile&&!validProfile(profile);initializeControls();initializeWorkflowControls();bindEvents();bindBulkEvents();bindModuleEvents();bindOverviewEvents();bindReassignEvents();if(profile&&!retiredProfile)enterApp();else{profile=null;showIdentity();if(retiredProfile)showToast('组别已更新，请选择当前作业类型与小组。');}}
     catch(error){$('appShell').classList.add('hidden');$('identityGate').classList.remove('hidden');const box=document.createElement('div');box.className='panel';const text=document.createElement('p');text.textContent='共享服务暂时无法连接，云端数据未清空。'+error.message;const button=document.createElement('button');button.type='button';button.className='btn primary';button.textContent='重试连接';button.addEventListener('click',()=>location.reload());box.append(text,button);$('identityGate').replaceChildren(box);}
   }
-  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20261023-prod80',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
+  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20261026-prod81',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
   init();
 })();

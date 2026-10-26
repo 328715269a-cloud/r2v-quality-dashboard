@@ -1,5 +1,18 @@
 # 正式新作业模式接手记录
 
+## 2026-10-26：多镜头新增同级新人组（prod81）
+
+新增 **多镜头新人组**，稳定 ID 为 m_newcomer，与多镜头1—12组同级；多镜头共有13个可选小组。单镜头选项保持原样。登录、管理员任务导入、小组总览、全部任务筛选、质检、验收与导出均沿用现有组别规则；负责人、总量和人数用现有设置入口维护，不预置成员或任务。
+
+- 前端只增共享 GROUPS 字典项与提示；API 只增 MODES 的 m_newcomer:'multi'。既有组 ID、历史、归属、权限和统计口径不改。新人标注/质检仍只能操作自己组。
+- API81：/home/deploy/releases/group-workbench-api-prod81/api，容器 r2v-group-workbench-api-prod81，回环3022。共享原 SQLite/WAL/session；EXISTING_DATABASE_ONLY=1、SKIP_STARTUP_BACKUP=1、BACKUP_INTERVAL_MS=0，原定时备份负责人保持。旧API74/3021及其他14个既有容器未重启。
+- 先独立验证再侧起服务，Nginx graceful reload 后确认旧worker及3021连接排空，再原子切换index。308个既有文件（仅授权index和新模式API路由例外）、旧服务与Nginx master核对保持；无强制刷新、业务写入或数据迁移。
+- 同生产 Node v22.23.2 镜像合成HTTP验证通过：35事务、17任务、55事件，含旧会话继续保存、双进程WAL冲突/幂等、新组完整返修链路及隔离。最终静态包真实Chrome 41 项通过，已检查登录/导入/总览/筛选和CSV导出。公网加载与组别选项通过。
+- **回退边界**：新人组入口对外后，禁止回API74或原prod80字典。即使库中暂时没有新组数据，已打开的新页也可能稍后登记。前后端都保留新人组兼容，以前向补丁修复；不回退数据库。发布工具的 rollback-static 已拒绝旧入口回退。
+
+证据：docs/releases/workbench-20261026-prod81.json。测试：scripts/verify-multi-newcomer-api.cjs、scripts/verify-newcomer-group-browser.cjs。发布包、快照和分阶段发布工具：outputs/acceptance-sampling-20261020/newcomer-group/。
+
+
 ## 2026-10-23：待质检包含返修重新提交（prod80）
 
 单、多镜头小组总览“待质检”改为：当前仍为 pending_qc / pending_reqc，且本轮最近一次有效提交的日期在所选范围内；按当前 TID 去重。首次提交、二次及以上返修提交、验收退回标注后重新提交均计入。已通过、已拒绝、尚未重新提交的返修不计入。

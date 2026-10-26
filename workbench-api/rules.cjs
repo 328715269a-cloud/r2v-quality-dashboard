@@ -1,7 +1,7 @@
 'use strict';
 
 const Flow = require('../group-workbench/workflow.js');
-const MODES = Object.freeze({ g01:'single',g02:'single',g03:'single',g04:'single',g05:'single',s06:'single',g06:'multi',g07:'multi',g08:'multi',g09:'multi',g10:'multi',m06:'multi',m07:'multi',m08:'multi',m09:'multi',m10:'multi',m11:'multi',m12:'multi' });
+const MODES = Object.freeze({ g01:'single',g02:'single',g03:'single',g04:'single',g05:'single',s06:'single',g06:'multi',g07:'multi',g08:'multi',g09:'multi',g10:'multi',m06:'multi',m07:'multi',m08:'multi',m09:'multi',m10:'multi',m11:'multi',m12:'multi',m_newcomer:'multi' });
 const QC_TAGS = new Set(['命名/ID对齐错误','分类/标签归属错误','朝向覆盖缺失（正/侧/背面）','景别/机位/角度/朝向判定错误','AI生成/图片来源异常','ID合并/拆分错误','主体/对象漏标','图片模糊/清晰度不足','黑边/裁切不完整','其他主体混入/画面污染']);
 class ApiError extends Error { constructor(status,code,message){super(message);this.status=status;this.code=code;} }
 function check(ok,message,code='INVALID_TRANSACTION',status=400){if(!ok)throw new ApiError(status,code,message);}
