@@ -101,6 +101,8 @@
             group:row.group,mode:row.mode,assignee:atDecision.assignee || '',actor:row.actor,
             result:Flow.isAcceptanceReject(event)?'拒绝':event.type === 'acceptance_pass'?'通过':'不通过',acceptanceRound:atDecision.acceptanceRound,
             inspection:assessment.inspectionLabel,disposition:assessment.flowLabel,
+            acceptanceIssueLevel:assessment.acceptanceIssueLevel,
+            acceptanceP2Included:!current.deleted && assessment.included && assessment.isP2 ? '是' : '否',
             firstAcceptanceIncluded:!current.deleted && assessment.included ? '是' : '否',
             firstAcceptanceReason:current.deleted ? '任务已删除，保留历史' : assessment.reason,
             acceptanceBatchId:assessment.acceptanceBatchId,
@@ -110,6 +112,7 @@
           ['tid','TID'],['movie','影片 / 包'],['group','小组'],['mode','类型'],['assignee','验收时标注人'],['actor','验收人'],
           ['result','验收结果'],['acceptanceRound','验收轮次'],['note','验收说明'],['date','验收日期（北京时间）'],['at','验收时间（北京时间）'],
           ['inspection','实际检查结果'],['disposition','任务处置方式'],['firstAcceptanceIncluded','是否计入首次验收准确率'],['firstAcceptanceReason','首验计入口径'],['acceptanceBatchId','验收批次ID'],
+          ['acceptanceIssueLevel','验收瑕疵等级'],['acceptanceP2Included','是否计入P2改判数量'],
           ['statusLabel','当前最新状态'],['eventId','事件ID']
         ]),rows};
       } else {
@@ -141,7 +144,8 @@
               ['rounds','轮次'],['statusLabel','当前状态'],['firstQc','首次质检'],['lastUpdated','最后更新（北京时间）'],
               ['firstAcceptanceInspection','首轮验收实际检查结果'],['firstAcceptanceDisposition','首轮验收任务处置'],
               ['firstAcceptanceIncluded','是否计入首次验收准确率'],['firstAcceptanceReason','首验计入口径'],
-              ['firstAcceptanceAt','首轮验收时间（北京时间）'],['firstAcceptanceBatchId','首轮验收批次ID']
+              ['firstAcceptanceAt','首轮验收时间（北京时间）'],['firstAcceptanceBatchId','首轮验收批次ID'],
+              ['firstAcceptanceIssueLevel','首轮验收瑕疵等级'],['firstAcceptanceP2Included','是否计入P2改判数量'],['acceptanceIssueLevel','最近验收瑕疵等级']
             ]),
             rows: report.rows.map(row => ({
               tid: row.tid, movie: row.movie, group: row.group, mode: row.mode,
@@ -150,6 +154,8 @@
               statusLabel: row.statusLabel, firstQc: firstQcText(row.taskId), lastUpdated: beijingTime(row.lastUpdated),
               firstAcceptanceInspection:row.firstAcceptanceInspection,firstAcceptanceDisposition:row.firstAcceptanceDisposition,
               firstAcceptanceIncluded:row.firstAcceptanceIncluded ? '是' : '否',firstAcceptanceReason:row.firstAcceptanceReason,
+              firstAcceptanceIssueLevel:row.firstAcceptanceIssueLevel,firstAcceptanceP2Included:row.firstAcceptanceP2Included ? '是' : '否',
+              acceptanceIssueLevel:row.acceptanceIssueLevel,
               firstAcceptanceAt:beijingTime(row.firstAcceptanceAt),firstAcceptanceBatchId:row.firstAcceptanceBatchId
             }))
           };

@@ -6,6 +6,7 @@ const {createService}=require('../workbench-api/server.cjs');
 const Flow=require('../group-workbench/workflow.js');
 const root=path.resolve(__dirname,'..'),directory=fs.mkdtempSync(path.join(os.tmpdir(),'r2v-sampling-browser-'));
 const packaged=process.env.SAMPLING_TEST_PACKAGED==='1';
+const packageStatic=process.env.SAMPLING_TEST_PACKAGE_DIR?path.resolve(process.env.SAMPLING_TEST_PACKAGE_DIR):path.resolve(root,'../package/static');
 const port=Number(process.env.SAMPLING_TEST_PORT||43187),origin=`http://127.0.0.1:${port}`;
 const service=createService({directory,groupPin:'isolated-test-group-pin',adminPin:'isolated-test-admin-pin',backupIntervalMs:0,skipStartupBackup:true,allowedOrigins:[origin]});
 const profiles={admin:{name:'admin',role:'admin'},single:{name:'测试验收',role:'acceptance',groupId:'g01',mode:'single'},multi:{name:'多镜验收',role:'acceptance',groupId:'g06',mode:'multi'},annotation:{name:'旧页标注',role:'annotation',groupId:'g01',mode:'single'}};
@@ -54,7 +55,7 @@ const server=http.createServer(async(req,res)=>{
     if(legacy)file=path.resolve(root,'../live',filename);
     else if(url.pathname.startsWith('/group-workbench/')){
       if(packaged){
-        file=[path.resolve(root,'../package/static',filename),path.join(root,'group-workbench',filename),path.resolve(root,'../live',filename)].find(candidate=>fs.existsSync(candidate))||path.resolve(root,'../package/static',filename);
+        file=[path.join(packageStatic,filename),path.join(root,'group-workbench',filename),path.resolve(root,'../live',filename)].find(candidate=>fs.existsSync(candidate))||path.join(packageStatic,filename);
       }else{
         const source=/^(app|workflow|reports|shared-store|data-io|export-worker)(?:\.[^/]+)?\.js$/.exec(filename);
         file=path.join(root,'group-workbench',source?`${source[1]}.js`:filename);

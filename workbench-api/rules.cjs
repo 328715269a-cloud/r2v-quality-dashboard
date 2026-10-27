@@ -97,8 +97,9 @@ function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled
   // whole flow restarts. Historical admin_reassign events stay readable.
   const allowed=new Set(['dispatch','claim','submit','package_built','package_claimed','qc_pass','qc_fail','qc_reject','annotator_reject','reject_confirm','reject_return','acceptance_pass','acceptance_fail','acceptance_reject','acceptance_route','qc_repair_done','metadata_edit','admin_release','group_daily_edit','task_deleted']);
   for(const e of raw.events){const eventId=fresh(e);check(allowed.has(e.type),'不支持此操作');check(!e.identityAlias&&!e.legacyName&&!e.targetStatus,'正式模式不接受旧演示身份或跳步状态');let task;
-    const hasInspection=Object.hasOwn(e,'acceptanceInspection'),hasInspectionBatch=Object.hasOwn(e,'acceptanceBatchId');
+    const hasInspection=Object.hasOwn(e,'acceptanceInspection'),hasInspectionBatch=Object.hasOwn(e,'acceptanceBatchId'),hasIssueLevel=Object.hasOwn(e,'acceptanceIssueLevel');
     if(hasInspection||hasInspectionBatch)check(hasInspection&&['acceptance_pass','acceptance_fail'].includes(e.type),'检查结果与随批编号只能用于验收通过或退回');
+    if(hasIssueLevel)check(e.acceptanceIssueLevel==='P2'&&e.type==='acceptance_pass'&&hasInspection&&e.acceptanceInspection==='pass','验收 P2 仅用于已修正后的实检合格通过');
     const event={id:eventId,taskId:e.taskId,type:e.type,workflowVersion:e.assignmentKind==='rework_transfer'?4:3,at:stamp(),actor:profile.name,actorRole:profile.role};const note=text(e.note,2000);if(note)event.note=note;
     if(e.type==='group_daily_edit'){
       const group={groupId:e.groupId,mode:e.mode};manager(profile,group);check(e.taskId===`group:${e.groupId}`,'小组设置 ID 无效');checkPin(pin,'group');event.date=date(e.date);event.groupId=e.groupId;event.mode=e.mode;check(object(e.after)&&object(e.before),'小组设置格式无效');
@@ -141,6 +142,7 @@ function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled
               check(hasInspectionBatch||e.acceptanceInspection!=='uninspected'&&!(e.type==='acceptance_fail'&&e.acceptanceInspection==='pass'),'随批处理需要批次编号');
               event.acceptanceInspection=e.acceptanceInspection;
               if(hasInspectionBatch)event.acceptanceBatchId=text(e.acceptanceBatchId,128,true);
+              if(hasIssueLevel)event.acceptanceIssueLevel=e.acceptanceIssueLevel;
             }
             if(e.type==='acceptance_fail')event.note=text(e.note,2000,true);
           }

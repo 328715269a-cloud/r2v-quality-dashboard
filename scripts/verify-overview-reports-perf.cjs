@@ -91,6 +91,9 @@ const additiveColumns = new Set([
   'firstAcceptanceInspection','firstAcceptanceDisposition','firstAcceptanceIncluded','firstAcceptanceReason','firstAcceptanceAt','firstAcceptanceBatchId',
   'acceptanceInspection','acceptanceBatchId','acceptanceInspectionLabel','acceptanceDisposition','acceptanceFirstIncluded','acceptanceFirstReason',
   'firstAcceptanceInspectedTIDs','firstAcceptancePassedTIDs','firstAcceptanceAccuracy',
+  // P2 fields are additive; all pre-existing values and column order below
+  // must still match the immutable baseline for histories without P2 markers.
+  'firstAcceptanceIssueLevel','firstAcceptanceP2Included','acceptanceIssueLevel','acceptanceP2Included','firstAcceptanceP2TIDs','acceptanceP2Rate',
   'acceptanceInspectedPassActions','acceptanceInspectedFailActions','acceptanceBatchReturnActions','acceptanceBatchPassActions'
 ]);
 function originalColumns(value) {

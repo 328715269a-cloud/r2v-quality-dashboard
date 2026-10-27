@@ -126,7 +126,7 @@ function createService(options={}){
     try{
       const url=new URL(request.url,'http://localhost');check(url.pathname.startsWith(API),'未找到接口','NOT_FOUND',404);const endpoint=url.pathname.slice(API.length);
       if(request.headers.origin)check(allowedOrigins.has(request.headers.origin),'请求来源不允许','ORIGIN_FORBIDDEN',403);
-      if(endpoint==='health'&&request.method==='GET')return respond(response,200,{ok:true,service:'r2v-group-workbench',schemaVersion:1,revision:getRevision(),capabilities:{importDelete:{supported:true,enabled:importDeleteEnabled()},acceptanceInspection:{supported:true,version:1}},backup:{...backupState,mode:backupDelegated?'delegated':'local',delegated:backupDelegated}});
+      if(endpoint==='health'&&request.method==='GET')return respond(response,200,{ok:true,service:'r2v-group-workbench',schemaVersion:1,revision:getRevision(),capabilities:{importDelete:{supported:true,enabled:importDeleteEnabled()},acceptanceInspection:{supported:true,version:1},acceptanceP2:{supported:true,version:1}},backup:{...backupState,mode:backupDelegated?'delegated':'local',delegated:backupDelegated}});
       if(endpoint==='session'&&request.method==='POST'){const source=String(request.headers['x-forwarded-for']||request.socket.remoteAddress||'unknown').split(',').at(-1).trim();return respond(response,200,login(await bodyOf(request),source));}
       const token=request.headers['x-workbench-session'],profile=authenticate(token);
       if(endpoint==='session'&&request.method==='GET')return respond(response,200,{profile});

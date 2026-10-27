@@ -110,6 +110,7 @@
             <div class="overview-metric overview-metric-firstqc" title="所选日期内首检通过的 TID ÷ 所选日期内首检通过或打回的 TID，按首检发生日期统计。质检拒绝不计入，后续返修复检不改变首次结果。"><span>首次质检准确率</span><strong id="metricFirstQcAccuracy">—</strong><small id="metricFirstQcDetail">按首检日期 · 拒绝不计入</small></div>
             <button class="overview-metric overview-metric-today-rejected" type="button" data-action="overview-bucket" data-bucket="rejected" title="统计所选日期内被最终拒绝（质检拒绝 / 验收拒绝 / 标注拒绝确认废弃）的任务条数，按拒绝操作日期计入，可随上方日期筛选。点击查看已拒绝任务列表。"><span>已拒绝</span><strong id="metricRejected">—</strong><small id="metricRejectedHint">当日拒绝（条）</small></button>
             <div class="overview-metric overview-metric-firstqc" title="按首次验收的北京时间统计首轮实检合格 ÷ 首轮实检合格与不合格；未实检随批处理、拒绝和复验不计入。历史首次结果保持原口径。"><span>首次验收实检准确率</span><strong id="metricAcceptanceAccuracy">—</strong><small id="metricAcceptanceAccuracyDetail">按首次验收日期 · 复验不计入</small></div>
+            <div class="overview-metric overview-metric-firstqc" title="首次实检结果为 P2 修正后通过的 TID ÷ 全部首次实检 TID。P2 同时计入实检合格与验收通过；未实检随批处理、拒绝和复验不计入。范围跟随当前镜头、小组与首次实检日期。"><span>P2改判率</span><strong id="metricAcceptanceP2Rate">—</strong><small id="metricAcceptanceP2Detail">P2 / 首轮实检（条）</small></div>
             <div class="overview-metric overview-metric-qc-volume" title="所选日期内质检普通通过或打回的任务数，同一任务在区间内只计一次；直接拒绝和确认标注拒绝单列，不计入本项。先做过普通质检、后来拒绝的任务，仍保留之前普通质检的记录。验收操作、管理员释放前的记录不计入。"><span>质检量级</span><strong id="metricQcVolume">—</strong><small id="metricQcVolumeDetail">质检处理（条）· 不含拒绝</small></div>
             <div class="overview-metric overview-metric-today-rework overview-metric-qc-reject" title="质检直接拒绝或确认标注拒绝的任务数，按两种操作中首次发生的北京时间日期统计；同一任务当天或跨天只计一次。仅申请未确认、验收拒绝不计入。管理员释放前的记录不计入。"><span>质检拒绝</span><strong id="metricQcRejected">—</strong><small id="metricQcRejectedHint">首次质检拒绝（条）· 含确认拒绝</small></div>
             <div class="overview-metric overview-metric-acc-volume" title="所选日期内验收处理过的 case 数：通过、打回、拒绝都算，按判定发生日期计入，一条 case 只算一次；任务被管理员释放后此前的判定作废不计。"><span>验收量级</span><strong id="metricAcceptanceVolume">—</strong><small id="metricAcceptanceVolumeDetail">当日验收处理（条）· 去重</small></div>
@@ -276,7 +277,7 @@
             <label class="field" for="acceptanceText"><span>本次验收的 TID（可批量粘贴）</span><textarea id="acceptanceText" rows="4" spellcheck="false" placeholder="TID001&#10;TID002&#10;每行一个，也可用空格、逗号、分号分隔" aria-describedby="acceptanceHelp"></textarea><small id="acceptanceHelp">只粘贴 TID，重复、未导入或不在待验收状态的会单独提示。支持同一镜头内跨组退回；跨组时顶部选择“全部小组”。</small></label>
             <div class="import-actions"><button id="acceptancePreviewBtn" class="btn" type="button">批量查找</button></div>
             <div id="acceptancePreview" class="preview-box" aria-live="polite">粘贴 TID 或先用上方片段查找，查找结果会显示影片、小组、标注人和当前状态。</div>
-            <fieldset id="acceptanceChoice" class="batch-status-choice"><legend>所选 TID 的处理方式</legend><div class="decision-options"><label><input type="radio" name="acceptanceResult" value="acceptance_pass"> 实检合格，验收通过</label><label><input type="radio" name="acceptanceResult" value="acceptance_batch_pass"> 未实检，随批通过</label><label><input type="radio" name="acceptanceResult" value="acceptance_fail"> 实检不合格，退回质检</label><label><input type="radio" name="acceptanceResult" value="acceptance_reject"> 拒绝，结束流转</label><label><input type="radio" name="acceptanceResult" value="acceptance_batch_return"> 整批退回，统一复查</label></div></fieldset>
+            <fieldset id="acceptanceChoice" class="batch-status-choice"><legend>所选 TID 的处理方式</legend><div class="decision-options"><label><input type="radio" name="acceptanceResult" value="acceptance_pass"> 实检合格，验收通过</label><label><input type="radio" name="acceptanceResult" value="acceptance_p2_pass"> P2错误，修正后通过</label><label><input type="radio" name="acceptanceResult" value="acceptance_batch_pass"> 未实检，随批通过</label><label><input type="radio" name="acceptanceResult" value="acceptance_fail"> 实检不合格，退回质检</label><label><input type="radio" name="acceptanceResult" value="acceptance_reject"> 拒绝，结束流转</label><label><input type="radio" name="acceptanceResult" value="acceptance_batch_return"> 整批退回，统一复查</label></div></fieldset>
             <label class="field" for="acceptanceChoiceNote"><span>说明（实检不合格或拒绝时必填，其余选填）</span><textarea id="acceptanceChoiceNote" rows="2" maxlength="2000" placeholder="填写需要修改的问题、拒绝原因或补充说明"></textarea><small id="acceptanceChoiceHelp" aria-live="polite">实际检查合格才选“实检合格”；未检查的随批放行请选“未实检，随批通过”。实检不合格与拒绝需填写原因。</small></label>
             <div class="bulk-entry-actions"><span id="acceptanceChoiceSummary" aria-live="polite">请先校验 TID</span><button id="acceptanceCommitBtn" class="btn primary" type="button" disabled>保存所选 0 条</button></div>
             <div id="acceptanceImportFeedback" class="inline-result" aria-live="polite"></div>
@@ -295,7 +296,7 @@
               </div>
               <p class="acceptance-filter-hint">全选与待验收导出跟随筛选，包含全部分页。验收记录导出仍按上方小组和日期。</p>
             </div>
-            <div class="bulk-toolbar"><span id="acceptanceSelectionSummary" aria-live="polite">已选 0 条</span><div class="actions"><button id="acceptanceBulkPass" class="btn primary small" type="button" disabled title="实际检查合格，计入实检准确率">实检合格，验收通过</button><button id="acceptanceBulkUninspectedPass" class="btn small" type="button" disabled title="未实际检查，只计验收通过量和闭环，不计实检准确率">未实检，随批通过</button><button id="acceptanceBulkFail" class="btn small" type="button" disabled>实检不合格</button><button id="acceptanceBulkReject" class="btn danger small" type="button" disabled>拒绝 · 结束流转</button><button id="acceptanceBulkReturn" class="btn small" type="button" disabled>整批退回，统一复查</button><button id="acceptanceSampleBatch" class="btn small" type="button" disabled>抽检后整批处理</button></div></div>
+            <div class="bulk-toolbar"><span id="acceptanceSelectionSummary" aria-live="polite">已选 0 条</span><div class="actions"><button id="acceptanceBulkPass" class="btn primary small" type="button" disabled title="实际检查合格，计入实检准确率">实检合格，验收通过</button><button id="acceptanceBulkP2Pass" class="btn small" type="button" disabled title="验收时修正 P2 错误，计入实检合格与验收通过">P2错误，修正后通过</button><button id="acceptanceBulkUninspectedPass" class="btn small" type="button" disabled title="未实际检查，只计验收通过量和闭环，不计实检准确率">未实检，随批通过</button><button id="acceptanceBulkFail" class="btn small" type="button" disabled>实检不合格</button><button id="acceptanceBulkReject" class="btn danger small" type="button" disabled>拒绝 · 结束流转</button><button id="acceptanceBulkReturn" class="btn small" type="button" disabled>整批退回，统一复查</button><button id="acceptanceSampleBatch" class="btn small" type="button" disabled>抽检后整批处理</button></div></div>
             <div id="acceptanceBulkWorkbench" class="bulk-workbench" aria-live="polite"></div>
             <div class="table-wrap"><table><thead><tr><th class="selection-cell"><input id="acceptanceSelectAll" type="checkbox" aria-label="全选当前范围待验收任务"></th><th>TID</th><th>影片</th><th>小组</th><th>标注人</th><th>当前状态</th><th>操作</th></tr></thead><tbody id="acceptanceBody"></tbody></table></div>
           </div>
@@ -329,8 +330,8 @@
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
   <script src="data-io.20260920-prod8.js" defer></script>
   <script src="shared-store.20260923-prod37.js" defer></script>
-  <script src="workflow.20261020-prod74-acceptance-sampling.js" defer></script>
-  <script src="reports.20261020-prod74-acceptance-sampling.js" defer></script>
-  <script src="app.20261026-prod81-newcomer-group.js" defer></script>
+  <script src="workflow.20261027-prod82-acceptance-p2.js" defer></script>
+  <script src="reports.20261027-prod82-acceptance-p2.js" defer></script>
+  <script src="app.20261027-prod82-acceptance-p2.js" defer></script>
 </body>
 </html>

@@ -1,5 +1,19 @@
 # 正式新作业模式接手记录
 
+## 2026-10-27：验收 P2 修正后通过与 P2 改判率（prod82）
+
+验收新增 **P2错误，修正后通过**。验收人已完成修正后直接通过，仍是实检合格。总览在“首次验收实检准确率”后增加 **P2改判率**：首轮实检中的 P2 TID 数 ÷ 同一范围全部首轮实检 TID 数。例如普通合格8、P2合格1、不合格1：实检准确率90%，P2改判率10%。单多镜头、日期与小组共用原首轮样本；复验、未实检随批处理与拒绝不计入。历史数据不补猜 P2，质检 P2 不转成验收 P2。
+
+- 单条、粘贴 TID、勾选批量、抽检表单均支持。P2备注选填。抽检表单中 P2 必须属于实检名单且不与不合格重叠；有 P2 时不能选择整批退回，保留输入并提示改选其余随批放行或单独处理。原普通通过、未实检、退回与拒绝流程保持。
+- 事件字段为 acceptance_pass + acceptanceInspection:'pass' + acceptanceIssueLevel:'P2'。API 严格校验，不接受其他等级或未实检/退回/拒绝组合。每次 P2 提交先检查 health.capabilities.acceptanceP2={supported:true,version:1}；不支持时保存前阻止并保留输入。旧页面原提交不受该门槛影响。
+- 卡片复用同一次 acceptanceAccuracy 计算，新增 p2Count/p2Rate，不新增全量流水扫描。任务、流水、验收历史、首验明细、小组、影片及每日导出增补标记与计入口径；原列、数值保留。
+- API82位于 /home/deploy/releases/group-workbench-api-prod82/api，回环3023。原API81/3022及全部既有15个容器保持运行，原定时备份负责人不变。共享原 SQLite/WAL/session，无迁移或生产测试数据。先备份并验证新服务，Nginx平滑切换及旧连接排空后再原子更新index，无强制刷新。
+- 同线上 Node v22.23.2 镜像验证通过：36事务、32任务、157事件、39个非法/冲突请求；包含真实prod81源双进程WAL、旧会话、并发与幂等。最终静态包Chrome 43项通过；338项旧值对照和54项CSV对照通过。
+- 回退时必须保留P2字段和能力支持；已打开页面可能稍后提交，禁止退回会剥离字段的API81。采用兼容前向修复，不回退数据库。
+
+证据：docs/releases/workbench-20261027-prod82.json。测试：workbench-api/verify-acceptance-p2.cjs、scripts/verify-acceptance-p2-reports.cjs、scripts/verify-acceptance-p2-browser.cjs。发布工具、隔离验证与快照：outputs/acceptance-sampling-20261020/acceptance-p2/。
+
+
 ## 2026-10-26：多镜头新增同级新人组（prod81）
 
 新增 **多镜头新人组**，稳定 ID 为 m_newcomer，与多镜头1—12组同级；多镜头共有13个可选小组。单镜头选项保持原样。登录、管理员任务导入、小组总览、全部任务筛选、质检、验收与导出均沿用现有组别规则；负责人、总量和人数用现有设置入口维护，不预置成员或任务。

@@ -34,13 +34,13 @@ async function main(){
    const req=request(kind,scope),reports=reference(req),expected=chosen(reports,kind,req.scope),actual=exporter.generate(req,state);
    if(kind==='tasks'){
     // The served prod69 worker already customized tasks to ten UI columns.
-    // Compare those exact production values, then allow only the six new
-    // acceptance audit columns exercised by verify-acceptance-sampling-reports.
+    // Compare those exact production values, then allow the explicit acceptance
+    // audit/P2 columns exercised by the sampling and P2 report fixtures.
     const prior=productionTaskExporter.generate(req,state);
     const oldRows=IO.parseTable(await prior.blob.text()).records.map(row=>row.cells);
     const newRows=IO.parseTable(await actual.blob.text()).records.map(row=>row.cells);
     assert.deepEqual(newRows.map(row=>row.slice(0,10)),oldRows,'all existing prod69 task export values and order');
-    assert.deepEqual(newRows[0].slice(10),['首轮验收实际检查结果','首轮验收任务处置','是否计入首次验收准确率','首验计入口径','首轮验收时间（北京时间）','首轮验收批次ID']);
+    assert.deepEqual(newRows[0].slice(10),['首轮验收实际检查结果','首轮验收任务处置','是否计入首次验收准确率','首验计入口径','首轮验收时间（北京时间）','首轮验收批次ID','首轮验收瑕疵等级','是否计入P2改判数量','最近验收瑕疵等级']);
     assert.equal(actual.rowCount,prior.rowCount);
    }else{
     assert.equal(Buffer.from(await actual.blob.arrayBuffer()).toString('utf8'),IO.csv(expected.columns,expected.rows),`${kind} export bytes and field order`);assert.equal(actual.rowCount,expected.rows.length);

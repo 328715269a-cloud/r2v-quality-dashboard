@@ -1,0 +1,364 @@
+{
+  "version": "20261027-prod82",
+  "status": "deployed",
+  "baseCommit": "dde6e73d5ccf61eb85d07fe552b6756b7b478b43",
+  "checkedAt": "2026-10-27T02:56:21.407Z",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "change": {
+    "acceptanceChoice": "P2错误，修正后通过",
+    "event": {
+      "type": "acceptance_pass",
+      "acceptanceInspection": "pass",
+      "acceptanceIssueLevel": "P2"
+    },
+    "capability": {
+      "acceptanceP2": {
+        "supported": true,
+        "version": 1
+      }
+    },
+    "p2Rate": "First actual acceptance P2 TIDs / all first actual acceptance inspection TIDs; P2 remains an actual pass.",
+    "scopes": "Single/multi, selected group and first-acceptance Beijing date; use existing first-decision cohort. No new denominator or full-history pass.",
+    "exclusions": "Uninspected batch dispositions, reinspection and rejected decisions; no historical flags inferred from notes or QC P2.",
+    "entryPoints": [
+      "Single task",
+      "Pasted TIDs",
+      "Selected tasks",
+      "Sampled batch form"
+    ],
+    "sampleBatchGuard": "P2 requires direct pass; blocks whole-batch return + P2, preserves drafts and asks to use remaining-batch pass or separate P2 handling.",
+    "exports": [
+      "Tasks",
+      "Events",
+      "Acceptance history",
+      "First acceptance details",
+      "Groups",
+      "Movies",
+      "Daily"
+    ],
+    "oldStatisticsPreserved": true,
+    "historicalDataRewritten": false
+  },
+  "deployment": {
+    "apiContainer": "r2v-group-workbench-api-prod82",
+    "apiPort": 3023,
+    "apiCodeDirectory": "/home/deploy/releases/group-workbench-api-prod82/api",
+    "retainedApi": "r2v-group-workbench-api-prod81",
+    "retainedApiPort": 3022,
+    "database": "/opt/r2v/group-workbench-data/workbench.sqlite",
+    "databaseMigration": false,
+    "backupOwnerUnchanged": true,
+    "productionBusinessWrites": 0,
+    "oldServicesRestarted": false,
+    "forcedRefresh": false,
+    "protectedExistingFiles": 309,
+    "existingContainers": 15,
+    "nginxMasterUnchanged": true,
+    "oldWorkersDrained": true,
+    "backup": "/opt/r2v/backups/group-workbench/20261027-prod82-acceptance-p2",
+    "sequence": "Isolated same-image runtime and packaged Chrome tests; parallel candidate with existing DB only and delegated backups; online SQLite backup; graceful Nginx route switch; drain retained old workers and connections; atomic static index activation.",
+    "rollback": "Do not return to an API that strips acceptanceIssueLevel after exposing P2 pages. Retain P2 capability and field support, use a compatible forward fix, never roll back the shared database."
+  },
+  "validation": {
+    "runtime": {
+      "ok": true,
+      "runtime": "v22.23.2",
+      "checkedAt": "2026-10-27T02:52:36.644Z",
+      "legacySourceVerified": true,
+      "legacySourceSha256": {
+        "workbench-api/server.cjs": "c33691a61e75b77569d87aef9f3905b96a3cdadc178312d129c772696f181c4a",
+        "workbench-api/rules.cjs": "732131246e61469a649fe57a24f9bdc5c43c10c204c95d349c8f84c631e551a8",
+        "workbench-api/record-index.cjs": "8d38db075f3f5075b58dcb46fb9301d3823d5e54b69cf1d304460cde324d33a0",
+        "group-workbench/workflow.js": "e79b50b37b802e90edec52136b9bb1a6c29154d2155247b646ba38ceaa4219f1"
+      },
+      "sourceSha256": {
+        "workbench-api/server.cjs": "c87d77080b4d410eb242c425d19923a12434f3aa4cb702fa10735658e0873f9c",
+        "workbench-api/rules.cjs": "e2c732bc3d3cd7d83427d5027a3a2d710b3d27504d893f68e9504b8f2f2132c7",
+        "workbench-api/record-index.cjs": "8d38db075f3f5075b58dcb46fb9301d3823d5e54b69cf1d304460cde324d33a0",
+        "group-workbench/workflow.js": "99f53e8ba222f9f2055d51f894592555c983efe7746ce7d0d04ba354ac941556"
+      },
+      "independentProcesses": true,
+      "productionDataAccessed": false,
+      "invalidCases": 39,
+      "revision": 36,
+      "tasks": 32,
+      "events": 157,
+      "proofs": [
+        "旧会话与已有单/多镜含新人组任务直接接续；health增量声明P2能力，其余能力和schema版本保持",
+        "未知等级、缺实检字段、未实检/不合格/拒绝/非验收组合及非法批次全部原子拒绝；陈旧或缺失任务版本返回409",
+        "P2可不填说明且可多选实检，原样持久化为pass/pass/P2；直接闭环不增加轮次、不生成QC等级/标签；旧投影理解通过、跨进程重试幂等、终态保护保持",
+        "P2可加入合法统一batchId的实检/随批事务，标记不会传播到普通或未实检通过；验收同模块跨组可用、单多及角色边界不变、质检同步仍按原组隔离",
+        "旧格式通过/退回/拒绝保持原义；旧API可继续普通返修，服务端规范化旧轮次；质检P2与验收P2互不推导，标注返修和质检自修轮次不变",
+        "新P2通过与旧页退回并发只有一个完整结果；另一方409，成功请求跨进程重试不重复写入",
+        "投影每次验收决定重新计算P2，普通通过/退回/拒绝不残留；合法释放清空，已闭环释放继续忽略，QC标签显示不受影响",
+        "HTTP完整/增量及重开数据库保留P2字段与旧会话；历史任务事件原文不改、无迁移或重复备份、无关待验收任务保持"
+      ]
+    },
+    "productionContainersUnchangedDuringTest": true,
+    "browserChecks": [
+      "single: immutable packaged app URL loaded",
+      "single single: P2 explanation is optional",
+      "single single: old API capability blocks before any transaction",
+      "single single: choices and drafts remain available",
+      "single pasted TID: old API capability blocks before any transaction",
+      "single pasted TID: choices and drafts remain available",
+      "single pasted result identifies P2",
+      "single selected bulk: P2 note optional",
+      "single selected bulk: old API capability blocks before any transaction",
+      "single selected bulk: choices and drafts remain available",
+      "single sample: P2 blocks whole return without clearing inputs",
+      "single sample: overlapping P2/fail is blocked",
+      "single sample: categories remain disjoint",
+      "single sample: old API capability blocks before any transaction",
+      "single sample: choices and drafts remain available",
+      "single: all four entry points persist canonical P2 pass",
+      "single: ordinary pass/fail/uninspected remain distinct",
+      "single: each P2 save health-checks even after a recent success",
+      "single: P2 overview uses first actual inspection denominator",
+      "single: P2 metric immediately follows accuracy",
+      "ordinary actual pass remains available without P2 capability",
+      "multi: immutable packaged app URL loaded",
+      "multi single: P2 explanation is optional",
+      "multi single: old API capability blocks before any transaction",
+      "multi single: choices and drafts remain available",
+      "multi pasted TID: old API capability blocks before any transaction",
+      "multi pasted TID: choices and drafts remain available",
+      "multi pasted result identifies P2",
+      "multi selected bulk: P2 note optional",
+      "multi selected bulk: old API capability blocks before any transaction",
+      "multi selected bulk: choices and drafts remain available",
+      "multi sample: P2 blocks whole return without clearing inputs",
+      "multi sample: overlapping P2/fail is blocked",
+      "multi sample: categories remain disjoint",
+      "multi sample: old API capability blocks before any transaction",
+      "multi sample: choices and drafts remain available",
+      "multi: all four entry points persist canonical P2 pass",
+      "multi: ordinary pass/fail/uninspected remain distinct",
+      "multi: each P2 save health-checks even after a recent success",
+      "multi: P2 overview uses first actual inspection denominator",
+      "multi: P2 metric immediately follows accuracy",
+      "no page errors or external network requests",
+      "HTTP index and immutable app/workflow/reports match frozen package bytes"
+    ],
+    "browserErrors": [],
+    "reports": [
+      {
+        "command": "node scripts/verify-acceptance-p2-reports.cjs",
+        "actual": {
+          "p2Rate": "10.0%",
+          "fail": 1,
+          "checks": [
+            "single/multi parity",
+            "unchanged pass accuracy",
+            "first-round P2 freeze",
+            "uninspected/reject/reinspection exclusion",
+            "Beijing dates and group scopes",
+            "QC P2 separation",
+            "cached no-event scan",
+            "browser parity",
+            "task/event/group/movie/daily and worker exports",
+            "immutable sources"
+          ],
+          "p2Pass": 1,
+          "firstAccuracy": "90.0%",
+          "ordinaryPass": 8
+        },
+        "passed": true
+      },
+      {
+        "command": "node scripts/verify-overview-reports-perf.cjs",
+        "actual": {
+          "oracle": "reports.20260924-prod65-reject-col.js",
+          "eventCount": 5535,
+          "additiveP2Fields": [
+            "firstAcceptanceIssueLevel",
+            "firstAcceptanceP2Included",
+            "acceptanceIssueLevel",
+            "acceptanceP2Included",
+            "firstAcceptanceP2TIDs",
+            "acceptanceP2Rate"
+          ],
+          "fullToSelectedSpeedup": 9.03,
+          "selectedDailyMs": 61.94,
+          "comparisons": 338,
+          "selectedClosureAndDailyMs": 81.13,
+          "taskCount": 960
+        },
+        "passed": true
+      },
+      {
+        "command": "node scripts/verify-export-worker.cjs",
+        "actual": {
+          "backupByteIdentical": true,
+          "elapsedMs": 4115,
+          "scaleTasks": 12000,
+          "scaleEvents": 48000,
+          "outputBytes": 45095176,
+          "kindBuildEquivalent": true,
+          "mainFlowGuards": true,
+          "maxMainThreadTickGapMs": 20.6,
+          "byteIdenticalCsvComparisons": 54,
+          "mainThreadTicks": 267
+        },
+        "passed": true
+      },
+      {
+        "command": "node scripts/verify-acceptance-sampling-reports.cjs",
+        "actual": {
+          "inspected": 10,
+          "reinspectionCompleted": 100,
+          "returned": 100,
+          "accuracy": "80.0%",
+          "passed": 8,
+          "failed": 2
+        },
+        "passed": true
+      },
+      {
+        "command": "node scripts/verify-acceptance-accuracy.cjs",
+        "actual": {
+          "laterRoundsExcluded": 3,
+          "firstOwner": "张明",
+          "firstType": "acceptance_fail",
+          "firstAcceptanceDecisions": 1
+        },
+        "passed": true
+      },
+      {
+        "command": "node scripts/verify-acceptance-export.cjs",
+        "actual": {
+          "historyRows": 12,
+          "pendingRows": 69,
+          "projections": 1794
+        },
+        "passed": true
+      },
+      {
+        "command": "git diff --check -- group-workbench/reports.js group-workbench/export-worker.js scripts/verify-export-worker.cjs scripts/verify-overview-reports-perf.cjs scripts/verify-acceptance-p2-reports.cjs",
+        "actual": "No whitespace errors",
+        "passed": true
+      }
+    ],
+    "public": {
+      "ok": true,
+      "at": "2026-10-27T02:56:21.407Z",
+      "hashes": {
+        "ok": true,
+        "checks": [
+          "index",
+          "styles.20260922-prod25-today.css",
+          "styles.20260922-prod31-accept.css",
+          "styles.20260922-prod35-cards.css",
+          "first-qc-date.20260923-prod36.css",
+          "pagination.20260923-prod37.css",
+          "acceptance-filters.20260923-prod39.css",
+          "acceptance-finder.20260923-prod44.css",
+          "error-tids.20261008-prod70.css",
+          "/work-mode-entry.20260910.css",
+          "acceptance-sampling.20261020-prod74.css",
+          "data-io.20260920-prod8.js",
+          "shared-store.20260923-prod37.js",
+          "workflow.20261027-prod82-acceptance-p2.js",
+          "reports.20261027-prod82-acceptance-p2.js",
+          "app.20261027-prod82-acceptance-p2.js",
+          "export-worker.20261027-prod82-acceptance-p2.js",
+          "/",
+          "/group-beta/",
+          "/group-workbench-beta/"
+        ],
+        "health": {
+          "ok": true,
+          "acceptanceP2": {
+            "supported": true,
+            "version": 1
+          },
+          "backupDelegated": true
+        }
+      },
+      "facts": {
+        "version": "20261027-prod82",
+        "p2Metric": true,
+        "p2PastedChoice": true,
+        "p2BulkAction": true,
+        "multi": [
+          {
+            "id": "g06",
+            "label": "多镜头1组"
+          },
+          {
+            "id": "g07",
+            "label": "多镜头2组"
+          },
+          {
+            "id": "g08",
+            "label": "多镜头3组"
+          },
+          {
+            "id": "g09",
+            "label": "多镜头4组"
+          },
+          {
+            "id": "g10",
+            "label": "多镜头5组"
+          },
+          {
+            "id": "m06",
+            "label": "多镜头6组"
+          },
+          {
+            "id": "m07",
+            "label": "多镜头7组"
+          },
+          {
+            "id": "m08",
+            "label": "多镜头8组"
+          },
+          {
+            "id": "m09",
+            "label": "多镜头9组"
+          },
+          {
+            "id": "m10",
+            "label": "多镜头10组"
+          },
+          {
+            "id": "m11",
+            "label": "多镜头11组"
+          },
+          {
+            "id": "m12",
+            "label": "多镜头12组"
+          },
+          {
+            "id": "m_newcomer",
+            "label": "多镜头新人组"
+          }
+        ],
+        "single": [
+          "g01",
+          "g02",
+          "g03",
+          "g04"
+        ],
+        "productionBusinessWrites": 0
+      },
+      "errors": []
+    }
+  },
+  "sourceSha256": {
+    "static": {
+      "index.html": "996619b56cea115cfb2953e593cdcc82542f87831317e5cd715b70b6322e6f7f",
+      "app.20261027-prod82-acceptance-p2.js": "8830633435b5ab3f13a7dc523c8c1c0aa6392e936bd0610affba183e82c2fabf",
+      "reports.20261027-prod82-acceptance-p2.js": "0e21234db59f5cf6772e282198cb9945b5d528764d6963c9b0b459428c5237bd",
+      "workflow.20261027-prod82-acceptance-p2.js": "99f53e8ba222f9f2055d51f894592555c983efe7746ce7d0d04ba354ac941556",
+      "export-worker.20261027-prod82-acceptance-p2.js": "559d2206ec7643c800fbcddf67e9f02b45061d1118882687e83a320a8ae45967",
+      "acceptance-sampling.20261020-prod74.css": "ca613dd96210538f7cadb5255a981a4f27a9767eea520cbf8774fa6bf1c0e17d"
+    },
+    "api": {
+      "workbench-api/server.cjs": "c87d77080b4d410eb242c425d19923a12434f3aa4cb702fa10735658e0873f9c",
+      "workbench-api/rules.cjs": "e2c732bc3d3cd7d83427d5027a3a2d710b3d27504d893f68e9504b8f2f2132c7",
+      "workbench-api/record-index.cjs": "8d38db075f3f5075b58dcb46fb9301d3823d5e54b69cf1d304460cde324d33a0",
+      "group-workbench/workflow.js": "99f53e8ba222f9f2055d51f894592555c983efe7746ce7d0d04ba354ac941556"
+    }
+  }
+}
