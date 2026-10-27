@@ -66,7 +66,12 @@
         if(event.note)parts.push(event.note);return parts.join(' · ')||'已记录';
       };
       progress('正在生成所选报表…');
-      const reportInput = {state:source,tasks,auditTasks,groups:reportGroups,mode:scope.mode,statusMeta,groupLabel,eventLabel,eventDetail,localDate,
+      const contributions = new Map();
+      const contributionForTask = task => {
+        if(!contributions.has(task.id))contributions.set(task.id,Reports.annotationContributors(histories.get(task.id)||[]));
+        return contributions.get(task.id);
+      };
+      const reportInput = {state:source,tasks,auditTasks,groups:reportGroups,mode:scope.mode,statusMeta,groupLabel,eventLabel,eventDetail,localDate,contributionForTask,
         ...(scope.range === 'scope' ? {dateFrom:scope.dateFrom || '',dateTo:scope.dateTo || ''} : {})};
       const columns = definitions => definitions.map(([key,label]) => ({key,label}));
       let report;
@@ -90,7 +95,7 @@
         const detail = Reports.build({...reportInput,localDate:beijingDate,kind:'events'}).events;
         const rawTasks = new Map(source.tasks.map(task => [task.id,task])), currentTasks = new Map(auditTasks.map(task => [task.id,task]));
         const rawEvents = new Map((source.events || []).map(event => [event.id,event]));
-        const firstDecisions = new Map(auditTasks.map(task => [task.id,Reports.annotationContributors(histories.get(task.id) || []).firstAcceptanceDecision]));
+        const firstDecisions = new Map(auditTasks.map(task => [task.id,contributionForTask(task).firstAcceptanceDecision]));
         const positions = new Map();
         for (const [taskId,events] of histories) positions.set(taskId,new Map(events.map((event,index) => [event.id,index])));
         const rows = detail.rows.filter(row => ['acceptance_pass','acceptance_fail','acceptance_reject'].includes(row.type) && !row.excludedFromProgress).map(row => {
@@ -102,7 +107,8 @@
             result:Flow.isAcceptanceReject(event)?'拒绝':event.type === 'acceptance_pass'?'通过':'不通过',acceptanceRound:atDecision.acceptanceRound,
             inspection:assessment.inspectionLabel,disposition:assessment.flowLabel,
             acceptanceIssueLevel:assessment.acceptanceIssueLevel,
-            acceptanceP2Included:!current.deleted && assessment.included && assessment.isP2 ? '是' : '否',
+            acceptanceP2Included:row.acceptanceP2Included ? '是' : '否',
+            acceptanceActualIncluded:row.acceptanceActualIncluded ? '是' : '否',acceptanceActualReason:row.acceptanceActualReason,
             firstAcceptanceIncluded:!current.deleted && assessment.included ? '是' : '否',
             firstAcceptanceReason:current.deleted ? '任务已删除，保留历史' : assessment.reason,
             acceptanceBatchId:assessment.acceptanceBatchId,
@@ -112,7 +118,8 @@
           ['tid','TID'],['movie','影片 / 包'],['group','小组'],['mode','类型'],['assignee','验收时标注人'],['actor','验收人'],
           ['result','验收结果'],['acceptanceRound','验收轮次'],['note','验收说明'],['date','验收日期（北京时间）'],['at','验收时间（北京时间）'],
           ['inspection','实际检查结果'],['disposition','任务处置方式'],['firstAcceptanceIncluded','是否计入首次验收准确率'],['firstAcceptanceReason','首验计入口径'],['acceptanceBatchId','验收批次ID'],
-          ['acceptanceIssueLevel','验收瑕疵等级'],['acceptanceP2Included','是否计入P2改判数量'],
+          ['acceptanceIssueLevel','验收瑕疵等级'],['acceptanceP2Included','P2实检记录（统计按TID去重）'],
+          ['acceptanceActualIncluded','计入实际验收范围（含复验）'],['acceptanceActualReason','实际验收计入口径'],
           ['statusLabel','当前最新状态'],['eventId','事件ID']
         ]),rows};
       } else {
@@ -145,7 +152,8 @@
               ['firstAcceptanceInspection','首轮验收实际检查结果'],['firstAcceptanceDisposition','首轮验收任务处置'],
               ['firstAcceptanceIncluded','是否计入首次验收准确率'],['firstAcceptanceReason','首验计入口径'],
               ['firstAcceptanceAt','首轮验收时间（北京时间）'],['firstAcceptanceBatchId','首轮验收批次ID'],
-              ['firstAcceptanceIssueLevel','首轮验收瑕疵等级'],['firstAcceptanceP2Included','是否计入P2改判数量'],['acceptanceIssueLevel','最近验收瑕疵等级']
+              ['firstAcceptanceIssueLevel','首轮验收瑕疵等级'],['firstAcceptanceP2Included','是否首轮P2（原首轮口径）'],['acceptanceIssueLevel','最近验收瑕疵等级'],
+              ['actualAcceptanceIncluded','所选范围有实际验收（含复验）'],['actualAcceptanceP2Included','所选范围有P2（按TID去重）']
             ]),
             rows: report.rows.map(row => ({
               tid: row.tid, movie: row.movie, group: row.group, mode: row.mode,
@@ -156,13 +164,15 @@
               firstAcceptanceIncluded:row.firstAcceptanceIncluded ? '是' : '否',firstAcceptanceReason:row.firstAcceptanceReason,
               firstAcceptanceIssueLevel:row.firstAcceptanceIssueLevel,firstAcceptanceP2Included:row.firstAcceptanceP2Included ? '是' : '否',
               acceptanceIssueLevel:row.acceptanceIssueLevel,
+              actualAcceptanceIncluded:row.actualAcceptanceIncluded ? '是' : '否',actualAcceptanceP2Included:row.actualAcceptanceP2Included ? '是' : '否',
               firstAcceptanceAt:beijingTime(row.firstAcceptanceAt),firstAcceptanceBatchId:row.firstAcceptanceBatchId
             }))
           };
         }
       }
       if (!report) throw new Error('未找到此导出类型。');
-      if (scope.range === 'scope' && !['acceptancePending','groups','movies','summary'].includes(kind)) {
+      if (scope.range === 'scope' && kind === 'acceptanceP2' && scope.dateFrom && scope.dateTo && scope.dateFrom > scope.dateTo) throw new Error('请修正日期区间后再导出。');
+      if (scope.range === 'scope' && !['acceptancePending','acceptanceP2','groups','movies','summary'].includes(kind)) {
         if (scope.dateFrom && scope.dateTo && scope.dateFrom > scope.dateTo) throw new Error('请修正日期区间后再导出。');
         report = {...report, rows:report.rows.filter(row => {const date=String(row.date);return !!date&&(!scope.dateFrom||date>=scope.dateFrom)&&(!scope.dateTo||date<=scope.dateTo);})};
       }

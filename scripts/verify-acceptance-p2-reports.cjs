@@ -128,13 +128,13 @@ async function checkExports() {
   assert.equal(task.firstAcceptanceIssueLevel,'P2');assert.equal(task.firstAcceptanceP2Included,true);
   assert.equal(task.acceptanceIssueLevel,'P2','current inspection marker is exported separately from the first marker');
   const p2Events=report.events.rows.filter(row=>row.acceptanceIssueLevel==='P2');
-  assert.equal(p2Events.length,2);assert.equal(p2Events.filter(row=>row.acceptanceP2Included).length,1,'history keeps every marker, metric only first');
+  assert.equal(p2Events.length,2);assert.equal(p2Events.filter(row=>row.acceptanceP2Included).length,2,'both effective P2 inspections are eligible; the new metric deduplicates their TID');
   for(const summary of [report.groups.rows.find(row=>row.groupId==='g06'),report.movies.rows[0],report.daily.rows.find(row=>row.date==='2026-10-26'&&row.groupId==='g06')]) {
     assert.equal(summary.firstAcceptanceInspectedTIDs,10);assert.equal(summary.firstAcceptancePassedTIDs,9);
     assert.equal(summary.firstAcceptanceAccuracy,'90.0%');assert.equal(summary.firstAcceptanceP2TIDs,1);assert.equal(summary.acceptanceP2Rate,'10.0%');
   }
   const secondDay=report.daily.rows.find(row=>row.date==='2026-10-27'&&row.groupId==='g06');
-  assert.equal(secondDay.firstAcceptanceP2TIDs,0);assert.equal(secondDay.acceptanceP2Rate,'');
+  assert.equal(secondDay.firstAcceptanceP2TIDs,0);assert.equal(secondDay.firstAcceptanceP2Rate,'');assert.equal(secondDay.acceptanceP2Rate,'100.0%');
   const exporter=createExporter(Flow,Reports,IO);
   const output=async kind=>{
     const value=exporter.generate({kind,groups,statusMeta:Flow.STATUS_META,eventLabels:{},scope:{profile:{role:'admin'},mode:'multi',groupId:'g06',range:'all'}},f.state);
@@ -142,25 +142,26 @@ async function checkExports() {
     return parsed.records.slice(1).map(row=>Object.fromEntries(headers.map((key,index)=>[key,row.cells[index]])));
   };
   assert.equal((await output('acceptanceAccuracy')).filter(row=>row['验收瑕疵等级']==='P2').length,1);
-  assert.equal((await output('groups'))[0]['P2改判率（首轮P2/首轮全部实检）'],'10.0%');
+  assert.equal((await output('groups'))[0]['P2改判率（P2/实际验收TID）'],'10.0%');
   const history=await output('acceptanceHistory');
   assert.equal(history.filter(row=>row['实际检查结果']==='P2瑕疵，实检合格').length,2);
   assert.equal(history.filter(row=>row['实际检查结果']==='P2瑕疵，实检合格'&&row['是否计入首次验收准确率']==='是').length,1);
   assert.equal(history.filter(row=>row['验收瑕疵等级']==='P2').length,2);
-  assert.equal(history.filter(row=>row['是否计入P2改判数量']==='是').length,1);
+  assert.equal(history.filter(row=>row['P2实检记录（统计按TID去重）']==='是').length,2);
   const tasks=await output('tasks');assert.equal(tasks.filter(row=>row['首轮验收实际检查结果']==='P2瑕疵，实检合格').length,1);
   assert.equal(tasks.filter(row=>row['首轮验收瑕疵等级']==='P2').length,1);
   assert.equal(tasks.filter(row=>row['最近验收瑕疵等级']==='P2').length,1);
-  assert.equal(tasks.filter(row=>row['是否计入P2改判数量']==='是').length,1);
+  assert.equal(tasks.filter(row=>row['是否首轮P2（原首轮口径）']==='是').length,1);
   assert.equal(JSON.stringify(f.state),before,'all metric and export operations leave source records unchanged');
   f.verdict('sample-8','pass',{at:day('27'),acceptanceRound:3});
   const laterTask=(await output('tasks')).find(row=>row.TID==='TID-sample-8');
   assert.equal(laterTask['首轮验收瑕疵等级'],'P2');assert.equal(laterTask['最近验收瑕疵等级'],'');
-  assert.equal(laterTask['是否计入P2改判数量'],'是','a later ordinary pass never erases the first P2 metric');
+  assert.equal(laterTask['是否首轮P2（原首轮口径）'],'是','a later ordinary pass never erases the first P2 metric');
 }
 
 async function main() {
   checkMetric();checkExclusionsAndScope();await checkExports();
   console.log(JSON.stringify({ok:true,scenario:{ordinaryPass:8,p2Pass:1,fail:1,firstAccuracy:'90.0%',p2Rate:'10.0%'},checks:['single/multi parity','unchanged pass accuracy','first-round P2 freeze','uninspected/reject/reinspection exclusion','Beijing dates and group scopes','QC P2 separation','cached no-event scan','browser parity','task/event/group/movie/daily and worker exports','immutable sources']}));
 }
-main().catch(error=>{console.error(error);process.exitCode=1;});
+module.exports={fixture};
+if(require.main===module)main().catch(error=>{console.error(error);process.exitCode=1;});

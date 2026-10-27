@@ -1,0 +1,185 @@
+{
+  "version": "20261027-prod83",
+  "status": "deployed",
+  "baseCommit": "73fd96f00be457a511df5e16cac668503e2b6220",
+  "checkedAt": "2026-10-27T11:16:28.293Z",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "change": {
+    "p2Rate": "所选日期内给过验收 P2 的 TID 数 / 所选日期内实际验收过的 TID 数。首次与复验都算；先筛日期，再按单多镜头 + trim/uppercase TID 去重。",
+    "example": "同一 TID 首次不合格、返修后 P2 通过，两次都在范围内：分母 1、分子 1。",
+    "date": "每次有效验收事件的北京时间日期；支持单日及跨天区间。",
+    "scopes": [
+      "单镜头",
+      "多镜头",
+      "所选小组",
+      "所选日期"
+    ],
+    "exclusions": [
+      "未实检随批通过/退回",
+      "拒绝",
+      "删除任务",
+      "冲突事件",
+      "有效释放之前的流水"
+    ],
+    "p2Attribution": "只认验收 acceptance_pass + acceptanceInspection=pass + acceptanceIssueLevel=P2；不从质检等级或说明推测。",
+    "firstAcceptanceAccuracyUnchanged": true,
+    "exports": [
+      "新增 P2改判率明细（所选日期），每个 TID 一行",
+      "小组/影片/每日汇总同步新增全轮实检与 P2 TID 数",
+      "原首轮 P2 字段明确标为首轮",
+      "流水与验收记录标明全轮计入口径"
+    ],
+    "performance": "复用现有有效历史与贡献缓存；总览只取计数，不创建明细数组；CSV 仍通过 Worker 生成。",
+    "historicalDataRewritten": false
+  },
+  "deployment": {
+    "kind": "static-only",
+    "apiVersion": "20261027-prod82",
+    "apiPort": 3023,
+    "apiChanged": false,
+    "workflowChanged": false,
+    "databaseChanged": false,
+    "nginxReloaded": false,
+    "oldServicesRestarted": false,
+    "forcedRefresh": false,
+    "productionBusinessWrites": 0,
+    "protectedExistingFiles": 313,
+    "existingContainers": 16,
+    "existingServicesUnchanged": true,
+    "backup": "/opt/r2v/backups/group-workbench/20261027-prod83-p2-volume",
+    "sequence": "校验冻结包与隔离证据，增量放置不可变资源，备份旧 index，校验旧文件和服务未变后原子替换 index；所有旧资源保留。",
+    "rollback": "仅在当前 index 仍匹配本发布哈希时可恢复备份 index；保留新旧资源及 API82，不回退数据库。旧页可继续保存，新口径在用户完成填写后自行刷新时显示。"
+  },
+  "validation": {
+    "volumeBrowserChecks": 56,
+    "entrypointBrowserChecks": 43,
+    "reportCommands": [
+      "node scripts/verify-acceptance-p2-volume-reports.cjs",
+      "node scripts/verify-acceptance-p2-reports.cjs",
+      "node scripts/verify-acceptance-accuracy.cjs",
+      "node scripts/verify-acceptance-sampling-reports.cjs",
+      "node scripts/verify-acceptance-export.cjs",
+      "node scripts/verify-overview-reports-perf.cjs",
+      "node scripts/verify-export-worker.cjs",
+      "node --check group-workbench/reports.js",
+      "node --check group-workbench/export-worker.js",
+      "git diff --check -- group-workbench/reports.js group-workbench/export-worker.js group-workbench/workflow.js scripts/verify-acceptance-p2-volume-reports.cjs scripts/verify-acceptance-p2-reports.cjs scripts/verify-overview-reports-perf.cjs scripts/verify-export-worker.cjs scripts/verify-acceptance-accuracy.cjs"
+    ],
+    "reportRerun": "Worker 压力测试首次有调度耗时阈值失败，同源未修改阈值重跑通过；首次结果与重跑均保留在本地 reports-local.json。",
+    "public": {
+      "ok": true,
+      "at": "2026-10-27T11:16:17.930Z",
+      "hashes": {
+        "ok": true,
+        "checks": [
+          "index",
+          "styles.20260922-prod25-today.css",
+          "styles.20260922-prod31-accept.css",
+          "styles.20260922-prod35-cards.css",
+          "first-qc-date.20260923-prod36.css",
+          "pagination.20260923-prod37.css",
+          "acceptance-filters.20260923-prod39.css",
+          "acceptance-finder.20260923-prod44.css",
+          "error-tids.20261008-prod70.css",
+          "/work-mode-entry.20260910.css",
+          "acceptance-sampling.20261020-prod74.css",
+          "data-io.20260920-prod8.js",
+          "shared-store.20260923-prod37.js",
+          "workflow.20261027-prod82-acceptance-p2.js",
+          "reports.20261027-prod83-p2-volume.js",
+          "app.20261027-prod83-p2-volume.js",
+          "export-worker.20261027-prod83-p2-volume.js",
+          "/",
+          "/group-beta/",
+          "/group-workbench-beta/"
+        ],
+        "health": {
+          "ok": true,
+          "acceptanceP2": {
+            "supported": true,
+            "version": 1
+          },
+          "backupDelegated": true
+        }
+      },
+      "facts": {
+        "version": "20261027-prod83",
+        "p2Metric": true,
+        "p2PastedChoice": true,
+        "p2BulkAction": true,
+        "multi": [
+          {
+            "id": "g06",
+            "label": "多镜头1组"
+          },
+          {
+            "id": "g07",
+            "label": "多镜头2组"
+          },
+          {
+            "id": "g08",
+            "label": "多镜头3组"
+          },
+          {
+            "id": "g09",
+            "label": "多镜头4组"
+          },
+          {
+            "id": "g10",
+            "label": "多镜头5组"
+          },
+          {
+            "id": "m06",
+            "label": "多镜头6组"
+          },
+          {
+            "id": "m07",
+            "label": "多镜头7组"
+          },
+          {
+            "id": "m08",
+            "label": "多镜头8组"
+          },
+          {
+            "id": "m09",
+            "label": "多镜头9组"
+          },
+          {
+            "id": "m10",
+            "label": "多镜头10组"
+          },
+          {
+            "id": "m11",
+            "label": "多镜头11组"
+          },
+          {
+            "id": "m12",
+            "label": "多镜头12组"
+          },
+          {
+            "id": "m_newcomer",
+            "label": "多镜头新人组"
+          }
+        ],
+        "single": [
+          "g01",
+          "g02",
+          "g03",
+          "g04"
+        ],
+        "productionBusinessWrites": 0
+      },
+      "errors": []
+    },
+    "staticSha256": {
+      "index.html": "0844a553ef4388cb87694561d0d8acb7b093633c005bc2d0ae5136d2f1676f87",
+      "app.20261027-prod83-p2-volume.js": "471481f8676542521fb4fb96e2d68dad31cca38186cdced2f17d31cbc39551bf",
+      "reports.20261027-prod83-p2-volume.js": "365f865f20044494099d18f4ec46ebd8b5c8afbbe5fa577ed0e71945e18e23f1",
+      "export-worker.20261027-prod83-p2-volume.js": "11bc349a60511f13e67f351fca62b6ec9e8dd54ec5f5aa2ddc69aa4988332b60"
+    },
+    "protectedApiAndWorkflowHashes": {
+      "/opt/r2v/sites/quality/group-workbench/workflow.20261027-prod82-acceptance-p2.js": "99f53e8ba222f9f2055d51f894592555c983efe7746ce7d0d04ba354ac941556"
+    }
+  },
+  "localEvidence": "outputs/acceptance-sampling-20261020/p2-volume/"
+}

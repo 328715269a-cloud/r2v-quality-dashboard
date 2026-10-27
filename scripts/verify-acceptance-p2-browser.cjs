@@ -9,6 +9,8 @@ const packaged=process.env.P2_TEST_PACKAGED==='1'||process.env.SAMPLING_TEST_PAC
 const expectedApp=process.env.P2_EXPECTED_APP||'app.20261027-prod82-acceptance-p2.js';
 const port=Number(process.env.P2_TEST_PORT||43204),origin=`http://127.0.0.1:${port}`,out=process.env.P2_TEST_OUTPUT_DIR?path.resolve(process.env.P2_TEST_OUTPUT_DIR):path.resolve(__dirname,packaged?'../../acceptance-p2':'../../p2-browser');
 const packageDir=process.env.SAMPLING_TEST_PACKAGE_DIR?path.resolve(process.env.SAMPLING_TEST_PACKAGE_DIR):path.resolve(__dirname,'../../acceptance-p2/package/static');
+const inheritedDir=path.resolve(process.env.P2_INHERITED_STATIC_DIR||path.join(__dirname,'../../acceptance-p2/package/static'));
+function frozenResource(name){const current=path.join(packageDir,name);return fs.existsSync(current)?current:name==='workflow.20261027-prod82-acceptance-p2.js'?path.join(inheritedDir,name):current;}
 const checks=[],errors=[],requests=[],loadedAssets=[],resourceHashes=[],responseChecks=[];
 const check=(label,value)=>{assert(value,label);checks.push(label);console.log('PASS '+label);};
 async function state(){const response=await fetch(origin+'/__test/state');assert(response.ok);return response.json();}
@@ -49,7 +51,7 @@ async function main(){
       page.on('response',response=>{
         const url=new URL(response.url());if(url.origin!==origin||!url.pathname.startsWith('/group-workbench/'))return;
         const name=url.pathname.endsWith('/')?'index.html':path.basename(url.pathname);if(name!=='index.html'&&!/^(app|reports|workflow|export-worker)\..+\.js$/.test(name))return;
-        responseChecks.push(response.body().then(body=>{const sha256=createHash('sha256').update(body).digest('hex');resourceHashes.push({mode,url:response.url(),status:response.status(),name,sha256});if(packaged){const file=path.join(packageDir,name);assert(fs.existsSync(file),`Missing frozen resource ${name}`);assert.equal(sha256,createHash('sha256').update(fs.readFileSync(file)).digest('hex'),`HTTP resource ${name} must match frozen package`);}}).catch(error=>errors.push(error.message)));
+        responseChecks.push(response.body().then(body=>{const sha256=createHash('sha256').update(body).digest('hex'),file=packaged?frozenResource(name):undefined;resourceHashes.push({mode,url:response.url(),status:response.status(),name,sha256,frozenSource:file});if(packaged){assert(fs.existsSync(file),`Missing frozen resource ${name}`);assert.equal(sha256,createHash('sha256').update(fs.readFileSync(file)).digest('hex'),`HTTP resource ${name} must match frozen package`);}}).catch(error=>errors.push(error.message)));
       });
       page.on('request',request=>{if(request.method()==='POST'&&new URL(request.url()).pathname==='/group-workbench-api/transactions')requests.push(request.postDataJSON());});
       let p2Supported=false,healthReads=0;
@@ -97,7 +99,7 @@ async function main(){
       await page.locator('nav [data-view="overview"]').click();await page.locator('[data-date-preset="all"]').click();
       const total=mode==='single'?7:6,expected=(4/total*100).toFixed(1)+'%';
       await page.waitForFunction(expected=>document.getElementById('metricAcceptanceP2Rate').textContent===expected,expected);
-      check(`${mode}: P2 overview uses first actual inspection denominator`,await page.locator('#metricAcceptanceP2Rate').innerText()===expected&&(await page.locator('#metricAcceptanceP2Detail').innerText()).includes(`P2 4 / 首轮实检 ${total}`));
+      check(`${mode}: P2 overview uses unique actual inspection TIDs`,await page.locator('#metricAcceptanceP2Rate').innerText()===expected&&(await page.locator('#metricAcceptanceP2Detail').innerText()).includes(`P2 4 / 实检 ${total}`));
       check(`${mode}: P2 metric immediately follows accuracy`,await page.locator('#metricAcceptanceAccuracy').evaluate(element=>element.closest('.overview-metric').nextElementSibling.querySelector('#metricAcceptanceP2Rate')!==null));
       await page.locator('#metricAcceptanceP2Rate').locator('..').screenshot({path:path.join(out,`${mode}-p2-metric.png`)});
       await page.screenshot({path:path.join(out,`${mode}-overview-full.png`),fullPage:true});

@@ -25,12 +25,32 @@ function ready(prefix,count,movie,groupId='g01',mode='single',finish=false){
   return tasks;
 }
 const compact=process.env.SAMPLING_TEST_COMPACT==='1';
+function seedP2Volume(){
+  // Isolated startup only: deterministic dates without altering production clocks.
+  const RealDate=Date,sets=[];
+  const onDate=(day,run)=>{const at=RealDate.parse(day+'T04:00:00.000Z');global.Date=class extends RealDate{constructor(...args){super(...(args.length?args:[at]));}static now(){return at;}};try{return run();}finally{global.Date=RealDate;}};
+  const inspect=(entry,task,inspection,p2=false)=>{
+    const current=Flow.project(task,service.state().events.filter(e=>e.taskId===task.id));
+    tx(entry.acceptance,{events:[event(task,inspection==='fail'?'acceptance_fail':'acceptance_pass',{acceptanceInspection:inspection,expectedUpdatedAt:current.updatedAt,...(p2?{acceptanceIssueLevel:'P2'}:{}),...(inspection==='uninspected'?{acceptanceBatchId:uid('acceptance_batch')}:{}),note:'合成范围核对'})]});
+  };
+  const repair=(entry,task)=>{tx(entry.qc,{events:[event(task,'acceptance_route',{route:'qc',note:'合成复验'}),event(task,'qc_repair_done',{note:'合成返修完成'})]});};
+  onDate('2026-10-20',()=>{for(const mode of ['single','multi']){
+    const groupId=mode==='single'?'g01':'g06',otherGroup=mode==='single'?'g02':'g07';
+    const tasks=ready(mode==='single'?'VOLUME':'MULTIVOLUME',7,'P2区间核对影片',groupId,mode),other=ready(mode==='single'?'OTHER':'MULTIOTHER',1,'其他小组核对影片',otherGroup,mode)[0];
+    sets.push({mode,groupId,tasks,other,acceptance:profiles[mode],qc:{name:'测试组长',role:'qc',groupId,mode}});
+  }});
+  onDate('2026-10-21',()=>{for(const entry of sets){const [a,b,,,,f]=entry.tasks;inspect(entry,a,'fail');inspect(entry,b,'fail');inspect(entry,f,'pass',true);repair(entry,b);inspect(entry,b,'fail');}});
+  onDate('2026-10-22',()=>{for(const entry of sets){const [a,,c,d,e]=entry.tasks;repair(entry,a);inspect(entry,a,'pass',true);inspect(entry,c,'pass');inspect(entry,d,'uninspected');tx(entry.acceptance,{events:[event(e,'acceptance_reject',{note:'合成拒绝，不实检'})]});inspect(entry,entry.other,'pass',true);}});
+  onDate('2026-10-23',()=>{for(const entry of sets){const [,b,,,,,g]=entry.tasks;repair(entry,b);inspect(entry,b,'pass',true);inspect(entry,g,'pass');}});
+}
+if(process.env.SAMPLING_TEST_P2_VOLUME==='1')seedP2Volume();else{
 ready('RETURN',compact?12:100,'整批退回测试');ready('PASS',compact?12:100,'随批放行测试');ready('DRAFT',3,'草稿冲突测试');
 ready('MULTI',10,'多镜头抽检测试','g06','multi');ready('DONE',1,'已完成隔离保护','g01','single',true);
 ready('LEGACY',2,'旧验收页兼容');
 const annotationBatch={id:uid('batch'),date:'2026-10-20',groupId:'g01',mode:'single',movie:'旧标注页兼容'};
 const annotationTask={id:uid('task'),tid:'LEGACY-ANNOTATION',date:annotationBatch.date,groupId:'g01',mode:'single',movie:annotationBatch.movie,batchId:annotationBatch.id};
 annotationBatch.taskIds=[annotationTask.id];tx(profiles.admin,{tasks:[annotationTask],batches:[annotationBatch],events:[event(annotationTask,'dispatch')]});tx(profiles.annotation,{events:[event(annotationTask,'claim')]});
+}
 let healthSupported=true;
 const mime={'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.html':'text/html; charset=utf-8'};
 const server=http.createServer(async(req,res)=>{

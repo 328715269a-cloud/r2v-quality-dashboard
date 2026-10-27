@@ -40,7 +40,7 @@ async function main(){
     const oldRows=IO.parseTable(await prior.blob.text()).records.map(row=>row.cells);
     const newRows=IO.parseTable(await actual.blob.text()).records.map(row=>row.cells);
     assert.deepEqual(newRows.map(row=>row.slice(0,10)),oldRows,'all existing prod69 task export values and order');
-    assert.deepEqual(newRows[0].slice(10),['首轮验收实际检查结果','首轮验收任务处置','是否计入首次验收准确率','首验计入口径','首轮验收时间（北京时间）','首轮验收批次ID','首轮验收瑕疵等级','是否计入P2改判数量','最近验收瑕疵等级']);
+    assert.deepEqual(newRows[0].slice(10),['首轮验收实际检查结果','首轮验收任务处置','是否计入首次验收准确率','首验计入口径','首轮验收时间（北京时间）','首轮验收批次ID','首轮验收瑕疵等级','是否首轮P2（原首轮口径）','最近验收瑕疵等级','所选范围有实际验收（含复验）','所选范围有P2（按TID去重）']);
     assert.equal(actual.rowCount,prior.rowCount);
    }else{
     assert.equal(Buffer.from(await actual.blob.arrayBuffer()).toString('utf8'),IO.csv(expected.columns,expected.rows),`${kind} export bytes and field order`);assert.equal(actual.rowCount,expected.rows.length);

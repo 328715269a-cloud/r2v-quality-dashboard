@@ -47,7 +47,7 @@
       const from = nameOf(pair[0]), to = nameOf(pair[1]);
       if (from && to && from !== to) aliases.set(from, to);
     });
-    const result = { initial: null, submissions: [], rework: [], firstQc: null, firstAcceptance: null, firstAcceptanceDecision: null };
+    const result = { initial: null, submissions: [], rework: [], firstQc: null, firstAcceptance: null, firstAcceptanceDecision: null, acceptanceInspections: [] };
     const rework = new Map();
     let lastSubmit = null, firstClaim = null;
     const identity = event => ({ name: nameOf(event?.actor), rawName: text(event?.actor) });
@@ -78,6 +78,15 @@
         const owner = lastSubmit || firstClaim || { name: '', rawName: '' };
         result.firstAcceptance = { name: owner.name, rawName: owner.rawName, at: text(event.at), eventId: text(event.id) };
       }
+      if (['acceptance_pass', 'acceptance_fail', 'acceptance_reject'].includes(event.type)) {
+        const actual = actualAcceptanceAssessment(event);
+        if (actual.included) {
+          const owner = lastSubmit || firstClaim || { name: '', rawName: '' };
+          result.acceptanceInspections.push({ name: owner.name, rawName: owner.rawName, at: text(event.at), eventId: text(event.id),
+            type: event.type, acceptanceRound: event.acceptanceRound ?? '', date: actual.date,
+            inspection: actual.inspection, isP2: actual.isP2, acceptanceIssueLevel: actual.isP2 ? 'P2' : '' });
+        }
+      }
       if (['acceptance_pass', 'acceptance_fail', 'acceptance_reject'].includes(event.type) && !result.firstAcceptanceDecision) {
         const owner = lastSubmit || firstClaim || { name: '', rawName: '' };
         result.firstAcceptanceDecision = { name: owner.name, rawName: owner.rawName, at: text(event.at), eventId: text(event.id), type: flow.isAcceptanceReject(event) ? 'acceptance_reject' : event.type };
@@ -97,6 +106,69 @@
   function acceptanceDate(value) {
     const timestamp = Date.parse(value);
     return Number.isFinite(timestamp) ? new Date(timestamp + 8 * 60 * 60 * 1000).toISOString().slice(0, 10) : '';
+  }
+
+  // All effective actual inspections, independent of the first-round accuracy.
+  // Unclassified historical pass/fail keep their original meaning; explicit
+  // unsampled dispositions and rejection never become actual inspections.
+  function actualAcceptanceAssessment(event = {}) {
+    const legacy = !Object.hasOwn(event, 'acceptanceInspection');
+    const inspection = flow.acceptanceInspection(event), action = flow.acceptanceFlowAction(event), date = acceptanceDate(event.at);
+    let reason = '';
+    if (!action) reason = '非验收决定';
+    else if (action === 'reject') reason = '拒绝不计实检';
+    else if (!legacy && !['pass','fail','uninspected'].includes(event.acceptanceInspection)) reason = '检查标记无效';
+    else if (!legacy && (!Number.isSafeInteger(event.acceptanceRound) || event.acceptanceRound < 1)) reason = '验收轮次无效';
+    else if (inspection === 'uninspected') reason = '未实检随批处理';
+    else if (!['pass','fail'].includes(inspection)) reason = '没有实检结果';
+    else if (!date) reason = '实检时间无效';
+    const isP2 = !reason && event.type === 'acceptance_pass' && event.acceptanceInspection === 'pass' && event.acceptanceIssueLevel === 'P2';
+    return { included: !reason, reason: reason || (legacy ? '历史普通验收（原口径）' : '实际检查（含复验）'), date, inspection, isP2 };
+  }
+
+  function contributionReader(input) {
+    if (typeof input.contributionForTask === 'function') return input.contributionForTask;
+    const histories = new Map(), contributions = new Map();
+    (input.events || input.state?.events || []).forEach(event => {
+      if (!histories.has(event.taskId)) histories.set(event.taskId, []);
+      histories.get(event.taskId).push(event);
+    });
+    return task => {
+      if (!contributions.has(task.id)) contributions.set(task.id, annotationContributors(histories.get(task.id) || []));
+      return contributions.get(task.id);
+    };
+  }
+
+  function acceptanceP2(input = {}) {
+    const dateFrom = text(input.dateFrom), dateTo = text(input.dateTo);
+    if (dateFrom && dateTo && dateFrom > dateTo) return {total:0,p2Count:0,rate:null,rows:[]};
+    const readContribution = contributionReader(input), byTid = new Map(), includeRows = input.includeRows !== false;
+    (input.tasks || []).forEach(task => {
+      if (task.deleted || (input.mode && task.mode !== input.mode)
+        || (input.groupId && input.groupId !== 'all' && task.groupId !== input.groupId)) return;
+      for (const entry of readContribution(task)?.acceptanceInspections || []) {
+        if ((dateFrom && entry.date < dateFrom) || (dateTo && entry.date > dateTo)) continue;
+        const key = json([text(task.mode), text(task.tid).trim().toUpperCase() || text(task.id)]);
+        if (!byTid.has(key)) byTid.set(key, {tid:text(task.tid),mode:text(task.mode),isP2:false,...(includeRows?{inspections:[]}:{})});
+        const row = byTid.get(key);
+        if (entry.isP2) row.isP2 = true;
+        if (includeRows) row.inspections.push({...entry,taskId:task.id,movie:text(task.movie),groupId:text(task.groupId)});
+      }
+    });
+    if (!includeRows) {
+      const total = byTid.size, p2Count = Array.from(byTid.values()).filter(row=>row.isP2).length;
+      return {total,p2Count,rate:total ? p2Count / total * 100 : null,rows:[]};
+    }
+    const rows = Array.from(byTid.values()).map(row => {
+      const inspections = row.inspections, p2 = inspections.filter(entry => entry.isP2);
+      return {...row, taskIds:unique(inspections.map(entry=>entry.taskId)), movie:unique(inspections.map(entry=>entry.movie)).join('、'),
+        groupIds:unique(inspections.map(entry=>entry.groupId)), groupId:inspections[0].groupId,
+        name:unique(inspections.map(entry=>entry.name || '未记录标注人')).join('、'), isP2:p2.length > 0,
+        actualDates:unique(inspections.map(entry=>entry.date)).sort(), p2Dates:unique(p2.map(entry=>entry.date)).sort(),
+        eventIds:unique(inspections.map(entry=>entry.eventId)), p2EventIds:unique(p2.map(entry=>entry.eventId))};
+    });
+    const total = rows.length, p2Count = rows.filter(row => row.isP2).length;
+    return {total,p2Count,rate:total ? p2Count / total * 100 : null,rows};
   }
 
   // Quality and disposition are independent: a sampled pass can travel back
@@ -137,19 +209,12 @@
   function acceptanceAccuracy(input = {}) {
     const dateFrom = text(input.dateFrom), dateTo = text(input.dateTo);
     if (dateFrom && dateTo && dateFrom > dateTo) return {passed:0, total:0, rate:null, p2Count:0, p2Rate:null, rows:[]};
-    const histories = new Map();
-    if (typeof input.contributionForTask !== 'function') {
-      (input.events || input.state?.events || []).forEach(event => {
-        if (!histories.has(event.taskId)) histories.set(event.taskId, []);
-        histories.get(event.taskId).push(event);
-      });
-    }
+    const readContribution = contributionReader(input);
     const rows = [];
     (input.tasks || []).forEach(task => {
       if (task.deleted || (input.mode && task.mode !== input.mode)
         || (input.groupId && input.groupId !== 'all' && task.groupId !== input.groupId)) return;
-      const contribution = typeof input.contributionForTask === 'function'
-        ? input.contributionForTask(task) : annotationContributors(histories.get(task.id) || []);
+      const contribution = readContribution(task);
       const first = contribution?.firstAcceptanceDecision;
       if (!first) return;
       const assessment = acceptanceAssessment(first, first);
@@ -163,6 +228,8 @@
     let passed = 0, p2Count = 0;
     rows.forEach(row => { if (row.passed) passed += 1; if (row.isP2) p2Count += 1; });
     const total = rows.length;
+    // Retained first-round P2 fields for existing callers. The current P2 card
+    // uses acceptanceP2(), whose denominator includes all actual inspections.
     return {passed, total, rate:total ? passed / total * 100 : null, p2Count, p2Rate:total ? p2Count / total * 100 : null, rows};
   }
 
@@ -551,13 +618,25 @@
     // The overview only needs these stage counts. Keep the original calculation,
     // but do not construct export indexes, histories, columns or daily models.
     if (input.kind === 'closure') return { closure: closure() };
+    if (input.kind === 'acceptanceP2') {
+      const metric = acceptanceP2({...input,tasks});
+      return {acceptanceP2:{...metric,columns:columns([
+        ['tid','TID'],['movie','影片 / 包'],['group','小组'],['modeLabel','作业类型'],['name','实检时标注人'],
+        ['isP2Label','是否发生P2'],['actualDatesText','实检日期（北京时间）'],['p2DatesText','发生P2日期（北京时间）'],
+        ['inspectionCount','实检记录数（计数仍按TID去重）'],['eventIdsJSON','实检事件ID'],['p2EventIdsJSON','P2事件ID'],
+        ['taskIdsJSON','内部任务ID'],['inspectionsJSON','有效实检明细JSON']
+      ]),rows:metric.rows.map(row=>({...row,group:row.groupIds.map(groupName).join('、'),modeLabel:modeLabel(row.mode),
+        isP2Label:row.isP2?'是':'否',actualDatesText:row.actualDates.join('、'),p2DatesText:row.p2Dates.join('、'),
+        inspectionCount:row.inspections.length,eventIdsJSON:json(row.eventIds),p2EventIdsJSON:json(row.p2EventIds),
+        taskIdsJSON:json(row.taskIds),inspectionsJSON:json(row.inspections)}))}};
+    }
     if (input.kind === 'acceptanceAccuracy') {
       const metric = acceptanceAccuracy({...input, tasks});
       return {acceptanceAccuracy:{
         columns:columns([
           ['tid','TID'],['movie','影片 / 包'],['group','小组'],['modeLabel','作业类型'],['name','首验时标注人'],
           ['inspectionLabel','实际检查结果'],['flowLabel','任务处置方式'],['includedLabel','是否计入首次验收准确率'],
-          ['acceptanceIssueLevel','验收瑕疵等级'],['isP2','是否计入P2改判数量'],
+          ['acceptanceIssueLevel','验收瑕疵等级'],['isP2','是否首轮P2（原首轮口径）'],
           ['reason','计入口径'],['date','首次验收日期（北京时间）'],['at','首次验收时间'],['acceptanceRound','验收轮次'],
           ['acceptanceBatchId','验收批次ID'],['eventId','首验事件ID'],['taskId','内部任务ID']
         ]),
@@ -565,9 +644,16 @@
         passed:metric.passed,total:metric.total,rate:metric.rate,p2Count:metric.p2Count,p2Rate:metric.p2Rate
       }};
     }
-    const quality = wants('tasks') || wants('groups') || wants('movies') || wants('daily')
-      ? acceptanceAccuracy({...input, tasks}) : {rows:[]};
+    const needsQuality = wants('tasks') || wants('groups') || wants('movies') || wants('daily');
+    const qualityInput = needsQuality ? {...input,tasks,contributionForTask:contributionReader(input)} : null;
+    const quality = needsQuality ? acceptanceAccuracy(qualityInput) : {rows:[]};
     const qualityByTask = new Map(quality.rows.map(row => [row.taskId, row]));
+    const actualQuality = needsQuality ? acceptanceP2(qualityInput) : {rows:[]};
+    const actualByTask = new Map();
+    actualQuality.rows.forEach(row=>row.inspections.forEach(entry=>{
+      if (!actualByTask.has(entry.taskId)) actualByTask.set(entry.taskId, []);
+      actualByTask.get(entry.taskId).push(entry);
+    }));
     const needsAudit = wants('events') || wants('imports');
     const auditTasks = needsAudit ? (input.auditTasks || input.tasks || []).filter(task => !input.mode || task.mode === input.mode) : [];
     const auditMap = new Map(auditTasks.map(task => [task.id, task]));
@@ -632,6 +718,8 @@
         acceptanceIssueLevel: task.acceptanceIssueLevel || '',
         firstAcceptanceIssueLevel: firstQuality?.acceptanceIssueLevel || '',
         firstAcceptanceP2Included: !!(firstQuality?.included && firstQuality?.isP2),
+        actualAcceptanceIncluded: actualByTask.has(task.id),
+        actualAcceptanceP2Included: (actualByTask.get(task.id) || []).some(entry=>entry.isP2),
         firstAcceptanceReason: firstQuality?.reason || '尚无验收决定',
         firstAcceptanceAt: contributors.firstAcceptanceDecision?.at || '',
         firstAcceptanceBatchId: firstQuality?.acceptanceBatchId || ''
@@ -662,7 +750,8 @@
       ['firstQcDecision','首次质检结果'],['firstQcPLevel','首次质检P等级'],['firstQcTagsJSON','首次质检错误标签JSON'],['firstQcNote','首次质检说明'],['firstQcActor','首次质检人'],['firstQcAt','首次质检时间'],
       ['firstAcceptanceInspection','首轮验收实际检查结果'],['firstAcceptanceDisposition','首轮验收任务处置'],
       ['firstAcceptanceIncluded','是否计入首次验收准确率'],['firstAcceptanceReason','首验计入口径'],['firstAcceptanceAt','首轮验收时间'],['firstAcceptanceBatchId','首轮验收批次ID'],
-      ['firstAcceptanceIssueLevel','首轮验收瑕疵等级'],['firstAcceptanceP2Included','是否计入P2改判数量'],
+      ['firstAcceptanceIssueLevel','首轮验收瑕疵等级'],['firstAcceptanceP2Included','是否首轮P2（原首轮口径）'],
+      ['actualAcceptanceIncluded','所选范围有实际验收（含复验）'],['actualAcceptanceP2Included','所选范围有P2（按TID去重）'],
       ['acceptanceIssueLevel','最近验收瑕疵等级'],
       ['latestQcDecision','最近质检结果'],['latestQcPLevel','最近质检P等级'],['latestQcTagsJSON','最近质检错误标签JSON'],['latestQcNote','最近质检说明'],['latestQcActor','最近质检人'],['latestQcAt','最近质检时间'],
       ['qcPackageId','质检包ID'],['qcPackageName','质检包名'],['qcPackageRound','质检包轮次'],['qcPackageBuilder','质检建包人'],['qcPackageBuiltAt','质检建包时间'],['qcPackageClaimer','质检包认领人'],['qcPackageClaimedAt','质检包认领时间'],
@@ -674,17 +763,27 @@
       ['qcRepairNote','质检自行返修说明'],['qcRepairedBy','质检自行返修人'],['qcRepairedAt','质检自行返修完成时间'],['batchId','原始导入批次'],['createdBy','导入人'],['createdAt','导入时间'],['lastUpdated','最近更新时间'],['originalTaskJSON','完整原始任务JSON'],['fullTimelineJSON','完整任务流水JSON']
     ]);
 
-    const auditHistories = new Map(), auditFirstDecisions = new Map();
+    const auditHistories = new Map(), auditFirstDecisions = new Map(), auditActualInspections = new Map();
     if (wants('events')) {
       auditEvents.forEach(event => {
         if (!auditHistories.has(event.taskId)) auditHistories.set(event.taskId, []);
         auditHistories.get(event.taskId).push(event);
       });
-      auditHistories.forEach((history, taskId) => auditFirstDecisions.set(taskId, annotationContributors(history).firstAcceptanceDecision));
+      auditHistories.forEach((history, taskId) => {
+        const contribution = typeof input.contributionForTask === 'function' ? input.contributionForTask({id:taskId}) : annotationContributors(history);
+        auditFirstDecisions.set(taskId, contribution.firstAcceptanceDecision);
+        auditActualInspections.set(taskId, new Set(contribution.acceptanceInspections.map(entry=>entry.eventId)));
+      });
     }
     const eventRows = (wants('events') ? exportEvents : []).map(event => {
       const current = auditMap.get(event.taskId) || { groupId: event.groupId, mode: event.mode }, raw = auditRawMap.get(event.taskId) || current;
       const assessment = acceptanceAssessment(event, auditFirstDecisions.get(event.taskId));
+      const actual = actualAcceptanceAssessment(event);
+      const actualInRange = !(input.dateFrom && input.dateTo && input.dateFrom > input.dateTo)
+        && (!input.dateFrom || actual.date >= input.dateFrom) && (!input.dateTo || actual.date <= input.dateTo)
+        && (!input.groupId || input.groupId === 'all' || current.groupId === input.groupId);
+      const actualIncluded = !current.deleted && !conflictById.has(event.id) && actualInRange
+        && !!auditActualInspections.get(event.taskId)?.has(event.id);
       return {
         eventId: event.id, taskId: event.taskId, currentTid: text(current.tid), atTimeTid: text(event.tidAtEvent ?? raw.tid),
         currentMovie: text(current.movie), atTimeMovie: text(event.movieAtEvent ?? raw.movie),
@@ -694,7 +793,12 @@
         acceptanceInspection: event.acceptanceInspection ?? '', acceptanceBatchId: event.acceptanceBatchId || '',
         acceptanceInspectionLabel: assessment.inspectionLabel, acceptanceDisposition: assessment.flowLabel,
         acceptanceIssueLevel: assessment.acceptanceIssueLevel,
-        acceptanceP2Included: !current.deleted && !conflictById.has(event.id) && assessment.included && assessment.isP2,
+        acceptanceP2Included: actualIncluded && actual.isP2,
+        acceptanceActualIncluded: actualIncluded,
+        acceptanceActualReason: !assessment.flowAction ? '' : current.deleted ? '任务已删除，保留历史'
+          : conflictById.has(event.id) ? '冲突记录未计入进度' : !actual.included ? actual.reason
+            : !auditActualInspections.get(event.taskId)?.has(event.id) ? '已释放的历史记录'
+              : !actualInRange ? '不在所选实检日期或小组范围' : `${actual.reason}；区间按TID去重`,
         acceptanceFirstIncluded:!current.deleted && !conflictById.has(event.id) && assessment.included,
         acceptanceFirstReason:!assessment.flowAction ? '' : current.deleted ? '任务已删除，保留历史'
           : conflictById.has(event.id) ? '冲突记录未计入进度' : assessment.reason,
@@ -710,7 +814,8 @@
       ['actor','操作人'],['actorRole','操作角色'],['at','实际操作时间'],['localDate','实际操作日期'],['submitRound','标注提交轮次'],['qcRound','质检轮次'],['acceptanceRound','验收轮次'],['type','操作编码'],['label','操作'],['pLevel','质检P等级'],['tagsJSON','质检错误标签JSON'],['note','说明'],['detail','完整说明'],
       ['acceptanceInspection','验收检查标记'],['acceptanceInspectionLabel','验收实际检查结果'],['acceptanceDisposition','验收任务处置'],['acceptanceBatchId','验收批次ID'],
       ['acceptanceFirstIncluded','是否计入首次验收准确率'],['acceptanceFirstReason','首验计入口径'],
-      ['acceptanceIssueLevel','验收瑕疵等级'],['acceptanceP2Included','是否计入P2改判数量'],
+      ['acceptanceIssueLevel','验收瑕疵等级'],['acceptanceP2Included','P2实检记录（统计按TID去重）'],
+      ['acceptanceActualIncluded','计入实际验收范围（含复验）'],['acceptanceActualReason','实际验收计入口径'],
       ['stage','建包阶段'],['packageId','流转包ID'],['packageName','流转包名'],['packageRound','流转包轮次'],['assignee','标注人'],['previousAssignee','接续前标注人'],['settingDate','小组记录业务日期'],['beforeJSON','修改前JSON'],['afterJSON','修改后JSON'],['rawJSON','完整原始事件JSON'],
       ['assignmentKind','人员分配类型'],['fromAssignee','转出标注人'],['assignmentStatus','分配时返修状态'],['identityAlias','是否同一人身份接续'],
       ['excludedFromProgress','是否未计入进度'],['excludedReason','未计入进度的原因']
@@ -798,7 +903,11 @@
       row.firstAcceptancePassedTIDs = firstInspections.filter(item => item.passed).length;
       row.firstAcceptanceAccuracy = firstInspections.length ? `${(row.firstAcceptancePassedTIDs / firstInspections.length * 100).toFixed(1)}%` : '';
       row.firstAcceptanceP2TIDs = firstInspections.filter(item => item.isP2).length;
-      row.acceptanceP2Rate = firstInspections.length ? `${(row.firstAcceptanceP2TIDs / firstInspections.length * 100).toFixed(1)}%` : '';
+      row.firstAcceptanceP2Rate = firstInspections.length ? `${(row.firstAcceptanceP2TIDs / firstInspections.length * 100).toFixed(1)}%` : '';
+      const actual = acceptanceP2({...qualityInput,tasks:subset,includeRows:false});
+      row.actualAcceptanceTIDs = actual.total;
+      row.acceptanceP2TIDs = actual.p2Count;
+      row.acceptanceP2Rate = actual.rate === null ? '' : `${actual.rate.toFixed(1)}%`;
       statusKeys.forEach(key => { row[`status_${key}`] = 0; });
       subset.forEach(task => { row[`status_${task.status}`] += 1; });
       return row;
@@ -835,7 +944,8 @@
       ['mode','作业类型'],['totalTIDs','累计分配TID数量'],['movieCount','累计影片数量'],['groupCount','参与小组数'],['groups','参与小组'],['moviesJSON','影片明细JSON'],['firstAllocationDate','最早分配业务日期'],['lastAllocationDate','最近分配业务日期'],['acceptedTIDs','验收通过TID数量'],['rejectedTIDs','最终拒绝TID数量'],['closedTIDs','已闭环TID数量'],['completionRate','验收通过率'],['closureRate','闭环率（通过+拒绝）']
     ]).concat(columns([
       ['firstAcceptanceInspectedTIDs','首轮实检TID（历史沿用原口径）'],['firstAcceptancePassedTIDs','首轮实检合格TID'],['firstAcceptanceAccuracy','首次验收准确率'],
-      ['firstAcceptanceP2TIDs','首轮实检P2改判TID'],['acceptanceP2Rate','P2改判率（首轮P2/首轮全部实检）']
+      ['firstAcceptanceP2TIDs','首轮实检P2改判TID'],['firstAcceptanceP2Rate','首轮P2占比（原首轮口径）'],
+      ['actualAcceptanceTIDs','实际验收TID（含复验，区间去重）'],['acceptanceP2TIDs','P2实检TID（含复验，区间去重）'],['acceptanceP2Rate','P2改判率（P2/实际验收TID）']
     ]), statusColumns, columns([['taskIdsJSON','内部任务ID明细JSON'],['currentTIDsJSON','当前TID明细JSON']]));
 
     const dailyMap = new Map();
@@ -846,6 +956,7 @@
         annotationReworkActions: 0, qcPassed: new Set(), qcPassActions: 0, qcFailActions: 0, qcRejected: new Set(), acceptanceFailActions: 0, acceptanceRejected: new Set(), qcSelfRepairActions: 0, assignmentActions: 0, qcPackages: new Set(), acceptancePackages: new Set(), taskActions: new Map(),
         acceptanceInspectedPassActions:0, acceptanceInspectedFailActions:0, acceptanceBatchReturnActions:0, acceptanceBatchPassActions:0,
         firstAcceptanceInspectedTIDs:0, firstAcceptancePassedTIDs:0, firstAcceptanceP2TIDs:0,
+        actualAcceptanceTids:new Set(), acceptanceP2Tids:new Set(),
         // 条数型指标（质检通过 / 验收通过）按 TID 去重：同一 TID 的多条重复任务记录只算一条。
         qcPassedTids: new Set(), completedTids: new Set(), qcPassOwners: new Map(), completedOwners: new Map(),
         // 整体去重：一条 case 只算一次，只记第一次达成的那一天
@@ -966,6 +1077,11 @@
       if (item.passed) row.firstAcceptancePassedTIDs += 1;
       if (item.isP2) row.firstAcceptanceP2TIDs += 1;
     });
+    if (wants('daily')) actualQuality.rows.forEach(item=>item.inspections.forEach(entry=>{
+      const row=dayRow(entry.date,entry.groupId), key=json([item.mode,text(item.tid).trim().toUpperCase() || entry.taskId]);
+      row.modes.add(modeLabel(item.mode)); row.actualAcceptanceTids.add(key);
+      if(entry.isP2)row.acceptanceP2Tids.add(key);
+    }));
     const dailyRows = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date) || text(a.groupId).localeCompare(text(b.groupId))).map(row => ({
       date: row.date, groupId: row.groupId, group: row.group, mode: Array.from(row.modes).join('、'),
       importedTIDs: row.imported.size, initialAnnotationTIDs: row.initial.size, annotationReworkActions: row.annotationReworkActions,
@@ -975,7 +1091,9 @@
       firstAcceptanceInspectedTIDs:row.firstAcceptanceInspectedTIDs, firstAcceptancePassedTIDs:row.firstAcceptancePassedTIDs,
       firstAcceptanceAccuracy:row.firstAcceptanceInspectedTIDs ? `${(row.firstAcceptancePassedTIDs / row.firstAcceptanceInspectedTIDs * 100).toFixed(1)}%` : '',
       firstAcceptanceP2TIDs:row.firstAcceptanceP2TIDs,
-      acceptanceP2Rate:row.firstAcceptanceInspectedTIDs ? `${(row.firstAcceptanceP2TIDs / row.firstAcceptanceInspectedTIDs * 100).toFixed(1)}%` : '',
+      firstAcceptanceP2Rate:row.firstAcceptanceInspectedTIDs ? `${(row.firstAcceptanceP2TIDs / row.firstAcceptanceInspectedTIDs * 100).toFixed(1)}%` : '',
+      actualAcceptanceTIDs:row.actualAcceptanceTids.size, acceptanceP2TIDs:row.acceptanceP2Tids.size,
+      acceptanceP2Rate:row.actualAcceptanceTids.size ? `${(row.acceptanceP2Tids.size / row.actualAcceptanceTids.size * 100).toFixed(1)}%` : '',
       uniqueInitialTIDs: row.initial.size, uniqueQcPassTIDs: row.uniqueQcTids.size, uniqueAcceptanceTIDs: row.uniqueCompletedTids.size,
       rejectedTIDs: row.rejected.size, qcSelfRepairActions: row.qcSelfRepairActions, qcPackageCount: row.qcPackages.size, acceptancePackageCount: row.acceptancePackages.size,
       activeTIDs: row.active.size, assignmentActions: row.assignmentActions, importedTaskIdsJSON: json(Array.from(row.imported)), initialTaskIdsJSON: json(Array.from(row.initial)), completedTaskIdsJSON: json(Array.from(row.completed)), rejectedTaskIdsJSON: json(Array.from(row.rejected)),
@@ -987,7 +1105,8 @@
       ['acceptanceInspectedPassActions','实检合格次数（明确标记）'],['acceptanceInspectedFailActions','实检不合格次数（明确标记）'],
       ['acceptanceBatchReturnActions','随批退回次数（非实际缺陷）'],['acceptanceBatchPassActions','未实检随批放行次数'],
       ['firstAcceptanceInspectedTIDs','首轮实检TID（历史沿用原口径）'],['firstAcceptancePassedTIDs','首轮实检合格TID'],['firstAcceptanceAccuracy','首次验收准确率'],
-      ['firstAcceptanceP2TIDs','首轮实检P2改判TID'],['acceptanceP2Rate','P2改判率（首轮P2/首轮全部实检）'],
+      ['firstAcceptanceP2TIDs','首轮实检P2改判TID'],['firstAcceptanceP2Rate','首轮P2占比（原首轮口径）'],
+      ['actualAcceptanceTIDs','实际验收TID（含复验，日内去重）'],['acceptanceP2TIDs','P2实检TID（含复验，日内去重）'],['acceptanceP2Rate','P2改判率（P2/实际验收TID）'],
       ['uniqueInitialTIDs','首次标完TID数量（所选范围去重）'],['uniqueQcPassTIDs','质检通过TID数量（所选范围去重）'],['uniqueAcceptanceTIDs','验收通过TID数量（所选范围去重）'],
       ['qcPackageCount','新建质检包数'],['acceptancePackageCount','历史新建验收包数'],['activeTIDs','有操作TID数量'],['assignmentActions','代修分配任务次数'],['importedTaskIdsJSON','新增分配任务ID JSON'],['initialTaskIdsJSON','首次标注完成任务ID JSON'],['completedTaskIdsJSON','首次验收通过任务ID JSON'],['rejectedTaskIdsJSON','最终拒绝任务ID JSON']
     ]);
@@ -1020,5 +1139,5 @@
     return requested ? Object.fromEntries(Object.entries(result).filter(([kind]) => kind === 'closure' || wants(kind))) : result;
   }
 
-  return Object.freeze({ build, groupDaily, personDaily, qcOperator, movieTitle, movieProgress, annotationContributors, acceptanceDate, acceptanceAssessment, acceptanceAccuracy });
+  return Object.freeze({ build, groupDaily, personDaily, qcOperator, movieTitle, movieProgress, annotationContributors, acceptanceDate, acceptanceAssessment, acceptanceAccuracy, actualAcceptanceAssessment, acceptanceP2 });
 }));

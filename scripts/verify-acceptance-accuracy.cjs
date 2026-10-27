@@ -34,7 +34,7 @@ const rounds = [
   event('pass-c', 'acceptance_pass', '2026-09-21T16:00:00.000Z', { acceptanceRound: 4 })
 ];
 const clone = value => JSON.parse(JSON.stringify(value));
-const stripFirstDecision = ({ firstAcceptanceDecision, ...legacy }) => legacy;
+const stripFirstDecision = ({ firstAcceptanceDecision, acceptanceInspections, ...legacy }) => legacy;
 const dateOf = value => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value));
 const entry = (history, id, name, rawName = name) => {
   const value = history.find(row => row.id === id);
@@ -76,7 +76,7 @@ function main() {
   assert.deepEqual(boundaryFirsts.map(row => dateOf(row.at)), ['2026-09-20', '2026-09-21', '2026-09-21', '2026-09-22']);
   assert.equal(boundaryFirsts.filter(row => dateOf(row.at) >= '2026-09-21' && dateOf(row.at) <= '2026-09-21').length, 2);
 
-  const noData = { initial: null, submissions: [], rework: [], firstQc: null, firstAcceptance: null, firstAcceptanceDecision: null };
+  const noData = { initial: null, submissions: [], rework: [], firstQc: null, firstAcceptance: null, firstAcceptanceDecision: null, acceptanceInspections: [] };
   assert.deepEqual(Reports.annotationContributors(), noData);
   assert.deepEqual(Reports.annotationContributors([rounds.find(row => row.id === 'transfer-b')]), noData, 'assignment alone is not a contributor');
   assert.equal(Reports.annotationContributors(rounds.slice(0, 3)).firstAcceptanceDecision, null);
