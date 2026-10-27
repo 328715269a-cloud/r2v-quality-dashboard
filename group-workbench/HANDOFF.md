@@ -12,7 +12,9 @@
 
 发布记录：docs/releases/workbench-20261027-prod83.json。测试：scripts/verify-acceptance-p2-volume-reports.cjs、scripts/verify-acceptance-p2-volume-browser.cjs。备份：/opt/r2v/backups/group-workbench/20261027-prod83-p2-volume。发布工具与隔离证据：outputs/acceptance-sampling-20261020/p2-volume/。
 
-同日另按用户授权精准纠正一条多镜头验收误操作（与静态功能发布分开）：TID 01KWPDZCYFW54XY43EM132BBCM_1784599941274_298 的原实检通过改为未实检随批退回，保留原事件 ID、时间、操作人与其他流水，修正原事务回执并留审计；事务 revision 29790，92.17ms。备份 outputs 对应云端 /opt/r2v/backups/group-workbench/acceptance-correction-20261027-298/。云端 API 全量同步屏障及旧统计校验通过；10/27 多镜首轮实检从 9/12 变为 8/11，拒绝量和验收处理量不变。单镜头 29 条名单比对只读，未修改。
+同日另按用户授权精准纠正一条多镜头验收误操作（与静态功能发布分开）：TID 01KWPDZCYFW54XY43EM132BBCM_1784599941274_298 的原实检通过改为未实检随批退回，保留原事件 ID、时间、操作人与其他流水，修正原事务回执并留审计；事务 revision 29790，92.17ms。云端备份 /opt/r2v/backups/group-workbench/acceptance-correction-20261027-298/。当次云端 API 全量同步及统计校验通过；10/27 多镜首轮实检从 9/12 变为 8/11，拒绝量和验收处理量不变。单镜头 29 条名单比对只读，未修改。
+
+随后用户要求改回原结果，已再次备份并在无后续流转的前提下恢复上述 TID 为 **实检合格 · 验收通过**（非 P2）。原事件 ID、日期、人员、轮次及其他历史不变，两次更正审计均保留；revision 29804，事务137.54ms。云端 API 验证通过：当天多镜首验恢复9/12=75%，P2为6/12=50%；验收通过/闭环+1，验收打回-1，验收量与拒绝量不变。未重启服务。云端备份 /opt/r2v/backups/group-workbench/acceptance-restore-20261027-298/；本地验证与审计 outputs/acceptance-restore-20261027-298/。
 
 
 ## 2026-10-27：验收 P2 修正后通过与 P2 改判率（prod82）
