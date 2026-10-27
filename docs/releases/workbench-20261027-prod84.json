@@ -1,0 +1,185 @@
+{
+  "version": "20261027-prod84",
+  "status": "deployed",
+  "baseCommit": "22d852c",
+  "checkedAt": "2026-10-27T11:34:41.340Z",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "change": {
+    "title": "非 P2 率",
+    "formula": "(实际实检 TID 数 − 给过验收 P2 的 TID 数) / 实际实检 TID 数；即 1 − P2 / 实检。",
+    "example": {
+      "actual": 31,
+      "p2": 2,
+      "nonP2": 29,
+      "display": "93.5%"
+    },
+    "emptySample": "— / null / 空导出比例；不显示100%",
+    "scope": "保留prod83全轮实检口径：先筛选北京时间日期、镜头与小组，再按镜头类型+规范化TID去重；同TID在范围内任一次P2即不计非P2。",
+    "distinction": "非P2包含无P2的实检不合格，不等于验收合格率；首次验收实检准确率和旧首轮P2占比字段保持原值。",
+    "exclusions": [
+      "未实检随批处理",
+      "拒绝",
+      "已删除任务",
+      "冲突流水",
+      "已释放的旧流水"
+    ],
+    "changedOutputs": [
+      "总览卡片标题/比例/分子分母说明",
+      "四个验收操作提示",
+      "明细导出菜单和文件名",
+      "明细非P2标记",
+      "小组/影片/综合/每日导出非P2数量和比例"
+    ],
+    "actualTotalAndP2CountUnchanged": true,
+    "firstAccuracyUnchanged": true,
+    "acceptanceDecisionsUnchanged": true,
+    "historicalDataRewritten": false
+  },
+  "deployment": {
+    "type": "static-only",
+    "apiVersion": "20261027-prod82",
+    "apiPort": 3023,
+    "apiChanged": false,
+    "workflowChanged": false,
+    "databaseChanged": false,
+    "productionBusinessWrites": 0,
+    "forcedRefresh": false,
+    "serviceRestart": false,
+    "nginxReload": false,
+    "existingContainers": 16,
+    "protectedFiles": 316,
+    "backup": "/opt/r2v/backups/group-workbench/20261027-prod84-non-p2-rate",
+    "sequence": "独立验证最终冻结包；保留所有旧资源，原子更新index。旧页可继续提交，填写完成后自愿刷新查看新显示。"
+  },
+  "validation": {
+    "ok": true,
+    "apiChanged": false,
+    "productionBusinessWrites": 0,
+    "staticSha256": {
+      "index.html": "08ec46dc055d99f8b6a6970c649d2eb96b50d502bf4763b93270ef8d76fce426",
+      "app.20261027-prod84-non-p2-rate.js": "236f39180c41b0c104da53a05d077ecb6c5b316d3b930e029ee4beca51630172",
+      "reports.20261027-prod84-non-p2-rate.js": "7d3cff9a7b0a3138ff382223152991bda86fe9a103f096ad4896a5540ffec7f2",
+      "export-worker.20261027-prod84-non-p2-rate.js": "11bc349a60511f13e67f351fca62b6ec9e8dd54ec5f5aa2ddc69aa4988332b60"
+    },
+    "verifiedAt": "2026-10-27T11:33:58.989Z",
+    "volumeBrowserChecks": 76,
+    "entrypointBrowserChecks": 51,
+    "reportChecks": [
+      "node scripts/verify-acceptance-non-p2-reports.cjs",
+      "node scripts/verify-acceptance-p2-volume-reports.cjs",
+      "node scripts/verify-acceptance-p2-reports.cjs",
+      "node scripts/verify-acceptance-accuracy.cjs",
+      "node scripts/verify-acceptance-sampling-reports.cjs",
+      "node scripts/verify-overview-reports-perf.cjs",
+      "node scripts/verify-export-worker.cjs",
+      "node scripts/verify-acceptance-export.cjs"
+    ],
+    "firstAcceptanceUnchanged": true,
+    "public": {
+      "ok": true,
+      "at": "2026-10-27T11:34:27.198Z",
+      "hashes": {
+        "ok": true,
+        "checks": [
+          "index",
+          "styles.20260922-prod25-today.css",
+          "styles.20260922-prod31-accept.css",
+          "styles.20260922-prod35-cards.css",
+          "first-qc-date.20260923-prod36.css",
+          "pagination.20260923-prod37.css",
+          "acceptance-filters.20260923-prod39.css",
+          "acceptance-finder.20260923-prod44.css",
+          "error-tids.20261008-prod70.css",
+          "/work-mode-entry.20260910.css",
+          "acceptance-sampling.20261020-prod74.css",
+          "data-io.20260920-prod8.js",
+          "shared-store.20260923-prod37.js",
+          "workflow.20261027-prod82-acceptance-p2.js",
+          "reports.20261027-prod84-non-p2-rate.js",
+          "app.20261027-prod84-non-p2-rate.js",
+          "export-worker.20261027-prod84-non-p2-rate.js",
+          "/",
+          "/group-beta/",
+          "/group-workbench-beta/"
+        ],
+        "health": {
+          "ok": true,
+          "acceptanceP2": {
+            "supported": true,
+            "version": 1
+          },
+          "backupDelegated": true
+        }
+      },
+      "facts": {
+        "version": "20261027-prod84",
+        "p2Metric": true,
+        "p2PastedChoice": true,
+        "p2BulkAction": true,
+        "multi": [
+          {
+            "id": "g06",
+            "label": "多镜头1组"
+          },
+          {
+            "id": "g07",
+            "label": "多镜头2组"
+          },
+          {
+            "id": "g08",
+            "label": "多镜头3组"
+          },
+          {
+            "id": "g09",
+            "label": "多镜头4组"
+          },
+          {
+            "id": "g10",
+            "label": "多镜头5组"
+          },
+          {
+            "id": "m06",
+            "label": "多镜头6组"
+          },
+          {
+            "id": "m07",
+            "label": "多镜头7组"
+          },
+          {
+            "id": "m08",
+            "label": "多镜头8组"
+          },
+          {
+            "id": "m09",
+            "label": "多镜头9组"
+          },
+          {
+            "id": "m10",
+            "label": "多镜头10组"
+          },
+          {
+            "id": "m11",
+            "label": "多镜头11组"
+          },
+          {
+            "id": "m12",
+            "label": "多镜头12组"
+          },
+          {
+            "id": "m_newcomer",
+            "label": "多镜头新人组"
+          }
+        ],
+        "single": [
+          "g01",
+          "g02",
+          "g03",
+          "g04"
+        ],
+        "productionBusinessWrites": 0
+      },
+      "errors": []
+    }
+  },
+  "localEvidence": "outputs/acceptance-sampling-20261020/p2-non-rate/"
+}

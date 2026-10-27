@@ -7,8 +7,8 @@ const {createExporter}=require('../group-workbench/export-worker.js');
 const {fixture}=require('./verify-acceptance-p2-reports.cjs');
 const day=n=>`2026-10-${n}T09:00:00+08:00`,range=n=>({dateFrom:`2026-10-${n}`,dateTo:`2026-10-${n}`}),p2={acceptanceIssueLevel:'P2'};
 const metric=(f,scope={})=>Reports.acceptanceP2({...f.input(),...scope});
-const numbers=({total,p2Count,rate})=>({total,p2Count,rate});
-const expected=(total,p2Count)=>({total,p2Count,rate:total?p2Count/total*100:null});
+const numbers=({total,p2Count,nonP2Count,rate})=>({total,p2Count,nonP2Count,rate});
+const expected=(total,p2Count)=>({total,p2Count,nonP2Count:total-p2Count,rate:total?(total-p2Count)/total*100:null});
 function repair(f,id,at=day('27')) {
   f.addEvent(id,'acceptance_route',{at,actor:'质检员',actorRole:'qc',route:'qc'});
   f.addEvent(id,'qc_repair_done',{at,actor:'质检员',actorRole:'qc'});
@@ -25,7 +25,7 @@ function checks() {
     assert.deepEqual(numbers(metric(f,range('27'))),expected(1,1));
     assert.deepEqual(numbers(metric(f,{dateFrom:'2026-10-26',dateTo:'2026-10-27'})),expected(1,1),'range is not sum of the two days');
     assert.deepEqual(Reports.acceptanceAccuracy(f.input()),firstBefore,'P2 denominator change cannot rewrite any first-accuracy field');
-    const row=metric(f).rows[0];assert.equal(row.inspections.length,3);assert.equal(row.p2EventIds.length,2);assert.equal(row.isP2,true);
+    const row=metric(f).rows[0];assert.equal(row.inspections.length,3);assert.equal(row.p2EventIds.length,2);assert.equal(row.isP2,true);assert.equal(row.isNonP2,false);
     assert.deepEqual(row.actualDates,['2026-10-26','2026-10-27']);assert.deepEqual(row.p2Dates,['2026-10-27']);
 
     f.addTask('unsampled');f.addEvent('unsampled','acceptance_fail',{acceptanceInspection:'uninspected',acceptanceRound:1,acceptanceBatchId:'batch'});
@@ -110,19 +110,20 @@ async function exports() {
   const before=JSON.stringify(f.state),input=f.input(),report=Reports.build(input),worker=createExporter(Flow,Reports,IO);
   const group=report.groups.rows.find(row=>row.groupId==='g06');
   assert.equal(group.firstAcceptanceAccuracy,'0.0%');assert.equal(group.firstAcceptanceP2TIDs,0);assert.equal(group.firstAcceptanceP2Rate,'0.0%');
-  assert.equal(group.actualAcceptanceTIDs,1);assert.equal(group.acceptanceP2TIDs,1);assert.equal(group.acceptanceP2Rate,'100.0%');
-  assert.equal(report.movies.rows[0].acceptanceP2Rate,'100.0%');
-  for(const [date,num] of [['2026-10-26',0],['2026-10-27',1]]) {const row=report.daily.rows.find(row=>row.date===date);assert.equal(row.actualAcceptanceTIDs,1);assert.equal(row.acceptanceP2TIDs,num);}
+  assert.equal(group.actualAcceptanceTIDs,1);assert.equal(group.acceptanceP2TIDs,1);assert.equal(group.acceptanceNonP2TIDs,0);assert.equal(group.acceptanceP2Rate,'0.0%');
+  assert.equal(report.movies.rows[0].acceptanceP2Rate,'0.0%');
+  for(const [date,num] of [['2026-10-26',0],['2026-10-27',1]]) {const row=report.daily.rows.find(row=>row.date===date);assert.equal(row.actualAcceptanceTIDs,1);assert.equal(row.acceptanceP2TIDs,num);assert.equal(row.acceptanceNonP2TIDs,1-num);assert.equal(row.acceptanceP2Rate,num?'0.0%':'100.0%');}
   const get=async(kind,scope={})=>{
     const result=worker.generate({kind,groups:input.groups,statusMeta:Flow.STATUS_META,eventLabels:{},scope:{profile:{role:'admin'},mode:'multi',groupId:'g06',range:'all',...scope}},f.state);
     const parsed=IO.parseTable(await result.blob.text()),headers=parsed.records[0].cells;
     return parsed.records.slice(1).map(row=>Object.fromEntries(headers.map((key,index)=>[key,row.cells[index]])));
   };
   for(const scope of [{},{range:'scope',dateFrom:'2026-10-26',dateTo:'2026-10-27'},{range:'scope',...range('27')}]) {
-    const rows=await get('acceptanceP2',scope);assert.equal(rows.length,1);assert.equal(rows[0]['是否发生P2'],'是');
-    assert.equal((await get('groups',scope))[0]['P2改判率（P2/实际验收TID）'],'100.0%');
+    const rows=await get('acceptanceP2',scope);assert.equal(rows.length,1);assert.equal(rows[0]['是否发生P2'],'是');assert.equal(rows[0]['是否非P2'],'否');
+    assert.equal((await get('groups',scope))[0]['非P2率（非P2/实际验收TID）'],'0.0%');
   }
   assert.equal((await get('acceptanceP2',{range:'scope',...range('26')}))[0]['是否发生P2'],'否');
+  assert.equal((await get('acceptanceP2',{range:'scope',...range('26')}))[0]['是否非P2'],'是');
   assert.equal((await get('acceptanceP2',{range:'scope',...range('28')})).length,0);
   assert.equal((await get('acceptanceP2',{mode:'single',groupId:'all'})).length,0);
   assert.equal((await get('acceptanceP2',{profile:{role:'qc',groupId:'g07'},groupId:'all'})).length,0);
@@ -135,5 +136,5 @@ async function exports() {
   const badRequest={kind:'acceptanceP2',groups:input.groups,statusMeta:Flow.STATUS_META,eventLabels:{},scope:{profile:{role:'admin'},mode:'multi',groupId:'all',range:'scope',dateFrom:'2026-10-28',dateTo:'2026-10-26'}};
   assert.throws(()=>worker.generate(badRequest,f.state),/日期/);
 }
-async function main(){checks();exclusionsAndScope();await exports();console.log(JSON.stringify({ok:true,scenario:{firstFailureThenP2:{total:1,p2Count:1,rate:100},firstAccuracyUnchanged:0},checks:['all actual rounds','TID cross-day dedup','unsampled first then actual','legacy ordinary decisions','reject/unsampled/QC P2 exclusion','released/deleted/invalid exclusions','Beijing midnight','mode/group isolation','cached no-global scan','browser parity','task/event/history/group/movie/daily/detail exports','immutable source']}));}
+async function main(){checks();exclusionsAndScope();await exports();console.log(JSON.stringify({ok:true,scenario:{firstFailureThenP2:{total:1,p2Count:1,nonP2Count:0,rate:0},firstAccuracyUnchanged:0},checks:['all actual rounds','TID cross-day dedup','unsampled first then actual','legacy ordinary decisions','reject/unsampled/QC P2 exclusion','released/deleted/invalid exclusions','Beijing midnight','mode/group isolation','cached no-global scan','browser parity','task/event/history/group/movie/daily/detail exports','immutable source']}));}
 main().catch(error=>{console.error(error);process.exitCode=1;});

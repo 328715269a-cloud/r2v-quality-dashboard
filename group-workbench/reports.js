@@ -141,7 +141,7 @@
 
   function acceptanceP2(input = {}) {
     const dateFrom = text(input.dateFrom), dateTo = text(input.dateTo);
-    if (dateFrom && dateTo && dateFrom > dateTo) return {total:0,p2Count:0,rate:null,rows:[]};
+    if (dateFrom && dateTo && dateFrom > dateTo) return {total:0,p2Count:0,nonP2Count:0,rate:null,rows:[]};
     const readContribution = contributionReader(input), byTid = new Map(), includeRows = input.includeRows !== false;
     (input.tasks || []).forEach(task => {
       if (task.deleted || (input.mode && task.mode !== input.mode)
@@ -157,18 +157,22 @@
     });
     if (!includeRows) {
       const total = byTid.size, p2Count = Array.from(byTid.values()).filter(row=>row.isP2).length;
-      return {total,p2Count,rate:total ? p2Count / total * 100 : null,rows:[]};
+      const nonP2Count = total - p2Count;
+      return {total,p2Count,nonP2Count,rate:total ? nonP2Count / total * 100 : null,rows:[]};
     }
     const rows = Array.from(byTid.values()).map(row => {
       const inspections = row.inspections, p2 = inspections.filter(entry => entry.isP2);
       return {...row, taskIds:unique(inspections.map(entry=>entry.taskId)), movie:unique(inspections.map(entry=>entry.movie)).join('、'),
         groupIds:unique(inspections.map(entry=>entry.groupId)), groupId:inspections[0].groupId,
-        name:unique(inspections.map(entry=>entry.name || '未记录标注人')).join('、'), isP2:p2.length > 0,
+        name:unique(inspections.map(entry=>entry.name || '未记录标注人')).join('、'), isP2:p2.length > 0, isNonP2:p2.length === 0,
         actualDates:unique(inspections.map(entry=>entry.date)).sort(), p2Dates:unique(p2.map(entry=>entry.date)).sort(),
         eventIds:unique(inspections.map(entry=>entry.eventId)), p2EventIds:unique(p2.map(entry=>entry.eventId))};
     });
     const total = rows.length, p2Count = rows.filter(row => row.isP2).length;
-    return {total,p2Count,rate:total ? p2Count / total * 100 : null,rows};
+    const nonP2Count = total - p2Count;
+    // The current rate is the non-P2 share of actual inspected TIDs, not pass accuracy.
+    // Keep the first-round P2 share in acceptanceAccuracy unchanged for compatibility.
+    return {total,p2Count,nonP2Count,rate:total ? nonP2Count / total * 100 : null,rows};
   }
 
   // Quality and disposition are independent: a sampled pass can travel back
@@ -622,11 +626,11 @@
       const metric = acceptanceP2({...input,tasks});
       return {acceptanceP2:{...metric,columns:columns([
         ['tid','TID'],['movie','影片 / 包'],['group','小组'],['modeLabel','作业类型'],['name','实检时标注人'],
-        ['isP2Label','是否发生P2'],['actualDatesText','实检日期（北京时间）'],['p2DatesText','发生P2日期（北京时间）'],
+        ['isP2Label','是否发生P2'],['isNonP2Label','是否非P2'],['actualDatesText','实检日期（北京时间）'],['p2DatesText','发生P2日期（北京时间）'],
         ['inspectionCount','实检记录数（计数仍按TID去重）'],['eventIdsJSON','实检事件ID'],['p2EventIdsJSON','P2事件ID'],
         ['taskIdsJSON','内部任务ID'],['inspectionsJSON','有效实检明细JSON']
       ]),rows:metric.rows.map(row=>({...row,group:row.groupIds.map(groupName).join('、'),modeLabel:modeLabel(row.mode),
-        isP2Label:row.isP2?'是':'否',actualDatesText:row.actualDates.join('、'),p2DatesText:row.p2Dates.join('、'),
+        isP2Label:row.isP2?'是':'否',isNonP2Label:row.isNonP2?'是':'否',actualDatesText:row.actualDates.join('、'),p2DatesText:row.p2Dates.join('、'),
         inspectionCount:row.inspections.length,eventIdsJSON:json(row.eventIds),p2EventIdsJSON:json(row.p2EventIds),
         taskIdsJSON:json(row.taskIds),inspectionsJSON:json(row.inspections)}))}};
     }
@@ -907,6 +911,7 @@
       const actual = acceptanceP2({...qualityInput,tasks:subset,includeRows:false});
       row.actualAcceptanceTIDs = actual.total;
       row.acceptanceP2TIDs = actual.p2Count;
+      row.acceptanceNonP2TIDs = actual.nonP2Count;
       row.acceptanceP2Rate = actual.rate === null ? '' : `${actual.rate.toFixed(1)}%`;
       statusKeys.forEach(key => { row[`status_${key}`] = 0; });
       subset.forEach(task => { row[`status_${task.status}`] += 1; });
@@ -945,7 +950,7 @@
     ]).concat(columns([
       ['firstAcceptanceInspectedTIDs','首轮实检TID（历史沿用原口径）'],['firstAcceptancePassedTIDs','首轮实检合格TID'],['firstAcceptanceAccuracy','首次验收准确率'],
       ['firstAcceptanceP2TIDs','首轮实检P2改判TID'],['firstAcceptanceP2Rate','首轮P2占比（原首轮口径）'],
-      ['actualAcceptanceTIDs','实际验收TID（含复验，区间去重）'],['acceptanceP2TIDs','P2实检TID（含复验，区间去重）'],['acceptanceP2Rate','P2改判率（P2/实际验收TID）']
+      ['actualAcceptanceTIDs','实际验收TID（含复验，区间去重）'],['acceptanceP2TIDs','P2实检TID（含复验，区间去重）'],['acceptanceNonP2TIDs','非P2实检TID（含复验，区间去重）'],['acceptanceP2Rate','非P2率（非P2/实际验收TID）']
     ]), statusColumns, columns([['taskIdsJSON','内部任务ID明细JSON'],['currentTIDsJSON','当前TID明细JSON']]));
 
     const dailyMap = new Map();
@@ -1093,7 +1098,8 @@
       firstAcceptanceP2TIDs:row.firstAcceptanceP2TIDs,
       firstAcceptanceP2Rate:row.firstAcceptanceInspectedTIDs ? `${(row.firstAcceptanceP2TIDs / row.firstAcceptanceInspectedTIDs * 100).toFixed(1)}%` : '',
       actualAcceptanceTIDs:row.actualAcceptanceTids.size, acceptanceP2TIDs:row.acceptanceP2Tids.size,
-      acceptanceP2Rate:row.actualAcceptanceTids.size ? `${(row.acceptanceP2Tids.size / row.actualAcceptanceTids.size * 100).toFixed(1)}%` : '',
+      acceptanceNonP2TIDs:row.actualAcceptanceTids.size - row.acceptanceP2Tids.size,
+      acceptanceP2Rate:row.actualAcceptanceTids.size ? `${((row.actualAcceptanceTids.size - row.acceptanceP2Tids.size) / row.actualAcceptanceTids.size * 100).toFixed(1)}%` : '',
       uniqueInitialTIDs: row.initial.size, uniqueQcPassTIDs: row.uniqueQcTids.size, uniqueAcceptanceTIDs: row.uniqueCompletedTids.size,
       rejectedTIDs: row.rejected.size, qcSelfRepairActions: row.qcSelfRepairActions, qcPackageCount: row.qcPackages.size, acceptancePackageCount: row.acceptancePackages.size,
       activeTIDs: row.active.size, assignmentActions: row.assignmentActions, importedTaskIdsJSON: json(Array.from(row.imported)), initialTaskIdsJSON: json(Array.from(row.initial)), completedTaskIdsJSON: json(Array.from(row.completed)), rejectedTaskIdsJSON: json(Array.from(row.rejected)),
@@ -1106,7 +1112,7 @@
       ['acceptanceBatchReturnActions','随批退回次数（非实际缺陷）'],['acceptanceBatchPassActions','未实检随批放行次数'],
       ['firstAcceptanceInspectedTIDs','首轮实检TID（历史沿用原口径）'],['firstAcceptancePassedTIDs','首轮实检合格TID'],['firstAcceptanceAccuracy','首次验收准确率'],
       ['firstAcceptanceP2TIDs','首轮实检P2改判TID'],['firstAcceptanceP2Rate','首轮P2占比（原首轮口径）'],
-      ['actualAcceptanceTIDs','实际验收TID（含复验，日内去重）'],['acceptanceP2TIDs','P2实检TID（含复验，日内去重）'],['acceptanceP2Rate','P2改判率（P2/实际验收TID）'],
+      ['actualAcceptanceTIDs','实际验收TID（含复验，日内去重）'],['acceptanceP2TIDs','P2实检TID（含复验，日内去重）'],['acceptanceNonP2TIDs','非P2实检TID（含复验，日内去重）'],['acceptanceP2Rate','非P2率（非P2/实际验收TID）'],
       ['uniqueInitialTIDs','首次标完TID数量（所选范围去重）'],['uniqueQcPassTIDs','质检通过TID数量（所选范围去重）'],['uniqueAcceptanceTIDs','验收通过TID数量（所选范围去重）'],
       ['qcPackageCount','新建质检包数'],['acceptancePackageCount','历史新建验收包数'],['activeTIDs','有操作TID数量'],['assignmentActions','代修分配任务次数'],['importedTaskIdsJSON','新增分配任务ID JSON'],['initialTaskIdsJSON','首次标注完成任务ID JSON'],['completedTaskIdsJSON','首次验收通过任务ID JSON'],['rejectedTaskIdsJSON','最终拒绝任务ID JSON']
     ]);

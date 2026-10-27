@@ -131,10 +131,10 @@ async function checkExports() {
   assert.equal(p2Events.length,2);assert.equal(p2Events.filter(row=>row.acceptanceP2Included).length,2,'both effective P2 inspections are eligible; the new metric deduplicates their TID');
   for(const summary of [report.groups.rows.find(row=>row.groupId==='g06'),report.movies.rows[0],report.daily.rows.find(row=>row.date==='2026-10-26'&&row.groupId==='g06')]) {
     assert.equal(summary.firstAcceptanceInspectedTIDs,10);assert.equal(summary.firstAcceptancePassedTIDs,9);
-    assert.equal(summary.firstAcceptanceAccuracy,'90.0%');assert.equal(summary.firstAcceptanceP2TIDs,1);assert.equal(summary.acceptanceP2Rate,'10.0%');
+    assert.equal(summary.firstAcceptanceAccuracy,'90.0%');assert.equal(summary.firstAcceptanceP2TIDs,1);assert.equal(summary.firstAcceptanceP2Rate,'10.0%');assert.equal(summary.acceptanceNonP2TIDs,9);assert.equal(summary.acceptanceP2Rate,'90.0%');
   }
   const secondDay=report.daily.rows.find(row=>row.date==='2026-10-27'&&row.groupId==='g06');
-  assert.equal(secondDay.firstAcceptanceP2TIDs,0);assert.equal(secondDay.firstAcceptanceP2Rate,'');assert.equal(secondDay.acceptanceP2Rate,'100.0%');
+  assert.equal(secondDay.firstAcceptanceP2TIDs,0);assert.equal(secondDay.firstAcceptanceP2Rate,'');assert.equal(secondDay.acceptanceNonP2TIDs,0);assert.equal(secondDay.acceptanceP2Rate,'0.0%');
   const exporter=createExporter(Flow,Reports,IO);
   const output=async kind=>{
     const value=exporter.generate({kind,groups,statusMeta:Flow.STATUS_META,eventLabels:{},scope:{profile:{role:'admin'},mode:'multi',groupId:'g06',range:'all'}},f.state);
@@ -142,7 +142,7 @@ async function checkExports() {
     return parsed.records.slice(1).map(row=>Object.fromEntries(headers.map((key,index)=>[key,row.cells[index]])));
   };
   assert.equal((await output('acceptanceAccuracy')).filter(row=>row['验收瑕疵等级']==='P2').length,1);
-  assert.equal((await output('groups'))[0]['P2改判率（P2/实际验收TID）'],'10.0%');
+  assert.equal((await output('groups'))[0]['非P2率（非P2/实际验收TID）'],'90.0%');
   const history=await output('acceptanceHistory');
   assert.equal(history.filter(row=>row['实际检查结果']==='P2瑕疵，实检合格').length,2);
   assert.equal(history.filter(row=>row['实际检查结果']==='P2瑕疵，实检合格'&&row['是否计入首次验收准确率']==='是').length,1);

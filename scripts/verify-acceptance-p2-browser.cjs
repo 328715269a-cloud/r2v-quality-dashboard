@@ -6,9 +6,9 @@ const {fork}=require('node:child_process');
 const {createHash}=require('node:crypto');
 const {chromium}=require('C:/Users/yeddashang/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const packaged=process.env.P2_TEST_PACKAGED==='1'||process.env.SAMPLING_TEST_PACKAGED==='1';
-const expectedApp=process.env.P2_EXPECTED_APP||'app.20261027-prod82-acceptance-p2.js';
-const port=Number(process.env.P2_TEST_PORT||43204),origin=`http://127.0.0.1:${port}`,out=process.env.P2_TEST_OUTPUT_DIR?path.resolve(process.env.P2_TEST_OUTPUT_DIR):path.resolve(__dirname,packaged?'../../acceptance-p2':'../../p2-browser');
-const packageDir=process.env.SAMPLING_TEST_PACKAGE_DIR?path.resolve(process.env.SAMPLING_TEST_PACKAGE_DIR):path.resolve(__dirname,'../../acceptance-p2/package/static');
+const expectedApp=process.env.P2_EXPECTED_APP||'app.20261027-prod84-non-p2-rate.js';
+const port=Number(process.env.P2_TEST_PORT||43204),origin=`http://127.0.0.1:${port}`,out=process.env.P2_TEST_OUTPUT_DIR?path.resolve(process.env.P2_TEST_OUTPUT_DIR):path.resolve(__dirname,'../../p2-non-rate/entrypoints');
+const packageDir=process.env.SAMPLING_TEST_PACKAGE_DIR?path.resolve(process.env.SAMPLING_TEST_PACKAGE_DIR):path.resolve(__dirname,'../../p2-non-rate/package/static');
 const inheritedDir=path.resolve(process.env.P2_INHERITED_STATIC_DIR||path.join(__dirname,'../../acceptance-p2/package/static'));
 function frozenResource(name){const current=path.join(packageDir,name);return fs.existsSync(current)?current:name==='workflow.20261027-prod82-acceptance-p2.js'?path.join(inheritedDir,name):current;}
 const checks=[],errors=[],requests=[],loadedAssets=[],resourceHashes=[],responseChecks=[];
@@ -63,12 +63,14 @@ async function main(){
 
       await page.locator('#acceptanceBody tr').filter({has:page.getByText(detailTid,{exact:true})}).getByRole('button',{name:'查看 / 验收',exact:true}).click();
       await page.locator('#acceptanceForm [value="acceptance_p2_pass"]').check();
+      check(`${mode} single: copy keeps P2 actual pass and explains non-P2 denominator`,(await page.locator('#acceptanceForm [data-acceptance-choice-help]').innerText()).includes('P2 计入实检分母，不计入非 P2 分子'));
       check(`${mode} single: P2 explanation is optional`,!await page.locator('#acceptanceForm [name="note"]').evaluate(element=>element.required));
       await page.locator('#acceptanceWorkbench').screenshot({path:path.join(out,`${mode}-p2-single.png`)});
       await blockedSave(page,()=>page.locator('#acceptanceForm button[type="submit"]').click(),`${mode} single`,()=>page.locator('#acceptanceForm [value="acceptance_p2_pass"]').isChecked());
       p2Supported=true;await page.locator('#acceptanceForm button[type="submit"]').click();await page.locator('#acceptanceForm').waitFor({state:'detached'});
 
       await find(page,[finderTid],'acceptance_p2_pass','保留 P2 修正说明');p2Supported=false;
+      check(`${mode} pasted TID: copy explains non-P2 denominator`,(await page.locator('#acceptanceChoiceHelp').innerText()).includes('P2 计入实检分母，不计入非 P2 分子'));
       await blockedSave(page,()=>saveFinder(page),`${mode} pasted TID`,async()=>await page.locator('#acceptanceText').inputValue()===finderTid&&await page.locator('#acceptanceChoice [value="acceptance_p2_pass"]').isChecked()&&await page.locator('#acceptanceChoiceNote').inputValue()==='保留 P2 修正说明'&&await page.locator('input[name="acceptanceImportTask"]:checked').count()===1);
       p2Supported=true;await saveFinder(page);
       check(`${mode} pasted result identifies P2`,(await page.locator('#acceptanceImportFeedback').innerText()).includes('成功更新 1 条')&&(await page.locator('#acceptancePreview').innerText()).includes('P2'));
@@ -76,6 +78,7 @@ async function main(){
 
       await page.locator('#acceptanceBody tr').filter({has:page.getByText(bulkTid,{exact:true})}).locator('input[name="acceptanceTask"]').check();
       await page.locator('#acceptanceBulkP2Pass').click();p2Supported=false;
+      check(`${mode} selected bulk: copy explains non-P2 denominator`,(await page.locator('#acceptanceBulkDecisionForm').innerText()).includes('P2 计入实检分母，不计入非 P2 分子'));
       check(`${mode} selected bulk: P2 note optional`,!await page.locator('#acceptanceBulkDecisionForm [name="note"]').evaluate(element=>element.required));
       await blockedSave(page,()=>page.locator('#acceptanceBulkDecisionForm button[type="submit"]').click(),`${mode} selected bulk`,async()=>await page.locator('#acceptanceBulkDecisionForm').evaluate(form=>form.dataset.decision==='acceptance_p2_pass'&&form.__selected.length===1));
       p2Supported=true;await page.locator('#acceptanceBulkDecisionForm button[type="submit"]').click();await page.locator('#acceptanceBulkDecisionForm').waitFor({state:'detached'});
@@ -88,6 +91,7 @@ async function main(){
       await form.locator('[name="batchAction"][value="pass"]').check();await form.locator('[name="p2Tids"]').fill(sampleFail);
       check(`${mode} sample: overlapping P2/fail is blocked`,await form.locator('button[type="submit"]').isDisabled()&&(await form.locator('.acceptance-sample-preview').innerText()).includes('同时列入'));
       await form.locator('[name="p2Tids"]').fill(sampleP2);check(`${mode} sample: categories remain disjoint`,(await form.locator('.acceptance-sample-preview').innerText()).includes('实检合格 1 · P2修正后通过 1 · 实检不合格 1'));
+      check(`${mode} sample: copy explains non-P2 denominator`,(await form.locator('.acceptance-sample-preview').innerText()).includes('P2 计入实检分母，不计入非 P2 分子'));
       p2Supported=false;await blockedSave(page,()=>form.locator('button[type="submit"]').click(),`${mode} sample`,async()=>await form.locator('[name="p2Tids"]').inputValue()===sampleP2&&await form.locator('[name="failedTids"]').inputValue()===sampleFail&&await form.locator('[name="note"]').inputValue()==='合成抽检批次');
       await form.screenshot({path:path.join(out,`${mode}-p2-sample.png`)});
       p2Supported=true;await form.locator('button[type="submit"]').click();await form.waitFor({state:'detached'});
@@ -97,9 +101,9 @@ async function main(){
       check(`${mode}: ordinary pass/fail/uninspected remain distinct`,value.tasks.find(task=>task.tid===samplePass).acceptanceIssueLevel===''&&value.tasks.find(task=>task.tid===sampleFail).status==='acceptance_return_pending');
       check(`${mode}: each P2 save health-checks even after a recent success`,healthReads>=8);
       await page.locator('nav [data-view="overview"]').click();await page.locator('[data-date-preset="all"]').click();
-      const total=mode==='single'?7:6,expected=(4/total*100).toFixed(1)+'%';
+      const total=mode==='single'?7:6,expected=((total-4)/total*100).toFixed(1)+'%';
       await page.waitForFunction(expected=>document.getElementById('metricAcceptanceP2Rate').textContent===expected,expected);
-      check(`${mode}: P2 overview uses unique actual inspection TIDs`,await page.locator('#metricAcceptanceP2Rate').innerText()===expected&&(await page.locator('#metricAcceptanceP2Detail').innerText()).includes(`P2 4 / 实检 ${total}`));
+      check(`${mode}: non-P2 overview uses unique actual inspection TIDs`,await page.locator('#metricAcceptanceP2Rate').innerText()===expected&&(await page.locator('#metricAcceptanceP2Detail').innerText()).includes(`非 P2 ${total-4} / 实检 ${total} 条 · P2 4 条`));
       check(`${mode}: P2 metric immediately follows accuracy`,await page.locator('#metricAcceptanceAccuracy').evaluate(element=>element.closest('.overview-metric').nextElementSibling.querySelector('#metricAcceptanceP2Rate')!==null));
       await page.locator('#metricAcceptanceP2Rate').locator('..').screenshot({path:path.join(out,`${mode}-p2-metric.png`)});
       await page.screenshot({path:path.join(out,`${mode}-overview-full.png`),fullPage:true});

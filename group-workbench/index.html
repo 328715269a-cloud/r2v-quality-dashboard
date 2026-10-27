@@ -83,7 +83,7 @@
                 <button class="btn small" type="button" data-export="groups">小组汇总</button>
                 <button class="btn small" type="button" data-export="daily">每日统计</button>
                 <button class="btn small" type="button" data-export="personDaily">个人每日明细</button>
-                <button class="btn small" type="button" data-export="acceptanceP2" data-export-range="scope" title="所选日期内实检 TID 去重明细，含首次与复验，可核对 P2 分子与实检分母">P2改判率明细（所选日期）</button>
+                <button class="btn small" type="button" data-export="acceptanceP2" data-export-range="scope" title="所选日期内实检 TID 去重明细，含首次与复验，可核对非 P2 分子、P2 数量与实检分母">非 P2 率明细（所选日期）</button>
                 <button class="btn small" type="button" data-export="summary">综合汇总</button>
                 <button class="btn small" type="button" data-export="events">操作流水</button>
                 <button class="btn small" type="button" data-export="packages">历史建包记录</button>
@@ -111,7 +111,7 @@
             <div class="overview-metric overview-metric-firstqc" title="所选日期内首检通过的 TID ÷ 所选日期内首检通过或打回的 TID，按首检发生日期统计。质检拒绝不计入，后续返修复检不改变首次结果。"><span>首次质检准确率</span><strong id="metricFirstQcAccuracy">—</strong><small id="metricFirstQcDetail">按首检日期 · 拒绝不计入</small></div>
             <button class="overview-metric overview-metric-today-rejected" type="button" data-action="overview-bucket" data-bucket="rejected" title="统计所选日期内被最终拒绝（质检拒绝 / 验收拒绝 / 标注拒绝确认废弃）的任务条数，按拒绝操作日期计入，可随上方日期筛选。点击查看已拒绝任务列表。"><span>已拒绝</span><strong id="metricRejected">—</strong><small id="metricRejectedHint">当日拒绝（条）</small></button>
             <div class="overview-metric overview-metric-firstqc" title="按首次验收的北京时间统计首轮实检合格 ÷ 首轮实检合格与不合格；未实检随批处理、拒绝和复验不计入。历史首次结果保持原口径。"><span>首次验收实检准确率</span><strong id="metricAcceptanceAccuracy">—</strong><small id="metricAcceptanceAccuracyDetail">按首次验收日期 · 复验不计入</small></div>
-            <div class="overview-metric overview-metric-firstqc" title="所选日期内出现过 P2 的 TID ÷ 实际检查过的 TID。首次与复验都计入，同一 TID 当天及跨天均去重；未实检和拒绝排除。范围跟随当前镜头、小组与实检日期。"><span>P2改判率</span><strong id="metricAcceptanceP2Rate">—</strong><small id="metricAcceptanceP2Detail">P2 / 实检（条）· TID 去重</small></div>
+            <div class="overview-metric overview-metric-firstqc" title="非 P2 率 = 1 − P2 TID 数 ÷ 实检 TID 数。所选日期内首次与复验按 TID 去重；未实检和拒绝排除。非 P2 包含无 P2 的实检不合格样本。范围跟随当前镜头、小组与实检日期。"><span>非 P2 率</span><strong id="metricAcceptanceP2Rate">—</strong><small id="metricAcceptanceP2Detail">非 P2 / 实检（条）· TID 去重</small></div>
             <div class="overview-metric overview-metric-qc-volume" title="所选日期内质检普通通过或打回的任务数，同一任务在区间内只计一次；直接拒绝和确认标注拒绝单列，不计入本项。先做过普通质检、后来拒绝的任务，仍保留之前普通质检的记录。验收操作、管理员释放前的记录不计入。"><span>质检量级</span><strong id="metricQcVolume">—</strong><small id="metricQcVolumeDetail">质检处理（条）· 不含拒绝</small></div>
             <div class="overview-metric overview-metric-today-rework overview-metric-qc-reject" title="质检直接拒绝或确认标注拒绝的任务数，按两种操作中首次发生的北京时间日期统计；同一任务当天或跨天只计一次。仅申请未确认、验收拒绝不计入。管理员释放前的记录不计入。"><span>质检拒绝</span><strong id="metricQcRejected">—</strong><small id="metricQcRejectedHint">首次质检拒绝（条）· 含确认拒绝</small></div>
             <div class="overview-metric overview-metric-acc-volume" title="所选日期内验收处理过的 case 数：通过、打回、拒绝都算，按判定发生日期计入，一条 case 只算一次；任务被管理员释放后此前的判定作废不计。"><span>验收量级</span><strong id="metricAcceptanceVolume">—</strong><small id="metricAcceptanceVolumeDetail">当日验收处理（条）· 去重</small></div>
@@ -263,7 +263,7 @@
         <div class="section-heading"><div><h2 id="acceptanceHeading">验收台</h2><p>实检合格与不合格均可批量登记；抽检整批处理时，实检结果与流转去向分别保留。</p></div><div class="actions export-actions"><details id="acceptanceExportMenu" class="export-menu"><summary>导出</summary><div class="export-menu-list">
           <button class="btn small" type="button" data-export="acceptancePending" title="导出下方筛选结果的全部待验收任务，包含所有分页，不受勾选或统计日期限制">待验收明细（当前筛选）</button>
           <button class="btn small" type="button" data-export="acceptanceAccuracy" data-export-range="scope" title="导出当前镜头、小组与统计日期范围内计入首轮实检准确率的 TID">首轮实检准确率明细（所选日期）</button>
-          <button class="btn small" type="button" data-export="acceptanceP2" data-export-range="scope" title="所选日期内实检 TID 去重明细，含首次与复验，可核对 P2 分子与实检分母">P2改判率明细（所选日期）</button>
+          <button class="btn small" type="button" data-export="acceptanceP2" data-export-range="scope" title="所选日期内实检 TID 去重明细，含首次与复验，可核对非 P2 分子、P2 数量与实检分母">非 P2 率明细（所选日期）</button>
           <button class="btn small" type="button" data-export="acceptanceHistory" data-export-range="scope" title="按上方统计日期和小组导出，以验收实际操作日期为准，每次判定一行">验收记录（所选日期）</button>
           <button class="btn small" type="button" data-export="acceptanceHistory" title="导出当前镜头和上方小组范围的全部验收记录，不受下方待验收筛选影响">验收记录（全部日期）</button>
         </div></details></div></div>
@@ -316,7 +316,7 @@
               <button class="btn small" type="button" data-export="groups">小组汇总</button>
               <button class="btn small" type="button" data-export="daily">每日统计</button>
               <button class="btn small" type="button" data-export="personDaily">个人每日明细</button>
-                <button class="btn small" type="button" data-export="acceptanceP2" data-export-range="scope" title="所选日期内实检 TID 去重明细，含首次与复验，可核对 P2 分子与实检分母">P2改判率明细（所选日期）</button>
+                <button class="btn small" type="button" data-export="acceptanceP2" data-export-range="scope" title="所选日期内实检 TID 去重明细，含首次与复验，可核对非 P2 分子、P2 数量与实检分母">非 P2 率明细（所选日期）</button>
               <button class="btn small" type="button" data-export="summary">综合汇总</button>
               <button class="btn small" type="button" data-export="events">操作流水</button>
               <button class="btn small" type="button" data-export="packages">历史建包记录</button>
@@ -334,7 +334,7 @@
   <script src="data-io.20260920-prod8.js" defer></script>
   <script src="shared-store.20260923-prod37.js" defer></script>
   <script src="workflow.20261027-prod82-acceptance-p2.js" defer></script>
-  <script src="reports.20261027-prod83-p2-volume.js" defer></script>
-  <script src="app.20261027-prod83-p2-volume.js" defer></script>
+  <script src="reports.20261027-prod84-non-p2-rate.js" defer></script>
+  <script src="app.20261027-prod84-non-p2-rate.js" defer></script>
 </body>
 </html>

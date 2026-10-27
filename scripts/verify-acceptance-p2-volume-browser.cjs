@@ -5,11 +5,11 @@ const {fork}=require('node:child_process'),{createHash}=require('node:crypto');
 const {chromium}=require('C:/Users/yeddashang/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const IO=require('../group-workbench/data-io.js');
 const packaged=process.env.P2_TEST_PACKAGED==='1'||process.env.SAMPLING_TEST_PACKAGED==='1';
-const expectedApp=process.env.P2_EXPECTED_APP||'app.20261027-prod83-p2-volume.js';
-const packageDir=path.resolve(process.env.SAMPLING_TEST_PACKAGE_DIR||path.join(__dirname,'../../p2-volume/package/static'));
+const expectedApp=process.env.P2_EXPECTED_APP||'app.20261027-prod84-non-p2-rate.js';
+const packageDir=path.resolve(process.env.SAMPLING_TEST_PACKAGE_DIR||path.join(__dirname,'../../p2-non-rate/package/static'));
 const inheritedDir=path.resolve(process.env.P2_INHERITED_STATIC_DIR||path.join(__dirname,'../../acceptance-p2/package/static'));
 function frozenResource(name){const current=path.join(packageDir,name);return fs.existsSync(current)?current:name==='workflow.20261027-prod82-acceptance-p2.js'?path.join(inheritedDir,name):current;}
-const out=path.resolve(process.env.P2_TEST_OUTPUT_DIR||path.join(__dirname,'../../p2-volume'));
+const out=path.resolve(process.env.P2_TEST_OUTPUT_DIR||path.join(__dirname,'../../p2-non-rate'));
 const port=Number(process.env.P2_TEST_PORT||43205),origin=`http://127.0.0.1:${port}`;
 const checks=[],errors=[],resourceHashes=[],responseChecks=[],loadedAssets=[],exportChecks=[];
 const capturedResources=new Set();
@@ -18,8 +18,8 @@ const check=(label,condition)=>{assert(condition,label);checks.push(label);conso
 async function login(mode){const profile={name:mode==='single'?'测试验收':'多镜验收',role:'acceptance',groupId:mode==='single'?'g01':'g06',mode};const response=await fetch(origin+'/group-workbench-api/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile,pin:'isolated-test-group-pin'})});assert.equal(response.status,200,await response.clone().text());return response.json();}
 async function range(page,from,to){await page.locator('#scopeDateFrom').fill(from);await page.locator('#scopeDateTo').fill(to);await page.locator('#scopeDateTo').dispatchEvent('change');}
 async function metric(page,label,{total,p2,accuracy}){
-  const expected=total?`${(p2/total*100).toFixed(1)}%`:'—';
-  await page.waitForFunction(({expected,total,p2})=>document.getElementById('metricAcceptanceP2Rate').textContent===expected&&(total?document.getElementById('metricAcceptanceP2Detail').textContent.includes(`P2 ${p2} / 实检 ${total} 条`):document.getElementById('metricAcceptanceP2Detail').textContent.includes('暂无实检记录')),{expected,total,p2});
+  const expected=total?`${((total-p2)/total*100).toFixed(1)}%`:'—';
+  await page.waitForFunction(({expected,total,p2})=>document.getElementById('metricAcceptanceP2Rate').textContent===expected&&(total?document.getElementById('metricAcceptanceP2Detail').textContent.includes(`非 P2 ${total-p2} / 实检 ${total} 条 · P2 ${p2} 条`):document.getElementById('metricAcceptanceP2Detail').textContent.includes('暂无实检记录')),{expected,total,p2});
   check(label,await page.locator('#metricAcceptanceP2Rate').innerText()===expected);
   if(accuracy!==undefined)check(label+' · first accuracy unchanged',await page.locator('#metricAcceptanceAccuracy').innerText()===accuracy);
 }
@@ -27,9 +27,10 @@ async function exportDetail(page,mode,label,total,p2){
   await page.locator('#overviewView .export-menu').evaluate(element=>element.open=true);
   const downloadPromise=page.waitForEvent('download');await page.locator('#overviewView [data-export="acceptanceP2"]').click();const download=await downloadPromise;
   const file=path.join(out,`${mode}-${label}.csv`);await download.saveAs(file);
-  const csv=fs.readFileSync(file,'utf8'),table=IO.parseTable(csv),p2Index=table.headers.findIndex(value=>value==='是否发生P2'),tidIndex=table.headers.indexOf('TID');
+  const csv=fs.readFileSync(file,'utf8'),table=IO.parseTable(csv),p2Index=table.headers.findIndex(value=>value==='是否发生P2'),nonP2Index=table.headers.indexOf('是否非P2'),tidIndex=table.headers.indexOf('TID');
   check(`${mode} ${label}: export identifies unique denominator and P2 numerator`,p2Index>=0&&tidIndex>=0&&table.rows.length===total&&table.rows.filter(row=>row[p2Index]==='是').length===p2&&new Set(table.rows.map(row=>row[tidIndex])).size===total);
-  check(`${mode} ${label}: export file labels current scope`,download.suggestedFilename().includes('P2改判率明细')&&download.suggestedFilename().includes(mode==='single'?'单镜头':'多镜头'));
+  check(`${mode} ${label}: exported non-P2 count is the complementary numerator`,nonP2Index>=0&&table.rows.filter(row=>row[nonP2Index]==='是').length===total-p2&&table.rows.every(row=>row[nonP2Index]===(row[p2Index]==='是'?'否':'是')));
+  check(`${mode} ${label}: export file labels current scope`,download.suggestedFilename().includes('非 P2 率明细')&&download.suggestedFilename().includes(mode==='single'?'单镜头':'多镜头'));
   exportChecks.push({mode,label,file,rows:table.rows.length,headers:table.headers,sha256:hash(csv),filename:download.suggestedFilename()});return table;
 }
 async function main(){
@@ -48,9 +49,10 @@ async function main(){
       page.on('request',request=>{if(request.method()==='POST'&&new URL(request.url()).pathname==='/group-workbench-api/transactions')errors.push('Unexpected browser write');});
       page.on('response',response=>{const url=new URL(response.url());if(url.origin!==origin||!url.pathname.startsWith('/group-workbench/'))return;const name=url.pathname.endsWith('/')?'index.html':path.basename(url.pathname);if(name!=='index.html'&&!/^(app|reports|workflow|export-worker)\..+\.js$/.test(name))return;const key=mode+':'+name;if(capturedResources.has(key))return;capturedResources.add(key);responseChecks.push(response.body().then(body=>{const sha256=hash(body),file=packaged?frozenResource(name):undefined;resourceHashes.push({mode,name,url:response.url(),status:response.status(),sha256,frozenSource:file});if(packaged){assert(fs.existsSync(file),`Frozen resource missing: ${name}`);assert.equal(sha256,hash(fs.readFileSync(file)),`HTTP ${name} must match frozen package`);}}).catch(error=>errors.push(error.message)));});
       await page.goto(origin+'/group-workbench/');await page.locator('#appShell').waitFor({state:'visible'});await page.locator('nav [data-view="overview"]').click();
-      const app=await page.locator('script[src^="app."]').getAttribute('src');loadedAssets.push({mode,app});if(packaged)check(`${mode}: packaged immutable app is prod83`,app.split('?')[0]===expectedApp);
+      const app=await page.locator('script[src^="app."]').getAttribute('src');loadedAssets.push({mode,app});if(packaged)check(`${mode}: packaged immutable app is prod84`,app.split('?')[0]===expectedApp);
       await page.locator('#scopeGroup').selectOption(mode==='single'?'g01':'g06');
       await range(page,'','');await metric(page,`${mode}: all rounds and cross-day TID dedup`,{total:5,p2:3,accuracy:'60.0%'});
+      check(`${mode}: metric and all three export menus use non-P2 wording`,await page.locator('#metricAcceptanceP2Rate').locator('..').locator('span').innerText()==='非 P2 率'&&await page.locator('[data-export="acceptanceP2"]').count()===3&&(await page.locator('[data-export="acceptanceP2"]').allTextContents()).every(label=>label==='非 P2 率明细（所选日期）'));
       check(`${mode}: P2 metric follows first accuracy and describes all rounds`,await page.locator('#metricAcceptanceAccuracy').evaluate(node=>node.closest('.overview-metric').nextElementSibling.querySelector('#metricAcceptanceP2Rate')!==null)&&/首次与复验/.test(await page.locator('#metricAcceptanceP2Rate').locator('..').getAttribute('title')));
       const all=await exportDetail(page,mode,'all-dates',5,3);const records=all.headers.findIndex(value=>value.startsWith('实检记录数')),tid=all.headers.indexOf('TID');
       check(`${mode}: repeated same-day and cross-day inspections remain one exported TID`,records>=0&&all.rows.find(row=>row[tid]===prefix+'-002')?.[records]==='3');
@@ -62,6 +64,10 @@ async function main(){
       await range(page,'2026-10-21','2026-10-22');await metric(page,`${mode}: date interval deduplicates across days`,{total:4,p2:2,accuracy:'50.0%'});
       await page.locator('#scopeGroup').selectOption('all');await metric(page,`${mode}: all groups stay inside current shot mode`,{total:5,p2:3,accuracy:'60.0%'});
       await page.locator('#scopeGroup').selectOption(mode==='single'?'g02':'g07');await metric(page,`${mode}: individual group filtering`,{total:1,p2:1,accuracy:'100.0%'});
+      await page.locator('#scopeGroup').selectOption(mode==='single'?'g03':'g08');await range(page,'2026-10-25','2026-10-25');await metric(page,`${mode}: 2 P2 of 31 inspected means 93.5% non-P2`,{total:31,p2:2,accuracy:'96.8%'});
+      const complement=await exportDetail(page,mode,'complement-2-of-31',31,2),complementP2=complement.headers.indexOf('是否发生P2');
+      check(`${mode}: non-P2 includes a failed actual inspection without P2`,complement.rows.find(row=>row[tid]===(mode==='single'?'COMPLEMENT':'MULTICOMPLEMENT')+'-031')?.[complementP2]==='否');
+      await page.locator('#overviewView .export-menu').evaluate(element=>element.open=false);await page.screenshot({path:path.join(out,`${mode}-non-p2-93-5-overview.png`),fullPage:true});
       await range(page,'2026-10-24','2026-10-24');await metric(page,`${mode}: empty dates show no rate`,{total:0,p2:0,accuracy:'—'});await exportDetail(page,mode,'empty-date',0,0);
       await range(page,'2026-10-23','2026-10-21');check(`${mode}: reversed dates do not show a misleading rate`,await page.locator('#metricAcceptanceP2Rate').innerText()==='—'&&(await page.locator('#metricAcceptanceP2Detail').innerText()).includes('请修正日期区间'));
       await context.close();

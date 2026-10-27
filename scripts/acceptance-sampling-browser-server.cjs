@@ -35,13 +35,15 @@ function seedP2Volume(){
   };
   const repair=(entry,task)=>{tx(entry.qc,{events:[event(task,'acceptance_route',{route:'qc',note:'合成复验'}),event(task,'qc_repair_done',{note:'合成返修完成'})]});};
   onDate('2026-10-20',()=>{for(const mode of ['single','multi']){
-    const groupId=mode==='single'?'g01':'g06',otherGroup=mode==='single'?'g02':'g07';
+    const groupId=mode==='single'?'g01':'g06',otherGroup=mode==='single'?'g02':'g07',complementGroup=mode==='single'?'g03':'g08';
     const tasks=ready(mode==='single'?'VOLUME':'MULTIVOLUME',7,'P2区间核对影片',groupId,mode),other=ready(mode==='single'?'OTHER':'MULTIOTHER',1,'其他小组核对影片',otherGroup,mode)[0];
-    sets.push({mode,groupId,tasks,other,acceptance:profiles[mode],qc:{name:'测试组长',role:'qc',groupId,mode}});
+    const complement=ready(mode==='single'?'COMPLEMENT':'MULTICOMPLEMENT',31,'非P2率补数核对影片',complementGroup,mode);
+    sets.push({mode,groupId,tasks,other,complement,acceptance:profiles[mode],qc:{name:'测试组长',role:'qc',groupId,mode}});
   }});
   onDate('2026-10-21',()=>{for(const entry of sets){const [a,b,,,,f]=entry.tasks;inspect(entry,a,'fail');inspect(entry,b,'fail');inspect(entry,f,'pass',true);repair(entry,b);inspect(entry,b,'fail');}});
   onDate('2026-10-22',()=>{for(const entry of sets){const [a,,c,d,e]=entry.tasks;repair(entry,a);inspect(entry,a,'pass',true);inspect(entry,c,'pass');inspect(entry,d,'uninspected');tx(entry.acceptance,{events:[event(e,'acceptance_reject',{note:'合成拒绝，不实检'})]});inspect(entry,entry.other,'pass',true);}});
   onDate('2026-10-23',()=>{for(const entry of sets){const [,b,,,,,g]=entry.tasks;repair(entry,b);inspect(entry,b,'pass',true);inspect(entry,g,'pass');}});
+  onDate('2026-10-25',()=>{for(const entry of sets)entry.complement.forEach((task,index)=>inspect(entry,task,index===30?'fail':'pass',index<2));});
 }
 if(process.env.SAMPLING_TEST_P2_VOLUME==='1')seedP2Volume();else{
 ready('RETURN',compact?12:100,'整批退回测试');ready('PASS',compact?12:100,'随批放行测试');ready('DRAFT',3,'草稿冲突测试');

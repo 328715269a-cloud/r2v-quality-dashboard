@@ -828,7 +828,7 @@
     setText('metricAcceptanceAccuracyDetail',!validScopeRange()?'请修正日期区间':`${scopeRangeLabel()} · ${accuracy.total?`首轮实检 ${accuracy.total} 条 · 合格 ${accuracy.passed}`:'暂无首轮实检记录'}`);
     const p2=acceptanceP2(tasks);
     setText('metricAcceptanceP2Rate',!validScopeRange()||!Number.isFinite(p2.rate)?'—':`${p2.rate.toFixed(1)}%`);
-    setText('metricAcceptanceP2Detail',!validScopeRange()?'请修正日期区间':`${scopeRangeLabel()} · ${p2.total?`P2 ${p2.p2Count} / 实检 ${p2.total} 条 · TID 去重`:'暂无实检记录'}`);
+    setText('metricAcceptanceP2Detail',!validScopeRange()?'请修正日期区间':`${scopeRangeLabel()} · ${p2.total?`非 P2 ${p2.nonP2Count} / 实检 ${p2.total} 条 · P2 ${p2.p2Count} 条 · TID 去重`:'暂无实检记录'}`);
     const volumeWord=singleScopeDate()?'当日':'区间';
     setText('metricQcVolumeDetail',!validScopeRange()?'请修正日期区间':`${volumeWord}质检处理（条）· 通过 / 打回，不含拒绝`);
     setText('metricAcceptanceVolumeDetail',!validScopeRange()?'请修正日期区间':`${volumeWord}验收处理（条）· 通过 / 打回 / 拒绝`);
@@ -1333,7 +1333,7 @@
     const type=qs('input[name="decision"]:checked',form)?.value;
     form.elements.note.required=['acceptance_fail','acceptance_reject'].includes(type);
     form.elements.note.maxLength=type==='acceptance_batch_pass'?1960:2000;
-    const help=qs('[data-acceptance-choice-help]',form);if(help)help.textContent=type==='acceptance_p2_pass'?'P2 错误已在验收时修正，记录为实检合格并通过；首次与复验都计入 P2 改判率，所选日期内按 TID 去重。说明选填。':type==='acceptance_batch_pass'?'任务记为验收通过、计入通过量和闭环；未实检，不计入个人、小组和整体的实检准确率。':'实际检查合格才选“实检合格”；未检查的随批放行请选“未实检，随批通过”。';
+    const help=qs('[data-acceptance-choice-help]',form);if(help)help.textContent=type==='acceptance_p2_pass'?'P2 错误已在验收时修正，记录为实检合格并通过；计算非 P2 率时，P2 计入实检分母，不计入非 P2 分子。说明选填。':type==='acceptance_batch_pass'?'任务记为验收通过、计入通过量和闭环；未实检，不计入个人、小组和整体的实检准确率。':'实际检查合格才选“实检合格”；未检查的随批放行请选“未实检，随批通过”。';
   }
   function acceptanceTransition(task,type,note,options={}) {
     requireRole('acceptance',task);
@@ -1441,7 +1441,7 @@
     $('acceptanceChoiceNote').maxLength=batchReturn||batchPass?1960:2000;
     $('acceptanceCommitBtn').disabled=acceptanceBusy||!current||blocked||!selected||!type||(noteRequired&&!note);
     $('acceptanceCommitBtn').textContent=acceptanceBusy?'正在保存…':batchReturn?`确认整批退回 ${selected} 条`:batchPass?`确认未实检随批通过 ${selected} 条`:`保存所选 ${selected} 条`;
-    setText('acceptanceChoiceHelp',type==='acceptance_p2_pass'?'P2 错误已在验收时修正，记录为实检合格并通过；首次与复验都计入 P2 改判率，所选日期内按 TID 去重。说明选填。':batchReturn?'支持不同小组，分别退回各自小组质检，显示“随批退回”；不记录实检合格或不合格，不计入首次验收实检准确率。可补充说明。':batchPass?'所选 TID 记为验收通过、计入通过量和闭环；未实检，不计入个人、小组和整体的实检准确率。支持同镜头跨组。':'实际检查合格才选“实检合格”；未检查的随批放行请选“未实检，随批通过”。实检不合格与拒绝需填写原因。');
+    setText('acceptanceChoiceHelp',type==='acceptance_p2_pass'?'P2 错误已在验收时修正，记录为实检合格并通过；计算非 P2 率时，P2 计入实检分母，不计入非 P2 分子。说明选填。':batchReturn?'支持不同小组，分别退回各自小组质检，显示“随批退回”；不记录实检合格或不合格，不计入首次验收实检准确率。可补充说明。':batchPass?'所选 TID 记为验收通过、计入通过量和闭环；未实检，不计入个人、小组和整体的实检准确率。支持同镜头跨组。':'实际检查合格才选“实检合格”；未检查的随批放行请选“未实检，随批通过”。实检不合格与拒绝需填写原因。');
     const selectedIds=new Set(inputs.filter(input=>input.checked&&!input.disabled).map(input=>input.value));
     const groupSummary=current&&(batchReturn||batchPass)&&selected?` · ${acceptanceBatchGroups(acceptanceDraft.rows.filter(row=>row.outcome==='success'&&selectedIds.has(row.taskId)).map(row=>row.task),batchPass?'pass':'return')}`:'';
     setText('acceptanceChoiceSummary',current?`已选 ${selected} 条${groupSummary}${blocked?' · 请先修正多列内容':''}`:'请先校验 TID');
@@ -1642,7 +1642,7 @@
       const script=qsa('script[src]').find(node=>new URL(node.src,location.href).pathname.split('/').pop().match(new RegExp('^'+name+'(?:\\.[^/]+)?\\.js$')));
       if(!script)throw new Error('导出组件未加载，请稍后重试。');return script.src;
     });
-    const worker=new Worker(new URL('export-worker.20261027-prod83-p2-volume.js',location.href));job.worker=worker;
+    const worker=new Worker(new URL('export-worker.20261027-prod84-non-p2-rate.js',location.href));job.worker=worker;
     const result=new Promise((resolve,reject)=>{
       worker.onmessage=event=>{const data=event.data;if(data.type==='progress')setExportStatus(data.text);else if(data.type==='complete')resolve(data);else if(data.type==='error'){job.error=new Error(data.message);reject(job.error);}};
       worker.onerror=()=>{job.error=new Error('导出组件加载或生成失败，填写内容已保留，请重试。');reject(job.error);};
@@ -1686,7 +1686,7 @@
       if(!exportScopeCurrent(scope))throw new Error('作业身份或导出范围已变化，已取消下载，请重新导出。');
       if(kind==='backup'){download(`作业流程完整备份-单多全部-${todayString()}.json`,result.blob);const message='完整备份已下载，包含单、多镜头全部原始数据和最新任务状态。';setExportStatus(message);showToast(message);return;}
       if(kind==='legacyPackages'){download(`全部建包记录-${todayString()}.csv`,result.blob);const message=`已导出全部 ${result.rowCount} 个建包批次。`;setExportStatus(message);showToast(message);return;}
-      const names={imports:'导入记录',tasks:'任务明细',events:'操作流水',packages:'建包记录',movies:'影片汇总',groups:'小组汇总',daily:'每日统计',personDaily:'个人每日明细',summary:'小组影片综合汇总',acceptancePending:'待验收明细',acceptanceHistory:'验收记录',acceptanceAccuracy:'首轮实检准确率明细',acceptanceP2:'P2改判率明细'},dateLabel=range==='scope'?scopeRangeLabel():'全部日期';
+      const names={imports:'导入记录',tasks:'任务明细',events:'操作流水',packages:'建包记录',movies:'影片汇总',groups:'小组汇总',daily:'每日统计',personDaily:'个人每日明细',summary:'小组影片综合汇总',acceptancePending:'待验收明细',acceptanceHistory:'验收记录',acceptanceAccuracy:'首轮实检准确率明细',acceptanceP2:'非 P2 率明细'},dateLabel=range==='scope'?scopeRangeLabel():'全部日期';
       if(kind==='acceptancePending'||kind==='acceptanceHistory'||kind==='acceptanceAccuracy'||kind==='acceptanceP2'){
         const group=scope.groupId==='all'?'全部小组':groupLabel(scope.groupId),date=kind==='acceptancePending'?(Object.values(scope.acceptanceFilters).some(values=>values.length)?'当前筛选待办':'全部待办'):dateLabel;
         download(`${modeLabel(scope.mode)}-${group}-${names[kind]}-${date}-${todayString()}.csv`,result.blob);
@@ -1908,7 +1908,7 @@
       const plan=acceptanceSamplePlan(form.__selected,form.elements.inspectedTids.value,form.elements.failedTids.value,action,form.elements.p2Tids?.value||'');
       form.elements.failureNote.required=plan.failed>0;
       preview.classList.remove('is-error');
-      preview.textContent=`固定 ${plan.rows.length} 条：实检合格 ${plan.passed} · P2修正后通过 ${plan.p2} · 实检不合格 ${plan.failed} · 未实检 ${plan.uninspected}。保存后退回质检 ${plan.returned} 条，验收通过 ${plan.accepted} 条。${plan.passed+plan.p2+plan.failed?'P2 记为实检合格；P2 改判率包含首次与复验，所选日期内按 TID 去重。首次验收实检准确率仍只看首轮。':'本次没有实检结果，全部为随批处理，不计入实检准确率。'}`;
+      preview.textContent=`固定 ${plan.rows.length} 条：实检合格 ${plan.passed} · P2修正后通过 ${plan.p2} · 实检不合格 ${plan.failed} · 未实检 ${plan.uninspected}。保存后退回质检 ${plan.returned} 条，验收通过 ${plan.accepted} 条。${plan.passed+plan.p2+plan.failed?'P2 仍记为实检合格；计算非 P2 率时，P2 计入实检分母，不计入非 P2 分子。首次验收实检准确率仍只看首轮。':'本次没有实检结果，全部为随批处理，不计入实检准确率。'}`;
       button.textContent=action==='return'?`确认整批退回 ${plan.rows.length} 条`:`确认处理 ${plan.rows.length} 条（通过 ${plan.accepted} / 退回 ${plan.returned}）`;
       button.disabled=acceptanceBusy||!form.elements.note.value.trim()||(plan.failed>0&&!form.elements.failureNote.value.trim());
     }catch(error){preview.classList.add('is-error');preview.textContent=error.message;button.textContent='核对名单与处理方式后保存';button.disabled=true;}
@@ -1945,7 +1945,7 @@
     const p2=type==='acceptance_p2_pass',reject=type==='acceptance_reject',batchReturn=type==='acceptance_batch_return',batchPass=type==='acceptance_batch_pass',batchAction=batchReturn||batchPass,target=$('acceptanceBulkWorkbench');
     const groupSummary=batchAction?acceptanceBatchGroups(selected.map(row=>findTask(state,row.id)),batchPass?'pass':'return'):'';
     const title=p2?'P2错误，修正后通过':batchPass?'未实检，随批通过':batchReturn?'整批退回，统一复查':reject?'拒绝并结束流转':'实检不合格，退回质检';
-    const help=p2?'所选任务的 P2 错误已在验收时修正，记为实检合格并通过；首次与复验都计入 P2 改判率，所选日期内按 TID 去重。':batchPass?'名单已固定，所选任务记为验收通过、计入通过量和闭环；未实检，不计入个人、小组和整体的实检准确率。':batchReturn?'名单已固定，所选任务分别退回各自小组质检并显示“随批退回”。不记录实检合格或不合格，不计入首次验收实检准确率。':reject?'拒绝后不退回质检或标注，任务与历史记录仍保留。':'任务退回质检处理；质检可自行修改，或交给标注返修。';
+    const help=p2?'所选任务的 P2 错误已在验收时修正，记为实检合格并通过；计算非 P2 率时，P2 计入实检分母，不计入非 P2 分子。':batchPass?'名单已固定，所选任务记为验收通过、计入通过量和闭环；未实检，不计入个人、小组和整体的实检准确率。':batchReturn?'名单已固定，所选任务分别退回各自小组质检并显示“随批退回”。不记录实检合格或不合格，不计入首次验收实检准确率。':reject?'拒绝后不退回质检或标注，任务与历史记录仍保留。':'任务退回质检处理；质检可自行修改，或交给标注返修。';
     target.innerHTML=`<form id="acceptanceBulkDecisionForm" class="workbench-form" data-decision="${type}" data-scope="${escapeHtml(acceptanceScopeKey())}" data-batch-id="${escapeHtml(uid('acceptance_batch'))}"><h3>${title} · ${selected.length} 条</h3><p>${help}</p>${batchAction?`<p class="muted">${escapeHtml(groupSummary)}</p>`:''}<label class="field"><span>${batchAction||p2?'补充说明（选填）':`${reject?'拒绝原因':'实检不合格的原因'}（适用于全部勾选任务）`}</span><textarea name="note" ${batchAction||p2?`placeholder="统一说明：${title}"`:'required'} maxlength="${batchAction?1960:2000}"></textarea></label><div class="row-actions"><button type="submit" class="btn ${reject?'danger':'primary'}">${p2?`确认 P2 修正后通过 ${selected.length} 条`:batchPass?`确认未实检随批通过 ${selected.length} 条`:batchReturn?`确认整批退回 ${selected.length} 条`:reject?'确认拒绝并结束流转':'确认退回质检'}</button><button type="button" class="btn ghost" data-action="cancel-bulk-acceptance">取消</button></div></form>`;
     target.firstElementChild.__selected=selected;dirtyForms.add(target.firstElementChild);syncAcceptanceSelection();target.scrollIntoView({block:'nearest'});
   }
@@ -2339,6 +2339,6 @@
     try {state=await store.init();profile=store.profile();const retiredProfile=profile&&!validProfile(profile);initializeControls();initializeWorkflowControls();bindEvents();bindBulkEvents();bindModuleEvents();bindOverviewEvents();bindReassignEvents();if(profile&&!retiredProfile)enterApp();else{profile=null;showIdentity();if(retiredProfile)showToast('组别已更新，请选择当前作业类型与小组。');}}
     catch(error){$('appShell').classList.add('hidden');$('identityGate').classList.remove('hidden');const box=document.createElement('div');box.className='panel';const text=document.createElement('p');text.textContent='共享服务暂时无法连接，云端数据未清空。'+error.message;const button=document.createElement('button');button.type='button';button.className='btn primary';button.textContent='重试连接';button.addEventListener('click',()=>location.reload());box.append(text,button);$('identityGate').replaceChildren(box);}
   }
-  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20261027-prod83',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
+  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20261027-prod84',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
   init();
 })();
