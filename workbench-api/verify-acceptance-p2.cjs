@@ -115,16 +115,15 @@ async function main(){
     assert.deepEqual(batch.result.delta.events.map(row=>row.acceptanceIssueLevel||''),['P2','','']);
     assert(batch.result.delta.events.every(row=>row.acceptanceBatchId===batchId));
     assert.equal(Flow.label(current(two.tasks[1])),'实检合格 · 验收通过');assert.equal(Flow.label(current(two.tasks[2])),'未实检 · 随批放行');
-    await reject(one.acceptance,[p2(multi.tasks[0])],403,'FORBIDDEN');
     for(const session of [one.qc,one.annotation,admin])await reject(session,[p2(two.tasks[4])],403,'FORBIDDEN');
     await reject(two.qc,[event(one.tasks[5],'acceptance_route',{route:'qc',note:'不能跨组'})],403,'FORBIDDEN');
-    await tx(multi.acceptance,{events:[p2(multi.tasks[0]),p2(newcomer.tasks[0])]});
+    await tx(one.acceptance,{events:[p2(multi.tasks[0]),p2(newcomer.tasks[0])]});
     for(const [groupId,group]of Object.entries(groups)){
       const scoped=await data(base,'state?scope=role-v1',{token:group.qc.token}),ownIds=new Set(group.tasks.map(task=>task.id));
       assert(scoped.state.tasks.every(task=>task.groupId===groupId));assert(scoped.state.events.every(row=>ownIds.has(row.taskId)));assert.equal(scoped.state.tasks.length,8);
       const inc=await data(base,'state?scope=role-v1&after='+plain.body.revision,{token:group.qc.token});assert(inc.delta.events.every(row=>ownIds.has(row.taskId)));
     }
-    proofs.push('P2可加入合法统一batchId的实检/随批事务，标记不会传播到普通或未实检通过；验收同模块跨组可用、单多及角色边界不变、质检同步仍按原组隔离');
+    proofs.push('P2可加入合法统一batchId的实检/随批事务，标记不会传播到普通或未实检通过；验收可跨组和单多镜头，其他角色边界及质检原组同步隔离保持');
 
     const oldPass=await tx(one.acceptance,{events:[event(one.tasks[2],'acceptance_pass')]});
     const oldFail=await tx(one.acceptance,{events:[event(one.tasks[3],'acceptance_fail',{note:'旧页普通退回'})]});

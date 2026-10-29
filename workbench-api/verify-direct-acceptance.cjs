@@ -136,9 +136,9 @@ async function main(){
     await tx(acceptance,{events:[event(otherTask,'acceptance_pass')]});
     const multiTask=(await tx(admin,importDelta(['OTHER-MODE'],{groupId:'g06',mode:'multi'}))).delta.tasks[0];
     await ready([multiTask],multiAnnotation,multiQc);
-    await fail(acceptance,{events:[event(multiTask,'acceptance_pass')]},403,'FORBIDDEN');
     await fail(qc,{events:[event(multiTask,'qc_pass')]},403,'FORBIDDEN');
-    proofs.push('现有质检拒绝marker正确终止；组长不能跨组、单镜验收不能跨到多镜；验收仍可处理本模块多个小组');
+    await tx(acceptance,{events:[event(multiTask,'acceptance_pass')]});assert.equal((await view(multiTask,acceptance)).status,'accepted');
+    proofs.push('现有质检拒绝marker正确终止；组长不能跨组或跨模块；验收角色可跨组及单多镜头通过');
 
     child=fork(__filename,['--wal-peer',directory],{stdio:['ignore','ignore','inherit','ipc']});
     const peer=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('WAL peer did not start')),15000);child.once('message',message=>{clearTimeout(timer);resolve(message);});child.once('error',error=>{clearTimeout(timer);reject(error);});});

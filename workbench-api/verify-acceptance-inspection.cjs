@@ -130,7 +130,6 @@ async function main(){
     await fail(acceptance,{events:[decision(atomic,'acceptance_pass','pass'),decision(atomic,'acceptance_fail','fail')]},409,'STATE_CONFLICT');
     await fail(acceptance,{events:[decision(atomic,'acceptance_pass','uninspected',{acceptanceBatchId:invalidBatch}),decision(invalid,'acceptance_pass','uninspected',{acceptanceBatchId:invalidBatch,expectedUpdatedAt:'outdated'})]},409,'STATE_CONFLICT');
     await fail(qc,{events:[decision(invalid,'acceptance_pass','pass')]},403,'FORBIDDEN');
-    await fail(multiAcceptance,{events:[decision(invalid,'acceptance_pass','pass')]},403,'FORBIDDEN');
     proofs.push('枚举、字段适用范围、非法组合、必填原因、批次名单、重复任务、版本与权限拒绝均整批原子且不丢数据');
 
     const released=await tx(acceptance,{events:[decision(releaseA,'acceptance_pass','uninspected',{acceptanceBatchId:'release-single'}),decision(releaseB,'acceptance_pass','uninspected',{acceptanceBatchId:'release-single'})]});
@@ -138,9 +137,9 @@ async function main(){
     for(const task of [releaseA,releaseB]){assert.equal(current(task).status,'accepted');assert.equal(current(task).acceptanceFlowAction,'pass');assert.equal(legacyFlow.project(task,service.state().events).status,'accepted');}
     const errors=await tx(acceptance,{events:[decision(inspectedBad,'acceptance_fail','fail'),decision(uninspectedBad,'acceptance_fail','fail')]});
     assert(errors.delta.events.every(row=>Flow.acceptanceInspection(row)==='fail'),'Selecting multiple actual errors remains inspected');
-    const mixed=await tx(acceptance,{events:[decision(atomic,'acceptance_fail','fail',{acceptanceBatchId:'mixed-release'}),decision(invalid,'acceptance_pass','uninspected',{acceptanceBatchId:'mixed-release'})]});
+    const mixed=await tx(multiAcceptance,{events:[decision(atomic,'acceptance_fail','fail',{acceptanceBatchId:'mixed-release'}),decision(invalid,'acceptance_pass','uninspected',{acceptanceBatchId:'mixed-release'})]});
     assert.equal(mixed.delta.events.length,2);assert.equal(current(atomic).status,'acceptance_return_pending');assert.equal(current(invalid).status,'accepted');
-    proofs.push('多选实际错误仍全部算实检；随批放行真实通过且不计实检；放行批次中的实检不合格项仍退回');
+    proofs.push('多选实际错误仍全部算实检；多镜验收身份可处理单镜任务，随批放行真实通过且不计实检，批次中的实检不合格项仍退回');
 
     for(const [groupId,mode] of Object.entries(MODES)){
       const annotationGroup=await login(profile('annotation',groupId)),qcGroup=await login(profile('qc',groupId),groupPin),reviewer=mode==='single'?acceptance:multiAcceptance;

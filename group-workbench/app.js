@@ -221,7 +221,7 @@
   const groupDayDrafts = new Map();
   const reworkAssignmentDrafts = new Map();
   let acceptanceDraft = null;
-  let acceptanceBusy=false,acceptancePreviewTicket=0,qcMatchBusy=false,qcBulkReturnBusy=false;
+  let acceptanceBusy=false,acceptancePreviewTicket=0,acceptanceKeywordTicket=0,acceptanceKeywordBusy=false,qcMatchBusy=false,qcBulkReturnBusy=false;
   let selectedAcceptanceTaskId = '';
   const acceptanceSingleDrafts = new Map();
   const annotationStatuses = ['unclaimed', 'annotating', 'rework', 'acceptance_rework'];
@@ -519,7 +519,7 @@
   }
   function multiApply(id) {
     if (id === 'recordMovie' || id === 'recordStatus') { if (refreshState()) renderRecords(); }
-    if (isAcceptanceFilter(id)) { invalidateAcceptancePreview(); if (refreshState()) renderAcceptance(); }
+    if (isAcceptanceFilter(id)) { if (refreshState()) renderAcceptance(); }
   }
   function initializeControls() {
     const groups = activeGroups().map(group => ({value: group.id, label: group.name}));
@@ -1245,6 +1245,15 @@
   function acceptanceScopeKey() {return JSON.stringify({identity:batchIdentityScope(),group:selectedGroup(),filters:acceptanceFilters()});}
   /* 批量查找只看「作业身份 + 镜头模块 + 顶部小组」，不受下方影片 / 标注人 / 轮次筛选限制 */
   function acceptanceSearchScopeKey() {return JSON.stringify({identity:batchIdentityScope(),group:selectedGroup()});}
+  // Only the explicit TID importer spans modes/groups. Queue and keyword search
+  // retain their existing visible scope; an identity change still invalidates a draft.
+  function acceptanceImportScopeKey() {return JSON.stringify(profile);}
+  function requireAcceptanceImportTask(task) {
+    requireRole('acceptance');
+    if(!task||!['single','multi'].includes(task.mode))throw new Error('此 TID 的镜头类型不明确，请联系管理员核对。');
+    if(groupById(task.groupId)?.defaultMode!==task.mode)throw new Error('此 TID 的小组与镜头类型不一致，请联系管理员核对。');
+    if(!canViewGroup(task.groupId))throw new Error('当前作业身份无权处理此 TID 所属小组。');
+  }
   function inAcceptanceSearchScope(task) {return inCurrentScope(task,false);}
   function acceptanceScopeError(task) {
     if(!task)return '';
@@ -1285,12 +1294,14 @@
   }
   async function findAcceptanceByKeyword() {
     if(acceptanceBusy)return;
-    const keyword=$('acceptanceKeyword').value.trim();
+    const keyword=$('acceptanceKeyword').value.trim(),searchScope=acceptanceSearchScopeKey();
     if(!keyword){showToast('请输入 TID、影片或标注人的片段再查找。','error');$('acceptanceKeyword').focus();return;}
+    const ticket=++acceptanceKeywordTicket,text=$('acceptanceText').value,previewTicket=acceptancePreviewTicket,draft=acceptanceDraft,selectionKey=acceptanceImportSelectionKey(draft),type=qs('input[name="acceptanceResult"]:checked')?.value,note=$('acceptanceChoiceNote').value;
+    acceptanceKeywordBusy=true;
     $('acceptanceKeywordBtn').disabled=true;
     try {
       requireRole('acceptance');await refreshBatchSource();
-      if($('acceptanceKeyword').value.trim()!==keyword)return;
+      if(ticket!==acceptanceKeywordTicket||acceptanceBusy||$('acceptanceKeyword').value.trim()!==keyword||searchScope!==acceptanceSearchScopeKey()||text!==$('acceptanceText').value||previewTicket!==acceptancePreviewTicket||draft!==acceptanceDraft||selectionKey!==acceptanceImportSelectionKey(draft)||type!==qs('input[name="acceptanceResult"]:checked')?.value||note!==$('acceptanceChoiceNote').value)return;
       const needle=keyword.toLowerCase(),pool=allTasks(state).filter(task=>task.status==='pending_acceptance'&&inAcceptanceSearchScope(task));
       const matched=pool.filter(task=>String(task.tid||'').toLowerCase().includes(needle)||String(task.movie||'').toLowerCase().includes(needle)||String(task.assignee||'').toLowerCase().includes(needle)||String(groupLabel(task.groupId)||'').toLowerCase().includes(needle));
       if(!matched.length){invalidateAcceptancePreview();$('acceptancePreview').textContent=`当前${modeLabel(activeMode)}模块、${selectedGroup()==='all'?'全部小组':groupLabel(selectedGroup())}范围内，没有待验收任务匹配“${keyword}”。`;showToast('没有匹配的待验收任务。','error');return;}
@@ -1299,8 +1310,8 @@
       invalidateAcceptancePreview();
       await previewAcceptance();
       showToast(`已按“${keyword}”找到 ${capped.length} 条待验收任务，已填入下方并自动勾选。${matched.length>capped.length?`仅取前 ${capped.length} 条，请缩小关键词。` : ''}`);
-    }catch(error){showToast(error.message,'error');}
-    finally{$('acceptanceKeywordBtn').disabled=false;}
+    }catch(error){if(ticket===acceptanceKeywordTicket)showToast(error.message,'error');}
+    finally{if(ticket===acceptanceKeywordTicket){acceptanceKeywordBusy=false;$('acceptanceKeywordBtn').disabled=acceptanceBusy;}}
   }
   function checkedAcceptanceTasks() {return listSelection('acceptanceTask');}
   function acceptanceSelectionKey(rows) {return JSON.stringify(rows.map(row=>row.id).sort());}
@@ -1336,8 +1347,8 @@
     const help=qs('[data-acceptance-choice-help]',form);if(help)help.textContent=type==='acceptance_p2_pass'?'P2 错误已在验收时修正，记录为实检合格并通过；计算非 P2 率时，P2 计入实检分母，不计入非 P2 分子。说明选填。':type==='acceptance_batch_pass'?'任务记为验收通过、计入通过量和闭环；未实检，不计入个人、小组和整体的实检准确率。':'实际检查合格才选“实检合格”；未检查的随批放行请选“未实检，随批通过”。';
   }
   function acceptanceTransition(task,type,note,options={}) {
-    requireRole('acceptance',task);
-    if(task.mode!==activeMode)throw new Error('此 TID 属于另一业务模块，请切换模块后处理。');
+    if(options.unifiedImport)requireAcceptanceImportTask(task);else requireRole('acceptance',task);
+    if(!options.unifiedImport&&task.mode!==activeMode)throw new Error('此 TID 属于另一业务模块，请切换模块后处理。');
     if(!options.ignoreFilters&&!inAcceptanceScope(task))throw new Error('此 TID 不在当前筛选范围，请重新选择。');
     if(!['acceptance_pass','acceptance_fail','acceptance_reject'].includes(type))throw new Error('请选择验收通过、不通过或拒绝。');
     if(task.status!=='pending_acceptance')throw new Error('当前任务不在待验收状态，或已有结果，不能覆盖状态。');
@@ -1367,20 +1378,21 @@
     return `${groups.size} 个小组（${[...groups].map(([id,count])=>`${groupLabel(id)} ${count} 条`).join('；')}），${action==='pass'?'按原小组记录验收通过':'分别退回所属小组质检'}`;
   }
   let acceptanceCapabilityAt=0;
-  async function requireAcceptanceInspectionSupport(p2=false) {
-    if(!p2&&acceptanceCapabilityAt&&Date.now()-acceptanceCapabilityAt<30000)return;
+  async function requireAcceptanceInspectionSupport(p2=false,crossMode=false) {
+    if(!p2&&!crossMode&&acceptanceCapabilityAt&&Date.now()-acceptanceCapabilityAt<30000)return;
     let response,body;
     try{response=await fetch('/group-workbench-api/health',{cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(10000)});body=await response.json();}
     catch(_){throw new Error('暂时无法核对验收服务版本，本次未提交，名单和填写内容已保留，请稍后重试。');}
     if(!response.ok||body.capabilities?.acceptanceInspection?.supported!==true||body.capabilities.acceptanceInspection.version<1)throw new Error('验收服务正在更新，本次未提交，名单和填写内容已保留，请稍后重试。');
     if(p2&&(body.capabilities?.acceptanceP2?.supported!==true||!Number.isInteger(body.capabilities.acceptanceP2.version)||body.capabilities.acceptanceP2.version<1))throw new Error('当前验收服务尚不支持 P2 修正后通过，本次未提交，名单、选择和说明已保留，请稍后重试。');
+    if(crossMode&&(body.capabilities?.acceptanceCrossMode?.supported!==true||!Number.isInteger(body.capabilities.acceptanceCrossMode.version)||body.capabilities.acceptanceCrossMode.version<1))throw new Error('当前验收服务尚不支持跨镜头处理，本次未提交，名单、选择和说明已保留，请稍后重试。');
     acceptanceCapabilityAt=Date.now();
   }
-  async function withAcceptanceSave(action,{p2=false}={}) {
+  async function withAcceptanceSave(action,{p2=false,crossMode=false}={}) {
     if(acceptanceBusy)return false;acceptanceBusy=true;
     const controls=[...qsa('input,textarea,button',$('acceptanceView')),$('scopeGroup'),$('changeIdentity'),...qsa('[data-mode]')],disabled=controls.map(control=>control.disabled);
     controls.forEach(control=>control.disabled=true);syncAcceptanceSelection();syncAcceptanceChoice();
-    try{await requireAcceptanceInspectionSupport(p2);return await action();}catch(error){showToast(error.message,'error');return false;}finally{controls.forEach((control,index)=>{if(control.isConnected)control.disabled=disabled[index];});acceptanceBusy=false;syncAcceptanceSelection();syncAcceptanceChoice();if($('acceptanceSampleForm'))syncAcceptanceSampleForm();}
+    try{await requireAcceptanceInspectionSupport(p2,crossMode);return await action();}catch(error){showToast(error.message,'error');return false;}finally{controls.forEach((control,index)=>{if(control.isConnected)control.disabled=disabled[index];});acceptanceBusy=false;$('acceptanceKeywordBtn').disabled=acceptanceKeywordBusy;syncAcceptanceSelection();syncAcceptanceChoice();if($('acceptanceSampleForm'))syncAcceptanceSampleForm();}
   }
   async function saveAcceptance(form) {
     if(acceptanceBusy)return;
@@ -1418,50 +1430,63 @@
     try {requireRole(role,task);if(task.mode!==(profile.mode||groupById(profile.groupId)?.defaultMode))throw new Error('此 TID 属于另一镜头类型，请使用对应作业身份。');return '';}catch(error){return error.message;}
   }
   function evaluateAcceptance(text,source) {
-    return resolveTidRows(text,source).map(row=>{
+    const matches=new Map();
+    allTasks(source).forEach(task=>{const key=String(task.tid||'').trim().toUpperCase();if(!matches.has(key))matches.set(key,[]);matches.get(key).push(task);});
+    return IO.parseTidRows(text).map(row=>{
+      const candidates=matches.get(row.tid.toUpperCase())||[],task=candidates.length===1?candidates[0]:null;
       let error=row.error;
-      if(!error)error=batchRoleError(row.task,'acceptance');
-      if(!error&&!inAcceptanceSearchScope(row.task))error=acceptanceScopeError(row.task);
-      if(!error&&row.task.status!=='pending_acceptance')error=`当前为“${window.WorkbenchFlow.label(row.task)}”，不可登记验收结果。`;
-      return{...row,error,outcome:error?'failed':'success',taskId:row.task?.id,expected:row.task?.updatedAt};
+      if(!error&&!candidates.length)error='尚未导入此 TID，请核对编号或联系管理员。';
+      if(!error&&candidates.length>1)error=`此 TID 对应 ${candidates.length} 条任务，归属不明确，请联系管理员核对；本行不会提交。`;
+      if(!error)try{requireAcceptanceImportTask(task);}catch(cause){error=cause.message;}
+      if(!error&&task.status!=='pending_acceptance')error=`当前为“${window.WorkbenchFlow.label(task)}”，不可登记验收结果。`;
+      return{...row,task,error,outcome:error?'failed':'success',taskId:task?.id,expected:task?.updatedAt};
     });
   }
   function invalidateAcceptancePreview() {
     acceptancePreviewTicket+=1;acceptanceDraft=null;
     $('acceptancePreviewBtn').disabled=false;
-    $('acceptancePreview').textContent='粘贴 TID 或先用上方片段查找，查找结果会显示影片、小组、标注人和当前状态。';
+    $('acceptancePreview').textContent='可混合粘贴单镜头与多镜头 TID，校验后显示镜头、影片、小组、标注人和当前状态。';
     setText('acceptanceImportFeedback','');syncAcceptanceChoice();
   }
-  function acceptanceDraftCurrent() {return !!acceptanceDraft&&acceptanceDraft.text===$('acceptanceText').value&&acceptanceDraft.scope===acceptanceSearchScopeKey();}
+  function acceptanceDraftCurrent() {return !!acceptanceDraft&&acceptanceDraft.text===$('acceptanceText').value&&acceptanceDraft.scope===acceptanceImportScopeKey();}
+  function selectedAcceptanceImportRows(draft=acceptanceDraft) {return draft?draft.rows.filter(row=>row.outcome==='success'&&draft.selected?.has(row.taskId)):[];}
+  function acceptanceImportSelectionKey(draft=acceptanceDraft) {return JSON.stringify(selectedAcceptanceImportRows(draft).map(row=>row.taskId).sort());}
+  function acceptanceImportModeSummary(rows) {return `单镜头 ${rows.filter(row=>row.task.mode==='single').length} 条 · 多镜头 ${rows.filter(row=>row.task.mode==='multi').length} 条`;}
   function syncAcceptanceChoice() {
-    const current=acceptanceDraftCurrent(),inputs=qsa('input[name="acceptanceImportTask"]'),selected=inputs.filter(input=>input.checked&&!input.disabled).length;
+    const current=acceptanceDraftCurrent(),inputs=qsa('input[name="acceptanceImportTask"]'),selectedRows=current?selectedAcceptanceImportRows():[],selected=selectedRows.length;
     const type=qs('input[name="acceptanceResult"]:checked')?.value||'',note=$('acceptanceChoiceNote').value.trim(),blocked=!!acceptanceDraft?.structureError;
     const batchReturn=type==='acceptance_batch_return',batchPass=type==='acceptance_batch_pass',noteRequired=['acceptance_fail','acceptance_reject'].includes(type);
     $('acceptanceChoiceNote').required=noteRequired;
     $('acceptanceChoiceNote').maxLength=batchReturn||batchPass?1960:2000;
     $('acceptanceCommitBtn').disabled=acceptanceBusy||!current||blocked||!selected||!type||(noteRequired&&!note);
-    $('acceptanceCommitBtn').textContent=acceptanceBusy?'正在保存…':batchReturn?`确认整批退回 ${selected} 条`:batchPass?`确认未实检随批通过 ${selected} 条`:`保存所选 ${selected} 条`;
-    setText('acceptanceChoiceHelp',type==='acceptance_p2_pass'?'P2 错误已在验收时修正，记录为实检合格并通过；计算非 P2 率时，P2 计入实检分母，不计入非 P2 分子。说明选填。':batchReturn?'支持不同小组，分别退回各自小组质检，显示“随批退回”；不记录实检合格或不合格，不计入首次验收实检准确率。可补充说明。':batchPass?'所选 TID 记为验收通过、计入通过量和闭环；未实检，不计入个人、小组和整体的实检准确率。支持同镜头跨组。':'实际检查合格才选“实检合格”；未检查的随批放行请选“未实检，随批通过”。实检不合格与拒绝需填写原因。');
-    const selectedIds=new Set(inputs.filter(input=>input.checked&&!input.disabled).map(input=>input.value));
-    const groupSummary=current&&(batchReturn||batchPass)&&selected?` · ${acceptanceBatchGroups(acceptanceDraft.rows.filter(row=>row.outcome==='success'&&selectedIds.has(row.taskId)).map(row=>row.task),batchPass?'pass':'return')}`:'';
-    setText('acceptanceChoiceSummary',current?`已选 ${selected} 条${groupSummary}${blocked?' · 请先修正多列内容':''}`:'请先校验 TID');
-    const selectAll=$('acceptanceImportSelectAll');if(selectAll){const enabled=inputs.filter(input=>!input.disabled);selectAll.disabled=acceptanceBusy||!enabled.length||blocked;selectAll.checked=!!enabled.length&&selected===enabled.length;selectAll.indeterminate=selected>0&&selected<enabled.length;}
+    const actionLabels={acceptance_pass:'确认实检合格',acceptance_p2_pass:'确认 P2 修正后通过',acceptance_batch_pass:'确认未实检随批通过',acceptance_fail:'确认实检不合格退回',acceptance_reject:'确认拒绝结束流转',acceptance_batch_return:'确认整批退回'};
+    $('acceptanceCommitBtn').textContent=acceptanceBusy?'正在保存…':`${actionLabels[type]||'保存所选'} ${selected} 条`;
+    setText('acceptanceChoiceHelp',type==='acceptance_p2_pass'?'P2 错误已在验收时修正，记录为实检合格并通过；计算非 P2 率时，P2 计入实检分母，不计入非 P2 分子。说明选填。':batchReturn?'可跨镜头、跨小组，分别退回各自小组质检，显示“随批退回”；不计入个人、小组和整体的实检准确率。':batchPass?'所选 TID 记为验收通过、计入通过量和闭环；未实检，不计入个人、小组和整体的实检准确率。可跨镜头、跨小组。':'实际检查合格才选“实检合格”；未检查的随批放行请选“未实检，随批通过”。实检不合格与拒绝需填写原因。');
+    const groupSummary=current&&(batchReturn||batchPass)&&selected?` · ${acceptanceBatchGroups(selectedRows.map(row=>row.task),batchPass?'pass':'return')}`:'';
+    setText('acceptanceChoiceSummary',current?`跨页已选 ${selected} 条（${acceptanceImportModeSummary(selectedRows)}）${groupSummary}${blocked?' · 请先修正多列内容':''}`:'请先校验 TID');
+    const pageSelected=inputs.filter(input=>acceptanceDraft?.selected?.has(input.value)).length;
+    inputs.forEach(input=>{input.checked=!!acceptanceDraft?.selected?.has(input.value);input.disabled=acceptanceBusy||!current||blocked;});
+    const selectAll=$('acceptanceImportSelectAll');if(selectAll){selectAll.disabled=acceptanceBusy||!current||!inputs.length||blocked;selectAll.checked=!!inputs.length&&pageSelected===inputs.length;selectAll.indeterminate=pageSelected>0&&pageSelected<inputs.length;}
+    qsa('[data-acceptance-import-action]',$('acceptancePreview')).forEach(button=>{button.disabled=acceptanceBusy||!current||blocked||(button.dataset.acceptanceImportAction==='clear'?!selected:!acceptanceDraft.rows.some(row=>row.outcome==='success'));});
+    qsa('[data-acceptance-import-page]',$('acceptancePreview')).forEach(button=>{const page=Number(button.dataset.acceptanceImportPage);button.disabled=acceptanceBusy||!current||page<1||page>Math.max(1,Math.ceil(acceptanceDraft.rows.length/LIST_PAGE_SIZE));});
   }
   function renderAcceptancePreview(selectedIds) {
     const draft=acceptanceDraft;if(!draft)return;
     const rows=draft.rows,eligible=rows.filter(row=>row.outcome==='success'),failed=rows.filter(row=>row.outcome==='failed').length,saved=rows.filter(row=>row.outcome==='saved').length;
-    const selection=new Set(selectedIds||eligible.map(row=>row.taskId));
-    $('acceptancePreview').innerHTML=`<div class="import-result"><strong>匹配 ${eligible.length} 条</strong><span>异常 ${failed} 条 · 已更新 ${saved} 条 · 共 ${rows.length} 条</span><span class="finder-copy-actions"><button type="button" class="btn ghost small" data-action="copy-list" data-list="matched" ${eligible.length?'':'disabled'}>复制匹配 ${eligible.length} 条</button><button type="button" class="btn ghost small" data-action="copy-list" data-list="failed" ${failed?'':'disabled'}>复制异常 ${failed} 条</button></span></div>${draft.split?`<p class="tid-match-success">已按空格或逗号自动拆分出 ${draft.split} 个 TID。</p>`:''}${draft.structureError?'<p class="tid-input-error">检测到多列或分隔内容，本批不能提交。请只保留一列 TID，状态在下方选择。</p>':''}<div class="table-wrap tid-match-table"><table><thead><tr><th class="selection-cell"><input id="acceptanceImportSelectAll" type="checkbox" aria-label="全选匹配的待验收 TID"></th><th>TID</th><th>影片（自动匹配）</th><th>小组</th><th>标注人</th><th>当前状态</th><th>校验结果</th></tr></thead><tbody>${rows.map(row=>`<tr class="${row.error?'tid-match-error':''}"><td>${row.outcome==='success'?`<input type="checkbox" name="acceptanceImportTask" value="${escapeHtml(row.taskId)}" ${selection.has(row.taskId)&&!draft.structureError?'checked':''} ${draft.structureError?'disabled':''} aria-label="选择 ${escapeHtml(row.tid)}">`:''}</td><td><span class="tid-cell"><span class="mono">${escapeHtml(row.tid||'空')}</span>${row.tid?`<button class="btn ghost small copy-tid" type="button" data-action="copy" data-tid="${escapeHtml(row.tid)}" aria-label="复制 TID ${escapeHtml(row.tid)}" title="复制 TID">复制</button>`:''}</span><small class="muted">第 ${row.line} 行</small></td><td>${escapeHtml(row.task?.movie||'未匹配')}</td><td>${escapeHtml(row.task?groupLabel(row.task.groupId)||'—':'—')}</td><td>${escapeHtml(row.task?.assignee||'—')}</td><td>${row.task?statusPill(row.task):'—'}</td><td>${escapeHtml(row.error||(row.outcome==='saved'?row.savedLabel:'可更新'))}</td></tr>`).join('')}</tbody></table></div>`;
+    if(selectedIds!==undefined||!draft.selected)draft.selected=new Set(selectedIds||eligible.map(row=>row.taskId));
+    const pages=Math.max(1,Math.ceil(rows.length/LIST_PAGE_SIZE));draft.page=Math.max(1,Math.min(draft.page||1,pages));
+    const start=(draft.page-1)*LIST_PAGE_SIZE,pageRows=rows.slice(start,start+LIST_PAGE_SIZE),duplicates=rows.filter(row=>row.code==='DUPLICATE_TID').length;
+    $('acceptancePreview').innerHTML=`<div class="import-result"><strong>匹配 ${eligible.length} 条</strong><span>${acceptanceImportModeSummary(eligible)} · 异常 ${failed} 条${duplicates?`（含重复 ${duplicates} 条，不会重复处理）`:''} · 已更新 ${saved} 条 · 共 ${rows.length} 条</span><span class="finder-copy-actions"><button type="button" class="btn ghost small" data-action="copy-list" data-list="matched" ${eligible.length?'':'disabled'}>复制匹配 ${eligible.length} 条</button><button type="button" class="btn ghost small" data-action="copy-list" data-list="failed" ${failed?'':'disabled'}>复制异常 ${failed} 条</button><button type="button" class="btn small" data-acceptance-import-action="all">全选全部有效 ${eligible.length} 条</button><button type="button" class="btn ghost small" data-acceptance-import-action="clear">清空全部勾选</button></span></div>${draft.split?`<p class="tid-match-success">已按空格或逗号自动拆分出 ${draft.split} 个 TID。</p>`:''}${draft.structureError?'<p class="tid-input-error">检测到多列或分隔内容，本批不能提交。请只保留一列 TID，状态在下方选择。</p>':''}<div class="table-wrap tid-match-table"><table><thead><tr><th class="selection-cell"><input id="acceptanceImportSelectAll" type="checkbox" aria-label="全选本页有效的待验收 TID" title="仅选择或取消本页，其他页勾选保留"></th><th>TID</th><th>镜头</th><th>影片（自动匹配）</th><th>小组</th><th>标注人</th><th>当前状态</th><th>校验结果</th></tr></thead><tbody>${pageRows.map(row=>`<tr class="${row.error?'tid-match-error':''}"><td>${row.outcome==='success'?`<input type="checkbox" name="acceptanceImportTask" value="${escapeHtml(row.taskId)}" ${draft.selected.has(row.taskId)?'checked':''} aria-label="选择 ${escapeHtml(row.tid)}">`:''}</td><td><span class="tid-cell"><span class="mono">${escapeHtml(row.tid||'空')}</span>${row.tid?`<button class="btn ghost small copy-tid" type="button" data-action="copy" data-tid="${escapeHtml(row.tid)}" aria-label="复制 TID ${escapeHtml(row.tid)}" title="复制 TID">复制</button>`:''}</span><small class="muted">第 ${row.line} 行</small></td><td>${row.task?escapeHtml(modeLabel(row.task.mode)):'—'}</td><td>${escapeHtml(row.task?.movie||'未匹配')}</td><td>${escapeHtml(row.task?groupLabel(row.task.groupId)||'—':'—')}</td><td>${escapeHtml(row.task?.assignee||'—')}</td><td>${row.task?statusPill(row.task):'—'}</td><td>${escapeHtml(row.error||(row.outcome==='saved'?row.savedLabel:'可更新'))}</td></tr>`).join('')}</tbody></table></div><div class="list-pagination"><p>共 ${rows.length} 条 · 本页 ${rows.length?start+1:0}–${Math.min(start+LIST_PAGE_SIZE,rows.length)} 条</p><div class="list-page-controls"><button type="button" class="btn ghost small" data-acceptance-import-page="${draft.page-1}" aria-label="验收 TID 预览上一页">上一页</button><span>第 ${draft.page} / ${pages} 页 · 每页 ${LIST_PAGE_SIZE} 条</span><button type="button" class="btn ghost small" data-acceptance-import-page="${draft.page+1}" aria-label="验收 TID 预览下一页">下一页</button></div></div>`;
     syncAcceptanceChoice();
   }
   async function previewAcceptance() {
     if(acceptanceBusy)return;
-    const ticket=++acceptancePreviewTicket,text=$('acceptanceText').value,scope=acceptanceSearchScopeKey();
+    const ticket=++acceptancePreviewTicket,text=$('acceptanceText').value,scope=acceptanceImportScopeKey();
     acceptanceDraft=null;$('acceptancePreview').textContent='正在查找 TID…';setText('acceptanceImportFeedback','');syncAcceptanceChoice();
     $('acceptancePreviewBtn').disabled=true;
     try {
       requireRole('acceptance');await refreshBatchSource();
-      if(ticket!==acceptancePreviewTicket||text!==$('acceptanceText').value||scope!==acceptanceSearchScopeKey())return;
+      if(ticket!==acceptancePreviewTicket||text!==$('acceptanceText').value||scope!==acceptanceImportScopeKey())return;
       const expanded=expandTidInput(text),rows=evaluateAcceptance(expanded.text,state);if(!rows.length)throw new Error('请粘贴本次 TID，每行一个，也可用空格或逗号分隔。');
       acceptanceDraft={text,scope,rows,structureError:rows.some(row=>row.structureError),split:expanded.split};setText('acceptanceImportFeedback',expanded.split?`已按空格或逗号自动拆分出 ${expanded.split} 个 TID。`:'');renderAcceptancePreview();
     }catch(error){if(ticket===acceptancePreviewTicket){acceptanceDraft=null;$('acceptancePreview').textContent=error.message;showToast(error.message,'error');}}
@@ -1470,17 +1495,18 @@
   async function commitAcceptance() {
     if(acceptanceBusy)return;
     if($('acceptanceSampleForm')||$('acceptanceBulkDecisionForm')){showToast('请先保存或取消当前整批处理，查找名单和说明已保留。','error');return;}
-    const draft=acceptanceDraft,scope=acceptanceSearchScopeKey(),type=qs('input[name="acceptanceResult"]:checked')?.value,note=$('acceptanceChoiceNote').value.trim();
+    const draft=acceptanceDraft,scope=acceptanceImportScopeKey(),type=qs('input[name="acceptanceResult"]:checked')?.value,note=$('acceptanceChoiceNote').value.trim();
     if(!acceptanceDraftCurrent()||draft.structureError){showToast('请先校验当前 TID，修正多列内容后再选择状态。','error');return;}
-    const ids=new Set(qsa('input[name="acceptanceImportTask"]:checked:not(:disabled)').map(input=>input.value)),selected=draft.rows.filter(row=>row.outcome==='success'&&ids.has(row.taskId));
+    const selected=selectedAcceptanceImportRows(draft),selectionKey=acceptanceImportSelectionKey(draft);
     if(!selected.length||!['acceptance_pass','acceptance_p2_pass','acceptance_batch_pass','acceptance_fail','acceptance_reject','acceptance_batch_return'].includes(type)){showToast('请勾选匹配的 TID，并选择处理方式。','error');return;}
     if(['acceptance_fail','acceptance_reject'].includes(type)&&!note){showToast('不通过或拒绝需要填写原因。','error');$('acceptanceChoiceNote').focus();return;}
     const batchId=['acceptance_batch_return','acceptance_batch_pass'].includes(type)?uid('acceptance_batch'):'';
     const form=$('acceptanceImportForm'),labels={acceptance_p2_pass:'P2错误已修正，验收通过',acceptance_pass:'实检合格，验收通过',acceptance_batch_pass:'未实检，随批通过（不计实检准确率）',acceptance_fail:'实检不合格，已退回质检',acceptance_reject:'已拒绝并结束流转',acceptance_batch_return:'随批退回质检，统一复查'};
     const saved=await withAcceptanceSave(()=>mutate(source=>{
-      requireRole('acceptance');if(scope!==acceptanceSearchScopeKey()||draft!==acceptanceDraft||draft.text!==$('acceptanceText').value)throw new Error('作业身份、范围或输入已变化，请重新校验；草稿已保留。');
-      return{events:type==='acceptance_batch_return'?acceptanceBatchReturnEvents(source,selected.map(row=>({id:row.taskId,expected:row.expected})),note,batchId,{ignoreFilters:true}):type==='acceptance_batch_pass'?acceptanceUninspectedPassEvents(source,selected.map(row=>({id:row.taskId,expected:row.expected})),note,batchId,{ignoreFilters:true}):selected.map(row=>{const task=findTask(source,row.taskId);assertFresh(task,row.expected);return acceptanceEvent(source,task,type,note,{source:'acceptance_import'},{ignoreFilters:true});})};
-    },`已更新 ${selected.length} 条：${labels[type]}。`,{form}),{p2:type==='acceptance_p2_pass'});
+      requireRole('acceptance');if(scope!==acceptanceImportScopeKey()||draft!==acceptanceDraft||draft.text!==$('acceptanceText').value||selectionKey!==acceptanceImportSelectionKey(draft)||type!==qs('input[name="acceptanceResult"]:checked')?.value||note!==$('acceptanceChoiceNote').value.trim())throw new Error('作业身份、输入、勾选或处理方式已变化，请重新核对；草稿已保留。');
+      const options={ignoreFilters:true,unifiedImport:true};
+      return{events:type==='acceptance_batch_return'?acceptanceBatchReturnEvents(source,selected.map(row=>({id:row.taskId,expected:row.expected})),note,batchId,options):type==='acceptance_batch_pass'?acceptanceUninspectedPassEvents(source,selected.map(row=>({id:row.taskId,expected:row.expected})),note,batchId,options):selected.map(row=>{const task=findTask(source,row.taskId);assertFresh(task,row.expected);return acceptanceEvent(source,task,type,note,{source:'acceptance_import'},options);})};
+    },`已更新 ${selected.length} 条：${labels[type]}。`,{form}),{p2:type==='acceptance_p2_pass',crossMode:selected.some(row=>row.task.mode!==(profile.mode||groupById(profile.groupId)?.defaultMode))});
     if(saved&&draft===acceptanceDraft){selected.forEach(row=>{row.outcome='saved';row.savedLabel=labels[type];row.task=findTask(state,row.taskId);});setText('acceptanceImportFeedback',`成功更新 ${selected.length} 条；其余 TID 可继续选择状态。`);renderAcceptancePreview([]);renderAcceptance();}
   }
   async function matchQcTids() {
@@ -2265,7 +2291,7 @@
     $('myTaskFilter').addEventListener('change',()=>{refreshState();renderMyTasks();});
     $('recordDateMode').addEventListener('change',()=>{refreshState();renderRecords();});$('recordSearch').addEventListener('input',debounceListSearch(renderRecords));
     ['recordMovie','recordStatus',...ACCEPTANCE_FILTER_IDS].forEach(id=>{const box=$(id);if(!box)return;box.addEventListener('click',event=>{event.stopPropagation();toggleMultiSelect(id);});box.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();toggleMultiSelect(id);}});});
-    $('acceptanceClearFilters').addEventListener('click',()=>{if(acceptanceBusy||mutationDepth)return;ACCEPTANCE_FILTER_IDS.forEach(id=>multiSet(id,[]));invalidateAcceptancePreview();if(refreshState())renderAcceptance();});
+    $('acceptanceClearFilters').addEventListener('click',()=>{if(acceptanceBusy||mutationDepth)return;ACCEPTANCE_FILTER_IDS.forEach(id=>multiSet(id,[]));if(refreshState())renderAcceptance();});
     document.addEventListener('click',event=>{
       /* 选项列表会被重建，被点节点可能已脱离 DOM，此时不要当成「点击外部」误关面板 */
       const target=event.target;
@@ -2289,7 +2315,18 @@
     $('acceptanceText').addEventListener('input',invalidateAcceptancePreview);
     $('acceptanceImportForm').addEventListener('submit',event=>event.preventDefault());
     $('acceptanceChoice').addEventListener('change',syncAcceptanceChoice);$('acceptanceChoiceNote').addEventListener('input',syncAcceptanceChoice);
-    $('acceptancePreview').addEventListener('change',event=>{if(event.target.id==='acceptanceImportSelectAll')qsa('input[name="acceptanceImportTask"]:not(:disabled)').forEach(input=>input.checked=event.target.checked);syncAcceptanceChoice();});
+    $('acceptancePreview').addEventListener('change',event=>{
+      if(acceptanceBusy||!acceptanceDraftCurrent()||acceptanceDraft.structureError)return;
+      const inputs=event.target.id==='acceptanceImportSelectAll'?qsa('input[name="acceptanceImportTask"]:not(:disabled)',$('acceptancePreview')):event.target.name==='acceptanceImportTask'?[event.target]:[];
+      inputs.forEach(input=>{if(event.target.checked)acceptanceDraft.selected.add(input.value);else acceptanceDraft.selected.delete(input.value);});syncAcceptanceChoice();
+    });
+    $('acceptancePreview').addEventListener('click',event=>{
+      const button=event.target.closest('[data-acceptance-import-page],[data-acceptance-import-action]');if(!button||button.disabled||acceptanceBusy||!acceptanceDraftCurrent())return;
+      if(button.dataset.acceptanceImportPage)acceptanceDraft.page=Number(button.dataset.acceptanceImportPage);
+      else if(button.dataset.acceptanceImportAction==='clear')acceptanceDraft.selected.clear();
+      else acceptanceDraft.selected=new Set(acceptanceDraft.rows.filter(row=>row.outcome==='success').map(row=>row.taskId));
+      renderAcceptancePreview();
+    });
     $('qcMatchForm').addEventListener('submit',event=>{event.preventDefault();matchQcTids();});$('qcMatchBtn').addEventListener('click',matchQcTids);
     $('qcMatchTids').addEventListener('input',()=>setText('qcMatchResult','内容已变化，请重新校验并勾选。'));
     $('acceptancePreviewBtn').addEventListener('click',previewAcceptance);$('acceptanceCommitBtn').addEventListener('click',commitAcceptance);
@@ -2339,6 +2376,6 @@
     try {state=await store.init();profile=store.profile();const retiredProfile=profile&&!validProfile(profile);initializeControls();initializeWorkflowControls();bindEvents();bindBulkEvents();bindModuleEvents();bindOverviewEvents();bindReassignEvents();if(profile&&!retiredProfile)enterApp();else{profile=null;showIdentity();if(retiredProfile)showToast('组别已更新，请选择当前作业类型与小组。');}}
     catch(error){$('appShell').classList.add('hidden');$('identityGate').classList.remove('hidden');const box=document.createElement('div');box.className='panel';const text=document.createElement('p');text.textContent='共享服务暂时无法连接，云端数据未清空。'+error.message;const button=document.createElement('button');button.type='button';button.className='btn primary';button.textContent='重试连接';button.addEventListener('click',()=>location.reload());box.append(text,button);$('identityGate').replaceChildren(box);}
   }
-  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20261027-prod84',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
+  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20261029-prod85',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
   init();
 })();

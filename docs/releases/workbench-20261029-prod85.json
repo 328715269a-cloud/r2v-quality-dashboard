@@ -1,0 +1,590 @@
+{
+  "version": "20261029-prod85",
+  "status": "deployed",
+  "baseCommit": "ea81f60",
+  "checkedAt": "2026-10-29T13:47:48.036Z",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "change": {
+    "entryPoint": "Unified acceptance pasted-TID input",
+    "scope": "Match original task mode/group/movie/annotator across single and multi; queue, keyword search and reports retain their existing scopes.",
+    "safety": [
+      "Only acceptance decision operations can span modes",
+      "50-row preview and cross-page selection",
+      "Explicit single/multi selected counts and outcome",
+      "Duplicate/unknown/ambiguous/non-pending rows cannot be selected",
+      "One transaction, expected-version checks and idempotency",
+      "Retain actual/P2/uninspected/rejected semantics",
+      "Stale keyword lookup cannot replace newer pasted text or draft"
+    ],
+    "capability": {
+      "acceptanceCrossMode": {
+        "supported": true,
+        "version": 1
+      }
+    },
+    "requestFormatChanged": false,
+    "statisticsFormulasChanged": false,
+    "historicalDataRewritten": false
+  },
+  "deployment": {
+    "apiContainer": "r2v-group-workbench-api-prod85",
+    "apiPort": 3024,
+    "apiCodeDirectory": "/home/deploy/releases/group-workbench-api-prod85/api",
+    "retainedApi": "r2v-group-workbench-api-prod82",
+    "retainedApiPort": 3023,
+    "database": "/opt/r2v/group-workbench-data/workbench.sqlite",
+    "databaseMigration": false,
+    "backupOwnerUnchanged": true,
+    "productionBusinessWrites": 0,
+    "existingServicesRestarted": false,
+    "forcedRefresh": false,
+    "protectedExistingFiles": 319,
+    "existingContainers": 16,
+    "nginxMasterUnchanged": true,
+    "oldWorkersDrained": true,
+    "backup": "/opt/r2v/backups/group-workbench/20261029-prod85-cross-mode",
+    "sequence": "Same-image isolated API/WAL checks and frozen Chrome UI validation; prepare parallel candidate; online backup; graceful API route switch; retain old services and wait for old connections to drain; atomically activate new static index.",
+    "rollback": "After exposing cross-mode pages, retain an API accepting mixed-mode acceptance decisions. Use a compatible forward fix; do not restore old database or route back to prod82."
+  },
+  "validation": {
+    "runtime": {
+      "ok": true,
+      "runtime": "v22.23.2",
+      "checkedAt": "2026-10-29T13:42:17.953Z",
+      "legacySourceVerified": true,
+      "legacySourceSha256": {
+        "workbench-api/server.cjs": "c87d77080b4d410eb242c425d19923a12434f3aa4cb702fa10735658e0873f9c",
+        "workbench-api/rules.cjs": "e2c732bc3d3cd7d83427d5027a3a2d710b3d27504d893f68e9504b8f2f2132c7",
+        "workbench-api/record-index.cjs": "8d38db075f3f5075b58dcb46fb9301d3823d5e54b69cf1d304460cde324d33a0",
+        "group-workbench/workflow.js": "99f53e8ba222f9f2055d51f894592555c983efe7746ce7d0d04ba354ac941556"
+      },
+      "sourceSha256": {
+        "workbench-api/server.cjs": "f15654a22285ac6eb5291c4a815dc7f55b8b509ff98b568c8e50303adb6136fa",
+        "workbench-api/rules.cjs": "35ebd623990ac64b445dbeed659d9f2c5e21f04632bcf636ee7ee45487961617",
+        "workbench-api/record-index.cjs": "8d38db075f3f5075b58dcb46fb9301d3823d5e54b69cf1d304460cde324d33a0",
+        "group-workbench/workflow.js": "99f53e8ba222f9f2055d51f894592555c983efe7746ce7d0d04ba354ac941556"
+      },
+      "reportSourceSha256": "7d3cff9a7b0a3138ff382223152991bda86fe9a103f096ad4896a5540ffec7f2",
+      "independentProcesses": true,
+      "productionDataAccessed": false,
+      "invalidCases": 23,
+      "groups": [
+        "g01",
+        "g02",
+        "g06",
+        "m_newcomer"
+      ],
+      "tasks": 64,
+      "events": 324,
+      "revision": 58,
+      "metricChecks": [
+        {
+          "mode": "single",
+          "groupId": "all",
+          "firstPassed": 4,
+          "firstTotal": 6,
+          "actualTotal": 6,
+          "p2Count": 2,
+          "nonP2Count": 4,
+          "passed": 6,
+          "returned": 4,
+          "rejected": 2,
+          "annotator": "验证标注"
+        },
+        {
+          "mode": "single",
+          "groupId": "g01",
+          "firstPassed": 2,
+          "firstTotal": 3,
+          "actualTotal": 3,
+          "p2Count": 1,
+          "nonP2Count": 2,
+          "passed": 3,
+          "returned": 2,
+          "rejected": 1,
+          "annotator": "验证标注"
+        },
+        {
+          "mode": "single",
+          "groupId": "g02",
+          "firstPassed": 2,
+          "firstTotal": 3,
+          "actualTotal": 3,
+          "p2Count": 1,
+          "nonP2Count": 2,
+          "passed": 3,
+          "returned": 2,
+          "rejected": 1,
+          "annotator": "验证标注"
+        },
+        {
+          "mode": "multi",
+          "groupId": "all",
+          "firstPassed": 4,
+          "firstTotal": 6,
+          "actualTotal": 6,
+          "p2Count": 2,
+          "nonP2Count": 4,
+          "passed": 6,
+          "returned": 4,
+          "rejected": 2,
+          "annotator": "验证标注"
+        },
+        {
+          "mode": "multi",
+          "groupId": "g06",
+          "firstPassed": 2,
+          "firstTotal": 3,
+          "actualTotal": 3,
+          "p2Count": 1,
+          "nonP2Count": 2,
+          "passed": 3,
+          "returned": 2,
+          "rejected": 1,
+          "annotator": "验证标注"
+        },
+        {
+          "mode": "multi",
+          "groupId": "m_newcomer",
+          "firstPassed": 2,
+          "firstTotal": 3,
+          "actualTotal": 3,
+          "p2Count": 1,
+          "nonP2Count": 2,
+          "passed": 3,
+          "returned": 2,
+          "rejected": 1,
+          "annotator": "验证标注"
+        }
+      ],
+      "proofs": [
+        "4组单/多镜含新人组，旧API身份和既有任务直接接续；health只增量声明跨镜头验收能力",
+        "实际prod82仍拒绝跨镜头事务且零写入；候选能力不是通过修改旧版本取得",
+        "六类验收均跨4组/单多镜以单事务保存；原group/mode/归属不变、字段和轮次原样；旧API可幂等返回已提交的新跨镜头事务",
+        "真实HTTP流水按任务单/多镜、小组、提交人分别核对首验/非P2及通过退回量；每组实检2/3、P2为1/3，随批通过/退回与拒绝排除实检，卡片口径及导出事件一致",
+        "旧单镜/多镜页面原通过、退回、拒绝格式无需新字段继续成功；原会话无需重新登录",
+        "陈旧/终态中间任务、非法检查组合、批次不一致/重复/缺版本均整批回滚；冒充角色、质检/标注跨组跨镜、验收混入其他动作仍403",
+        "原组质检完整/增量队列隔离保持；旧API能接续跨镜头随批退回和实检失败，原组返修后跨镜头复验仍规范化第2轮",
+        "新跨镜头与旧单镜头请求双进程并发只提交完整赢家；失败方409无部分保存，成功请求跨新旧API重试幂等，复用ID改内容拒绝",
+        "默认局部校验及完整校验两条路径均支持混合验收；旧历史/原始任务不改，无迁移、额外备份或未选任务写入"
+      ]
+    },
+    "productionContainersUnchangedDuringTest": true,
+    "browserChecks": [
+      "capability gate blocks cross-mode before transaction",
+      "capability block preserves text, selection, decision and note",
+      "opposite-mode-only input also requires capability",
+      "same-profile-mode action still works without new capability",
+      "acceptance_pass: mode column and separate selected totals",
+      "acceptance_pass: all four modes/groups saved once atomically",
+      "acceptance_pass: correct status",
+      "acceptance_pass: original mode/group/assignee preserved",
+      "acceptance_pass: actual/uninspected/reject semantics",
+      "acceptance_pass: accuracy correctly includes or excludes samples",
+      "acceptance_pass: single statistics use only own TIDs",
+      "acceptance_pass: multi statistics use only own TIDs",
+      "acceptance_pass: no unrelated task projection changes",
+      "acceptance_p2_pass: mode column and separate selected totals",
+      "acceptance_p2_pass: all four modes/groups saved once atomically",
+      "acceptance_p2_pass: correct status",
+      "acceptance_p2_pass: original mode/group/assignee preserved",
+      "acceptance_p2_pass: actual/uninspected/reject semantics",
+      "acceptance_p2_pass: accuracy correctly includes or excludes samples",
+      "acceptance_p2_pass: single statistics use only own TIDs",
+      "acceptance_p2_pass: multi statistics use only own TIDs",
+      "P2 flagged while counting actual pass",
+      "acceptance_p2_pass: no unrelated task projection changes",
+      "acceptance_batch_pass: mode column and separate selected totals",
+      "acceptance_batch_pass: all four modes/groups saved once atomically",
+      "acceptance_batch_pass: correct status",
+      "acceptance_batch_pass: original mode/group/assignee preserved",
+      "acceptance_batch_pass: actual/uninspected/reject semantics",
+      "acceptance_batch_pass: one shared batch id",
+      "acceptance_batch_pass: accuracy correctly includes or excludes samples",
+      "acceptance_batch_pass: single statistics use only own TIDs",
+      "acceptance_batch_pass: multi statistics use only own TIDs",
+      "acceptance_batch_pass: no unrelated task projection changes",
+      "acceptance_fail: mode column and separate selected totals",
+      "acceptance_fail: all four modes/groups saved once atomically",
+      "acceptance_fail: correct status",
+      "acceptance_fail: original mode/group/assignee preserved",
+      "acceptance_fail: actual/uninspected/reject semantics",
+      "acceptance_fail: accuracy correctly includes or excludes samples",
+      "acceptance_fail: single statistics use only own TIDs",
+      "acceptance_fail: multi statistics use only own TIDs",
+      "acceptance_fail: no unrelated task projection changes",
+      "acceptance_reject: mode column and separate selected totals",
+      "acceptance_reject: all four modes/groups saved once atomically",
+      "acceptance_reject: correct status",
+      "acceptance_reject: original mode/group/assignee preserved",
+      "acceptance_reject: actual/uninspected/reject semantics",
+      "acceptance_reject: accuracy correctly includes or excludes samples",
+      "acceptance_reject: single statistics use only own TIDs",
+      "acceptance_reject: multi statistics use only own TIDs",
+      "acceptance_reject: no unrelated task projection changes",
+      "acceptance_batch_return: mode column and separate selected totals",
+      "acceptance_batch_return: all four modes/groups saved once atomically",
+      "acceptance_batch_return: correct status",
+      "acceptance_batch_return: original mode/group/assignee preserved",
+      "acceptance_batch_return: actual/uninspected/reject semantics",
+      "acceptance_batch_return: one shared batch id",
+      "acceptance_batch_return: accuracy correctly includes or excludes samples",
+      "acceptance_batch_return: single statistics use only own TIDs",
+      "acceptance_batch_return: multi statistics use only own TIDs",
+      "acceptance_batch_return: no unrelated task projection changes",
+      "old prod84 tab draft survives new mixed transaction",
+      "old prod84 session can submit after new page mixed writes",
+      "large preview renders at most 50 rows, retains all 121 selected",
+      "page uncheck leaves off-page selection intact",
+      "second page selection survives",
+      "individual selection accumulates across pages",
+      "explicit all-valid button selects entire result",
+      "mode and top-group changes keep unified preview and selection",
+      "queue remains scoped to active mode/group",
+      "queue filters do not clear unified selection",
+      "all 121 rows submit in one transaction after filter changes",
+      "duplicates, unknown and already handled TIDs give explicit failures",
+      "one stale task aborts entire mixed operation and keeps draft",
+      "ambiguous TID does not silently pick a task",
+      "mode/group inconsistency is rejected during preview",
+      "QC cannot invoke unified acceptance even through hidden controls",
+      "multi-profile same-mode path remains available",
+      "multi-profile can submit both modes through unified importer",
+      "slow keyword refresh cannot replace newly pasted and previewed TIDs",
+      "slow keyword cannot overwrite a newer selection in the same draft",
+      "slow keyword preserves a newer decision and note",
+      "old search finally does not enable button during the newer search",
+      "newest keyword wins reverse-continuation race",
+      "keyword response during save preserves import and keeps controls disabled",
+      "keyword and duplicate-click races save one exact mixed decision",
+      "frozen prod85 HTTP assets verified",
+      "no browser errors or external network"
+    ],
+    "browserErrors": [],
+    "reports": [
+      {
+        "name": "scripts/verify-acceptance-non-p2-reports.cjs",
+        "passed": true,
+        "result": {
+          "ok": true,
+          "comparisons": 63,
+          "scenarios": [
+            {
+              "mode": "single",
+              "total": 31,
+              "p2": 2,
+              "nonP2": 29,
+              "nonP2Rate": "93.5%",
+              "firstAccuracy": "96.8%"
+            },
+            {
+              "mode": "multi",
+              "total": 31,
+              "p2": 2,
+              "nonP2": 29,
+              "nonP2Rate": "93.5%",
+              "firstAccuracy": "96.8%"
+            },
+            {
+              "name": "no-p2",
+              "total": 4,
+              "p2Count": 0,
+              "nonP2Count": 4,
+              "rate": 100
+            },
+            {
+              "name": "all-p2",
+              "total": 4,
+              "p2Count": 4,
+              "nonP2Count": 0,
+              "rate": 0
+            },
+            {
+              "name": "empty",
+              "total": 0,
+              "p2Count": 0,
+              "nonP2Count": 0,
+              "rate": null
+            }
+          ],
+          "checks": [
+            "2 of 31 is 93.5%",
+            "0 of N is 100%",
+            "N of N is 0%",
+            "empty is null/blank",
+            "ordinary fail is non-P2",
+            "cross-day/reinspection dedup unchanged",
+            "first accuracy and old first P2 share unchanged",
+            "single/multi/group/date CSV parity",
+            "source data immutable"
+          ]
+        },
+        "stderr": ""
+      },
+      {
+        "name": "scripts/verify-acceptance-p2-volume-reports.cjs",
+        "passed": true,
+        "result": {
+          "ok": true,
+          "scenario": {
+            "firstFailureThenP2": {
+              "total": 1,
+              "p2Count": 1,
+              "nonP2Count": 0,
+              "rate": 0
+            },
+            "firstAccuracyUnchanged": 0
+          },
+          "checks": [
+            "all actual rounds",
+            "TID cross-day dedup",
+            "unsampled first then actual",
+            "legacy ordinary decisions",
+            "reject/unsampled/QC P2 exclusion",
+            "released/deleted/invalid exclusions",
+            "Beijing midnight",
+            "mode/group isolation",
+            "cached no-global scan",
+            "browser parity",
+            "task/event/history/group/movie/daily/detail exports",
+            "immutable source"
+          ]
+        },
+        "stderr": ""
+      },
+      {
+        "name": "scripts/verify-acceptance-sampling-reports.cjs",
+        "passed": true,
+        "result": {
+          "ok": true,
+          "scenario": {
+            "returned": 100,
+            "inspected": 10,
+            "passed": 8,
+            "failed": 2,
+            "accuracy": "80.0%",
+            "reinspectionCompleted": 100
+          },
+          "checks": [
+            "first-round freeze",
+            "uninspected never promoted",
+            "legacy compatibility",
+            "rejection and release",
+            "ownership",
+            "Beijing dates",
+            "group person mode parity",
+            "flow and defect separation",
+            "history and denominator exports",
+            "production task columns",
+            "visibility and immutability"
+          ]
+        },
+        "stderr": ""
+      },
+      {
+        "name": "scripts/verify-acceptance-return-metric.cjs",
+        "passed": true,
+        "result": {
+          "ok": true,
+          "checks": 197,
+          "source": "group-workbench/app.js",
+          "coverage": [
+            "single/multi and group/role isolation",
+            "cross-day and duplicate-TID deduplication",
+            "actual failure and follow-batch return; final rejection excluded",
+            "release and deletion",
+            "Beijing dates, invalid ranges and empty days",
+            "cached facts and synchronization",
+            "actual renderer and card order; immutable synthetic histories"
+          ]
+        },
+        "stderr": ""
+      }
+    ],
+    "backendRegression": {
+      "ok": true,
+      "scope": "Targeted acceptance regressions; one pre-existing deprecated packaging fixture failure excluded with identical prod82 reproduction.",
+      "passed": [
+        {
+          "command": "node workbench-api/verify-acceptance-cross-mode.cjs --legacy-root ../acceptance-p2/package/api",
+          "evidence": "backend-local.json",
+          "legacySourceVerified": true,
+          "tasks": 64,
+          "invalidCases": 23
+        },
+        {
+          "command": "node workbench-api/verify-acceptance-inspection.cjs",
+          "legacySourceVerified": false,
+          "revision": 100,
+          "tasks": 188,
+          "events": 949
+        },
+        {
+          "command": "node workbench-api/verify-acceptance-p2.cjs",
+          "legacySourceVerified": false,
+          "invalidCases": 38,
+          "revision": 36,
+          "tasks": 32,
+          "events": 157
+        },
+        {
+          "command": "node scripts/verify-cross-group-return-api.cjs",
+          "revision": 42,
+          "tasks": 30,
+          "events": 152
+        }
+      ],
+      "knownBaselineFailure": {
+        "command": "node workbench-api/verify-direct-acceptance.cjs",
+        "candidateExitCode": 1,
+        "baselineExitCode": 1,
+        "reason": "ready() still builds obsolete QC packages; server returns STATE_CONFLICT 409 at line 55 before the cross-mode assertion.",
+        "baseline": "Exact retained prod82 server/rules/workflow loaded via read-only require remapping; same ready/main failure at lines 55/71.",
+        "baselineOutput": "BASELINE: exact retained prod82 server/rules/workflow, unchanged test before cross-mode assertion\nAssertionError [ERR_ASSERTION]: {\"error\":{\"code\":\"STATE_CONFLICT\",\"message\":\"任务当前不能建包\"}}\n\n409 !== 200\n\n    at request (C:\\Users\\yeddashang\\Desktop\\R2v\\outputs\\acceptance-sampling-20261020\\git-worktree\\workbench-api\\verify-direct-acceptance.cjs:31:45)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async ready (C:\\Users\\yeddashang\\Desktop\\R2v\\outputs\\acceptance-sampling-20261020\\git-worktree\\workbench-api\\verify-direct-acceptance.cjs:55:5)\n    at async main (C:\\Users\\yeddashang\\Desktop\\R2v\\outputs\\acceptance-sampling-20261020\\git-worktree\\workbench-api\\verify-direct-acceptance.cjs:71:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: 409,\n  expected: 200,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n"
+      },
+      "changedTestExpectations": [
+        "verify-direct-acceptance: acceptance cross-mode succeeds, QC cross-mode still 403.",
+        "verify-acceptance-inspection: multi acceptance executes the existing single-mode mixed-inspection batch; QC denial remains.",
+        "verify-acceptance-p2: single acceptance handles multi/newcomer P2; other roles remain denied.",
+        "verify-cross-group-return-api: both acceptance modes save mixed-mode returns using unused fixtures; QC/annotation/admin denials remain."
+      ],
+      "productionDataAccessed": false
+    },
+    "legacyP2EntryPoints": {
+      "ok": true,
+      "checks": [
+        "single: immutable packaged app URL loaded",
+        "single single: copy keeps P2 actual pass and explains non-P2 denominator",
+        "single single: P2 explanation is optional",
+        "single single: old API capability blocks before any transaction",
+        "single single: choices and drafts remain available",
+        "single pasted TID: copy explains non-P2 denominator",
+        "single pasted TID: old API capability blocks before any transaction",
+        "single pasted TID: choices and drafts remain available",
+        "single pasted result identifies P2",
+        "single selected bulk: copy explains non-P2 denominator",
+        "single selected bulk: P2 note optional",
+        "single selected bulk: old API capability blocks before any transaction",
+        "single selected bulk: choices and drafts remain available",
+        "single sample: P2 blocks whole return without clearing inputs",
+        "single sample: overlapping P2/fail is blocked",
+        "single sample: categories remain disjoint",
+        "single sample: copy explains non-P2 denominator",
+        "single sample: old API capability blocks before any transaction",
+        "single sample: choices and drafts remain available",
+        "single: all four entry points persist canonical P2 pass",
+        "single: ordinary pass/fail/uninspected remain distinct",
+        "single: each P2 save health-checks even after a recent success",
+        "single: non-P2 overview uses unique actual inspection TIDs",
+        "single: P2 metric immediately follows accuracy",
+        "ordinary actual pass remains available without P2 capability",
+        "multi: immutable packaged app URL loaded",
+        "multi single: copy keeps P2 actual pass and explains non-P2 denominator",
+        "multi single: P2 explanation is optional",
+        "multi single: old API capability blocks before any transaction",
+        "multi single: choices and drafts remain available",
+        "multi pasted TID: copy explains non-P2 denominator",
+        "multi pasted TID: old API capability blocks before any transaction",
+        "multi pasted TID: choices and drafts remain available",
+        "multi pasted result identifies P2",
+        "multi selected bulk: copy explains non-P2 denominator",
+        "multi selected bulk: P2 note optional",
+        "multi selected bulk: old API capability blocks before any transaction",
+        "multi selected bulk: choices and drafts remain available",
+        "multi sample: P2 blocks whole return without clearing inputs",
+        "multi sample: overlapping P2/fail is blocked",
+        "multi sample: categories remain disjoint",
+        "multi sample: copy explains non-P2 denominator",
+        "multi sample: old API capability blocks before any transaction",
+        "multi sample: choices and drafts remain available",
+        "multi: all four entry points persist canonical P2 pass",
+        "multi: ordinary pass/fail/uninspected remain distinct",
+        "multi: each P2 save health-checks even after a recent success",
+        "multi: non-P2 overview uses unique actual inspection TIDs",
+        "multi: P2 metric immediately follows accuracy",
+        "no page errors or external network requests",
+        "HTTP index and immutable app/workflow/reports match frozen package bytes"
+      ]
+    },
+    "public": {
+      "ok": true,
+      "at": "2026-10-29T13:47:48.036Z",
+      "hashes": {
+        "ok": true,
+        "checks": [
+          "index",
+          "styles.20260922-prod25-today.css",
+          "styles.20260922-prod31-accept.css",
+          "styles.20260922-prod35-cards.css",
+          "first-qc-date.20260923-prod36.css",
+          "pagination.20260923-prod37.css",
+          "acceptance-filters.20260923-prod39.css",
+          "acceptance-finder.20260923-prod44.css",
+          "error-tids.20261008-prod70.css",
+          "/work-mode-entry.20260910.css",
+          "acceptance-sampling.20261020-prod74.css",
+          "data-io.20260920-prod8.js",
+          "shared-store.20260923-prod37.js",
+          "workflow.20261027-prod82-acceptance-p2.js",
+          "reports.20261027-prod84-non-p2-rate.js",
+          "app.20261029-prod85-cross-mode.js",
+          "export-worker.20261027-prod84-non-p2-rate.js",
+          "/",
+          "/group-beta/",
+          "/group-workbench-beta/"
+        ],
+        "health": {
+          "ok": true,
+          "acceptanceCrossMode": {
+            "supported": true,
+            "version": 1
+          },
+          "backupDelegated": true
+        }
+      },
+      "facts": {
+        "version": "20261029-prod85",
+        "crossModeCopy": true,
+        "multi": [
+          "g06",
+          "g07",
+          "g08",
+          "g09",
+          "g10",
+          "m06",
+          "m07",
+          "m08",
+          "m09",
+          "m10",
+          "m11",
+          "m12",
+          "m_newcomer"
+        ],
+        "single": [
+          "g01",
+          "g02",
+          "g03",
+          "g04"
+        ],
+        "productionBusinessWrites": 0
+      },
+      "errors": []
+    }
+  },
+  "sourceSha256": {
+    "static": {
+      "index.html": "8f85e2daaed6e6daa72340ea5cd58bb78f553c9133e71094a279089a514f7946",
+      "app.20261029-prod85-cross-mode.js": "399dab30cf9f4b6aaffdee8cfea21b161bea932ae7a7d47b7b42227d6071cdab",
+      "reports.20261027-prod84-non-p2-rate.js": "7d3cff9a7b0a3138ff382223152991bda86fe9a103f096ad4896a5540ffec7f2",
+      "workflow.20261027-prod82-acceptance-p2.js": "99f53e8ba222f9f2055d51f894592555c983efe7746ce7d0d04ba354ac941556",
+      "export-worker.20261027-prod84-non-p2-rate.js": "11bc349a60511f13e67f351fca62b6ec9e8dd54ec5f5aa2ddc69aa4988332b60",
+      "acceptance-sampling.20261020-prod74.css": "ca613dd96210538f7cadb5255a981a4f27a9767eea520cbf8774fa6bf1c0e17d"
+    },
+    "api": {
+      "workbench-api/server.cjs": "f15654a22285ac6eb5291c4a815dc7f55b8b509ff98b568c8e50303adb6136fa",
+      "workbench-api/rules.cjs": "35ebd623990ac64b445dbeed659d9f2c5e21f04632bcf636ee7ee45487961617",
+      "workbench-api/record-index.cjs": "8d38db075f3f5075b58dcb46fb9301d3823d5e54b69cf1d304460cde324d33a0",
+      "group-workbench/workflow.js": "99f53e8ba222f9f2055d51f894592555c983efe7746ce7d0d04ba354ac941556"
+    }
+  }
+}

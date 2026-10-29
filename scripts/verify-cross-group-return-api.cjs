@@ -113,11 +113,13 @@ async function main(){
     proofs.push('各组质检完整快照和增量同步只收到本组退回任务；跨组批次不混入其他组质检队列');
 
     const mixedModeBatch=randomUUID();
-    await rejectBatch(reviewers.single,[decision(pendingSingle[0],mixedModeBatch),decision(pendingMulti[0],mixedModeBatch)],403,'FORBIDDEN');
-    await rejectBatch(reviewers.multi,[decision(pendingMulti[0],mixedModeBatch),decision(pendingSingle[0],mixedModeBatch)],403,'FORBIDDEN');
+    const mixedSingle=[groups.g01.tasks[2],groups.g06.tasks[2]],mixedMulti=[groups.g07.tasks[2],groups.g02.tasks[2]];
+    await apply(reviewers.single,mixedSingle.map(task=>decision(task,mixedModeBatch)));
+    await apply(reviewers.multi,mixedMulti.map(task=>decision(task,'reverse-'+mixedModeBatch)));
+    for(const task of [...mixedSingle,...mixedMulti])assert.equal(view(task).status,'acceptance_return_pending');
     for(const session of [groups.g01.qc,groups.g01.annotation,admin])await rejectBatch(session,pendingSingle.map(task=>decision(task,'role-rejection')),403,'FORBIDDEN');
     await rejectBatch(groups.g01.qc,[event(single[0],'acceptance_route',{route:'annotation',note:'本组合法'}),event(single[1],'acceptance_route',{route:'annotation',note:'跨组禁止'})],403,'FORBIDDEN');
-    proofs.push('单多镜混选、非验收身份和质检跨组处理全部原子拒绝；允许跨组的只有同模块验收角色');
+    proofs.push('单镜及多镜验收身份均可混选跨模块任务随批退回；非验收身份和质检跨组处理仍原子拒绝');
 
     await rejectBatch(reviewers.single,[decision(pendingSingle[0],'stale-batch'),decision(pendingSingle[1],'stale-batch','uninspected',{expectedUpdatedAt:'stale'})],409,'STATE_CONFLICT');
     await rejectBatch(reviewers.single,[decision(pendingSingle[0],'closed-batch'),decision(single[0],'closed-batch')],409,'STATE_CONFLICT');

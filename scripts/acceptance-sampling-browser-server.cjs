@@ -74,7 +74,7 @@ const server=http.createServer(async(req,res)=>{
     const legacy=url.pathname.startsWith('/legacy/group-workbench/');
     const filename=url.pathname.endsWith('/')?'index.html':path.basename(url.pathname);
     let file;
-    if(legacy)file=path.resolve(root,'../live',filename);
+    if(legacy)file=path.resolve(process.env.SAMPLING_TEST_LEGACY_DIR||path.resolve(root,'../live'),filename);
     else if(url.pathname.startsWith('/group-workbench/')){
       if(packaged){
         file=[path.join(packageStatic,filename),path.join(root,'group-workbench',filename),path.resolve(root,'../live',filename)].find(candidate=>fs.existsSync(candidate))||path.join(packageStatic,filename);

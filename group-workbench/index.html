@@ -270,15 +270,15 @@
         <details id="acceptanceImportDetails" class="panel import-details acceptance-finder">
           <summary><span><strong>批量查找 · 批量验收处理</strong><small>粘贴或查找 TID，可登记实检结果、拒绝，或整批退回统一复查</small></span></summary>
           <form id="acceptanceImportForm" class="panel-body import-form">
-            <div class="import-template-row"><p>影片自动匹配，无需重复填写。查找范围跟随当前镜头模块与顶部小组，不受下方影片、标注人、轮次筛选限制。</p></div>
+            <div class="import-template-row"><p>影片、镜头和小组自动匹配。可混合粘贴单镜头与多镜头 TID，无需切换；下方待验收队列仍按当前筛选显示。</p></div>
             <div class="finder-toolbar">
               <button id="acceptanceCopyFiltered" class="btn ghost small" type="button" title="复制下方筛选结果的全部待验收 TID，包含所有分页">复制当前筛选 TID</button>
               <button id="acceptanceCopySelected" class="btn ghost small" type="button" title="复制已勾选的待验收 TID">复制已勾选 TID</button>
-              <span class="finder-keyword-field"><label class="field" for="acceptanceKeyword"><span>片段查找</span><input id="acceptanceKeyword" type="search" spellcheck="false" placeholder="TID / 影片 / 标注人片段"></label><button id="acceptanceKeywordBtn" class="btn small" type="button">查找待验收</button></span>
+              <span class="finder-keyword-field"><label class="field" for="acceptanceKeyword"><span>片段查找（当前镜头 / 小组）</span><input id="acceptanceKeyword" type="search" spellcheck="false" placeholder="TID / 影片 / 标注人片段"></label><button id="acceptanceKeywordBtn" class="btn small" type="button">查找待验收</button></span>
             </div>
-            <label class="field" for="acceptanceText"><span>本次验收的 TID（可批量粘贴）</span><textarea id="acceptanceText" rows="4" spellcheck="false" placeholder="TID001&#10;TID002&#10;每行一个，也可用空格、逗号、分号分隔" aria-describedby="acceptanceHelp"></textarea><small id="acceptanceHelp">只粘贴 TID，重复、未导入或不在待验收状态的会单独提示。支持同一镜头内跨组退回；跨组时顶部选择“全部小组”。</small></label>
+            <label class="field" for="acceptanceText"><span>本次验收的 TID（单、多镜头可混合粘贴）</span><textarea id="acceptanceText" rows="4" spellcheck="false" placeholder="TID001&#10;TID002&#10;每行一个，也可用空格、逗号、分号分隔" aria-describedby="acceptanceHelp"></textarea><small id="acceptanceHelp">只粘贴 TID，可跨镜头、跨小组。重复编号只处理一次；未导入、归属不明确或非待验收任务会提示。</small></label>
             <div class="import-actions"><button id="acceptancePreviewBtn" class="btn" type="button">批量查找</button></div>
-            <div id="acceptancePreview" class="preview-box" aria-live="polite">粘贴 TID 或先用上方片段查找，查找结果会显示影片、小组、标注人和当前状态。</div>
+            <div id="acceptancePreview" class="preview-box" aria-live="polite">可混合粘贴单镜头与多镜头 TID，校验后显示镜头、影片、小组、标注人和当前状态。</div>
             <fieldset id="acceptanceChoice" class="batch-status-choice"><legend>所选 TID 的处理方式</legend><div class="decision-options"><label><input type="radio" name="acceptanceResult" value="acceptance_pass"> 实检合格，验收通过</label><label><input type="radio" name="acceptanceResult" value="acceptance_p2_pass"> P2错误，修正后通过</label><label><input type="radio" name="acceptanceResult" value="acceptance_batch_pass"> 未实检，随批通过</label><label><input type="radio" name="acceptanceResult" value="acceptance_fail"> 实检不合格，退回质检</label><label><input type="radio" name="acceptanceResult" value="acceptance_reject"> 拒绝，结束流转</label><label><input type="radio" name="acceptanceResult" value="acceptance_batch_return"> 整批退回，统一复查</label></div></fieldset>
             <label class="field" for="acceptanceChoiceNote"><span>说明（实检不合格或拒绝时必填，其余选填）</span><textarea id="acceptanceChoiceNote" rows="2" maxlength="2000" placeholder="填写需要修改的问题、拒绝原因或补充说明"></textarea><small id="acceptanceChoiceHelp" aria-live="polite">实际检查合格才选“实检合格”；未检查的随批放行请选“未实检，随批通过”。实检不合格与拒绝需填写原因。</small></label>
             <div class="bulk-entry-actions"><span id="acceptanceChoiceSummary" aria-live="polite">请先校验 TID</span><button id="acceptanceCommitBtn" class="btn primary" type="button" disabled>保存所选 0 条</button></div>
@@ -335,6 +335,6 @@
   <script src="shared-store.20260923-prod37.js" defer></script>
   <script src="workflow.20261027-prod82-acceptance-p2.js" defer></script>
   <script src="reports.20261027-prod84-non-p2-rate.js" defer></script>
-  <script src="app.20261027-prod84-non-p2-rate.js" defer></script>
+  <script src="app.20261029-prod85-cross-mode.js" defer></script>
 </body>
 </html>
