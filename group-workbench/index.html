@@ -28,7 +28,8 @@
         <label class="field" for="identityName"><span>中文名</span><input id="identityName" name="name" type="text" placeholder="填写中文名" required maxlength="20" autocomplete="name"></label>
         <label class="field" for="identityMode"><span>先选作业类型</span><select id="identityMode" name="mode" required aria-describedby="identityModeHelp"><option value="single">单镜头</option><option value="multi">多镜头</option></select><small id="identityModeHelp">选择后，下方只显示对应类型的小组。</small></label>
         <div class="form-grid">
-          <label class="field" for="identityGroup"><span>再选所属小组</span><select id="identityGroup" name="group" required aria-describedby="identityGroupHelp"></select><small id="identityGroupHelp">单镜头1—4组；多镜头1—12组及新人组。</small></label>
+          <label class="field" for="identityGroup"><span>再选所属小组</span><select id="identityGroup" name="group" required aria-describedby="identityGroupHelp"></select><small id="identityGroupHelp">请选择自己所属的小组。</small></label>
+          <div class="row-actions"><button id="refreshIdentityGroups" type="button" class="btn ghost small">更新小组列表</button><small id="identityGroupStatus" aria-live="polite"></small></div>
           <label class="field" for="identityRole"><span>角色</span><select id="identityRole" name="role" required><option value="annotation">标注</option><option value="qc">组长 / 质检</option><option value="acceptance">验收</option></select></label>
         </div>
         <label id="identityRolePinField" class="field hidden" for="identityRolePin"><span>身份校验码</span><input id="identityRolePin" name="rolePin" type="password" inputmode="numeric" autocomplete="off" maxlength="64"></label>
@@ -178,6 +179,19 @@
 
       <section id="dispatchView" class="view hidden" aria-labelledby="dispatchHeading">
         <div class="section-heading"><div><h2 id="dispatchHeading">导入影片任务</h2><p>先填写影片名，再添加本次 TID。预览核对后确认导入。</p></div></div>
+        <details id="groupManagement" class="panel hidden">
+          <summary class="panel-heading"><strong>小组管理 · 新增小组</strong><span id="groupManagementCount" class="muted"></span></summary>
+          <div class="panel-body">
+            <form id="groupCreateForm" class="import-form">
+              <div class="form-grid compact">
+                <label class="field"><span>镜头类型</span><select name="groupMode" id="groupCreateMode" required><option value="single">单镜头</option><option value="multi">多镜头</option></select></label>
+                <label class="field"><span>小组名称</span><input name="groupName" id="groupCreateName" required maxlength="80" autocomplete="off" placeholder="例如：新人二组" aria-describedby="groupNameHelp"><small id="groupNameHelp">1至40个字，同一镜头类型内不能重名。</small></label>
+              </div>
+              <div class="row-actions"><button type="submit" class="btn primary">新增小组</button><span id="groupCreateResult" role="status" aria-live="polite"></span></div>
+            </form>
+            <details><summary>查看现有小组</summary><p><strong>单镜头：</strong><span id="groupManagementSingle"></span></p><p><strong>多镜头：</strong><span id="groupManagementMulti"></span></p></details>
+          </div>
+        </details>
         <div class="panel">
           <form id="dispatchForm" class="panel-body import-form">
             <div class="form-grid compact">
@@ -332,9 +346,9 @@
   </div>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
   <script src="data-io.20260920-prod8.js" defer></script>
-  <script src="shared-store.20260923-prod37.js" defer></script>
+  <script src="shared-store.20261030-prod86-dynamic-groups.js" defer></script>
   <script src="workflow.20261027-prod82-acceptance-p2.js" defer></script>
   <script src="reports.20261027-prod84-non-p2-rate.js" defer></script>
-  <script src="app.20261029-prod85-cross-mode.js" defer></script>
+  <script src="app.20261030-prod86-dynamic-groups.js" defer></script>
 </body>
 </html>

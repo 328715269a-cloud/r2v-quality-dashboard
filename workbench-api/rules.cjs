@@ -1,7 +1,8 @@
 'use strict';
 
 const Flow = require('../group-workbench/workflow.js');
-const MODES = Object.freeze({ g01:'single',g02:'single',g03:'single',g04:'single',g05:'single',s06:'single',g06:'multi',g07:'multi',g08:'multi',g09:'multi',g10:'multi',m06:'multi',m07:'multi',m08:'multi',m09:'multi',m10:'multi',m11:'multi',m12:'multi',m_newcomer:'multi' });
+const {BUILTIN_GROUPS,GROUP_ID,groupName,groupNameKey,groupModes,groupsFromEvents}=require('./groups.cjs');
+const MODES = groupModes(BUILTIN_GROUPS);
 const QC_TAGS = new Set(['命名/ID对齐错误','分类/标签归属错误','朝向覆盖缺失（正/侧/背面）','景别/机位/角度/朝向判定错误','AI生成/图片来源异常','ID合并/拆分错误','主体/对象漏标','图片模糊/清晰度不足','黑边/裁切不完整','其他主体混入/画面污染']);
 class ApiError extends Error { constructor(status,code,message){super(message);this.status=status;this.code=code;} }
 function check(ok,message,code='INVALID_TRANSACTION',status=400){if(!ok)throw new ApiError(status,code,message);}
@@ -11,9 +12,9 @@ function id(value){check(typeof value==='string'&&/^(?:[a-z][a-z0-9_]{0,30}_)?[0
 function chinese(value){const out=text(value,20,true);check(/^\p{Script=Han}{1,20}$/u.test(out),'姓名需要 1 至 20 个中文汉字');return out;}
 function date(value){const parsed=typeof value==='string'?Date.parse(value+'T00:00:00Z'):NaN;check(typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(parsed)&&new Date(parsed).toISOString().slice(0,10)===value,'日期无效');return value;}
 function tid(value){const out=text(value,128,true);check(/^[A-Za-z0-9_-]{1,128}$/.test(out),'TID 格式无效');return out;}
-function scope(profile,task,role,{acceptanceAcrossModes=false}={}){check(!role||profile.role===role,'当前身份没有操作权限','FORBIDDEN',403);check(task&&MODES[task.groupId]===task.mode,'小组与模块不匹配');if(profile.role!=='admin'){check(profile.mode===task.mode||(acceptanceAcrossModes&&role==='acceptance'&&profile.role==='acceptance'),'不能跨镜头模块操作','FORBIDDEN',403);if(profile.role!=='acceptance')check(profile.groupId===task.groupId,'只能操作本人小组','FORBIDDEN',403);}}
-function manager(profile,task){check(['qc','admin'].includes(profile.role),'需要组长 / 质检或管理员权限','FORBIDDEN',403);scope(profile,task);}
-function profileInput(input){check(object(input),'身份格式无效');const role=input.role;check(['annotation','qc','acceptance','admin'].includes(role),'身份无效');if(role==='admin'){check(input.name==='admin','身份或密码不正确','AUTH_FAILED',401);return{name:'admin',role};}const name=chinese(input.name);check(MODES[input.groupId]===input.mode,'请选择正确的镜头类型与小组');return{name,role,mode:input.mode,groupId:input.groupId};}
+function checkScope(profile,task,role,{acceptanceAcrossModes=false,modes=MODES}={}){check(!role||profile.role===role,'当前身份没有操作权限','FORBIDDEN',403);check(task&&Object.hasOwn(modes,task.groupId)&&modes[task.groupId]===task.mode,'小组与模块不匹配');if(profile.role!=='admin'){check(profile.mode===task.mode||(acceptanceAcrossModes&&role==='acceptance'&&profile.role==='acceptance'),'不能跨镜头模块操作','FORBIDDEN',403);if(profile.role!=='acceptance')check(profile.groupId===task.groupId,'只能操作本人小组','FORBIDDEN',403);}}
+function checkManager(profile,task,modes=MODES){check(['qc','admin'].includes(profile.role),'需要组长 / 质检或管理员权限','FORBIDDEN',403);checkScope(profile,task,undefined,{modes});}
+function profileInput(input,groups=BUILTIN_GROUPS){check(object(input),'身份格式无效');const role=input.role;check(['annotation','qc','acceptance','admin'].includes(role),'身份无效');if(role==='admin'){check(input.name==='admin','身份或密码不正确','AUTH_FAILED',401);return{name:'admin',role};}const name=chinese(input.name),modes=groupModes(groups);check(Object.hasOwn(modes,input.groupId)&&modes[input.groupId]===input.mode,'请选择正确的镜头类型与小组');return{name,role,mode:input.mode,groupId:input.groupId};}
 function same(a,b){return JSON.stringify(a)===JSON.stringify(b);}
 // Already-open WorkBuddy pages calculate acceptance rounds before direct flow
 // advanced them. Recognize that exact calculation, never an arbitrary stale
@@ -39,11 +40,29 @@ function snapshot(state,taskId){const raw=state.tasks.find(t=>t.id===taskId);che
 // All structural/admin edits keep the full-state validator below.
 const RELATED_EVENT_TYPES=new Set(['claim','submit','qc_pass','qc_fail','qc_reject','annotator_reject','reject_confirm','reject_return','acceptance_pass','acceptance_fail','acceptance_reject','acceptance_route','qc_repair_done','admin_reassign']);
 function canNormalizeRelated(input){return object(input)&&Object.keys(input).every(key=>['tasks','events','batches'].includes(key))&&[input.tasks,input.batches].every(rows=>rows==null||Array.isArray(rows)&&rows.length===0)&&Array.isArray(input.events)&&input.events.length>0&&input.events.length<=10000&&input.events.every(event=>object(event)&&RELATED_EVENT_TYPES.has(event.type));}
-function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled=()=>check(false,'删除功能尚未开放','IMPORT_DELETE_DISABLED',503),relatedOnly=false,recordExists,clockEvents}){
+function canNormalizeGroup(input){return object(input)&&Object.keys(input).every(key=>['tasks','events','batches'].includes(key))&&[input.tasks,input.batches].every(rows=>rows==null||Array.isArray(rows)&&rows.length===0)&&Array.isArray(input.events)&&input.events.length===1&&object(input.events[0])&&input.events[0].type==='group_created';}
+function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled=()=>check(false,'删除功能尚未开放','IMPORT_DELETE_DISABLED',503),relatedOnly=false,recordExists,clockEvents,groups=state.groups||groupsFromEvents(state.events)}){
   check(!relatedOnly||(canNormalizeRelated(input)&&typeof recordExists==='function'),'局部校验上下文无效');
   check(object(input),'缺少操作内容');check(Object.keys(input).every(k=>['tasks','events','batches'].includes(k)),'不能覆盖共享存储字段');
   const raw={};for(const kind of ['tasks','events','batches']){raw[kind]=input[kind]??[];check(Array.isArray(raw[kind])&&raw[kind].length<=10000,'批量内容过大');}
   check(raw.tasks.length+raw.events.length+raw.batches.length<=16000,'请减小本次批量');
+  const modes=groupModes(groups),scope=(who,task,role,options={})=>checkScope(who,task,role,{...options,modes}),manager=(who,task)=>checkManager(who,task,modes);
+  if(raw.events.some(event=>event?.type==='group_created')){
+    check(profile.role==='admin','仅管理员可以新增小组','FORBIDDEN',403);
+    check(raw.tasks.length===0&&raw.batches.length===0&&raw.events.length===1,'新增小组必须单独保存');
+    const rawEvent=raw.events[0];check(object(rawEvent),'小组资料无效');
+    const eventId=id(rawEvent.id),groupId=rawEvent.groupId;
+    check(typeof groupId==='string'&&GROUP_ID.test(groupId)&&eventId!==groupId,'新小组 ID 无效');
+    check(rawEvent.taskId===`group:${groupId}`,'小组设置 ID 无效');
+    check(['single','multi'].includes(rawEvent.mode),'请选择单镜头或多镜头');
+    check(typeof rawEvent.name==='string','请填写小组名称');const name=groupName(rawEvent.name);
+    check(name.length>0&&Array.from(name).length<=40&&!/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202E\u2066-\u2069\uFEFF]/u.test(name),'小组名称需为 1 至 40 个可见字符，不能含换行或控制字符');
+    check(!groups.some(group=>group.id===groupId),'小组 ID 已存在','DUPLICATE_GROUP',409);
+    check(!groups.some(group=>group.defaultMode===rawEvent.mode&&groupNameKey(group.name)===groupNameKey(name)),'该镜头下已有同名小组','DUPLICATE_GROUP_NAME',409);
+    const records=[...state.tasks,...state.events,...state.batches];check(!records.some(value=>value.id===eventId||value.id===groupId)&&(!recordExists||!recordExists(eventId)&&!recordExists(groupId)),'记录 ID 已存在','DUPLICATE_ID',409);
+    const event={id:eventId,taskId:`group:${groupId}`,type:'group_created',workflowVersion:3,at:new Date(Math.max(Date.now(),Date.parse(now)||0,...(clockEvents||state.events.slice(-10)).map(event=>(Date.parse(event.at)||0)+1))).toISOString(),actor:profile.name,actorRole:profile.role,groupId,mode:rawEvent.mode,name};
+    return{tasks:[],batches:[],events:[event]};
+  }
   const inspectionBatches=raw.events.filter(event=>object(event)&&Object.hasOwn(event,'acceptanceBatchId'));
   if(inspectionBatches.length){
     const batchId=text(inspectionBatches[0].acceptanceBatchId,128,true);
@@ -181,4 +200,4 @@ function normalizeDelta(state,input,profile,{pin,checkPin,now,checkDeleteEnabled
   if(!relatedOnly){const finalTids=new Set();for(const task of working.tasks){const current=view(task.id);if(current.deleted)continue;const value=current.tid.toUpperCase();check(!finalTids.has(value),'TID 已存在，整批未保存','DUPLICATE_TID',409);finalTids.add(value);}}
   return delta;
 }
-module.exports={ApiError,check,object,text,id,chinese,date,profileInput,normalizeDelta,canNormalizeRelated,snapshot,MODES};
+module.exports={ApiError,check,object,text,id,chinese,date,profileInput,normalizeDelta,canNormalizeRelated,canNormalizeGroup,snapshot,MODES};

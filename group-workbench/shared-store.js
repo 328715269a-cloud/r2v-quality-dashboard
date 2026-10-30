@@ -7,6 +7,24 @@
   function create() {
     const base = '/group-workbench-api/';
     let session = null, state = empty(), revision = -1, queue = Promise.resolve(), syncPromise = null;
+    let groupCatalog = null, groupCatalogRevision = -1, groupCatalogPromise = null;
+    function prepareGroups(result) {
+      if (!Array.isArray(result.groups)) return null;
+      const incomingRevision = Number.isSafeInteger(result.revision) ? result.revision : -1;
+      if (incomingRevision < groupCatalogRevision) return null;
+      const ids = new Set();
+      const next = result.groups.map(group => {
+        if (!group || typeof group.id !== 'string' || !group.id || ids.has(group.id) || typeof group.name !== 'string' || !group.name.trim() || !['single', 'multi'].includes(group.defaultMode)) throw new Error('小组目录格式异常，请稍后重试。');
+        ids.add(group.id);
+        return { ...group };
+      });
+      return { next, revision: incomingRevision, changed: JSON.stringify(next) !== JSON.stringify(groupCatalog) };
+    }
+    function publishGroups(prepared) {
+      if (!prepared) return false;
+      groupCatalog = prepared.next; groupCatalogRevision = prepared.revision;
+      return prepared.changed;
+    }
     let recordIndexes = Object.fromEntries(collections.map(name => [name, new Map()]));
     const listeners = new Set();
     const notify = detail => listeners.forEach(listener => listener(detail));
@@ -50,6 +68,7 @@
     function apply(result) {
       if (!Number.isSafeInteger(result.revision) || result.revision < 0) throw new Error('共享数据版本异常，未替换现有数据。');
       if (result.revision < revision) return false;
+      const preparedGroups = prepareGroups(result);
       let changed = result.revision !== revision;
       if (result.state) {
         if (!collections.every(name => Array.isArray(result.state[name]))) throw new Error('共享数据格式不完整，未替换现有数据。');
@@ -76,7 +95,20 @@
         }
       }
       revision = result.revision;
-      return changed;
+      const groupsChanged = publishGroups(preparedGroups);
+      return changed || groupsChanged;
+    }
+    async function refreshGroups() {
+      if (groupCatalogPromise) return groupCatalogPromise;
+      groupCatalogPromise = (async () => {
+        try {
+          const result = await request('groups');
+          const changed = publishGroups(prepareGroups(result));
+          notify({ kind: 'groups', changed, revision: groupCatalogRevision });
+          return groupCatalog;
+        } finally { groupCatalogPromise = null; }
+      })();
+      return groupCatalogPromise;
     }
     async function refresh() {
       if (!session) return false;
@@ -97,6 +129,10 @@
       return syncPromise;
     }
     async function init() {
+      // The directory is public metadata only, so new groups are selectable
+      // before a worker signs in. A temporary directory failure must not evict
+      // a working session or discard a saved draft on existing clients.
+      try { await refreshGroups(); } catch (_) { /* Built-in groups remain available. */ }
       try { const saved = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null'); if (saved?.token && saved?.profile) session = saved; } catch (_) { /* Start at identity registration. */ }
       if (session) {
         try {
@@ -150,7 +186,7 @@
       return pending;
     }
     async function backup() { if (session?.profile?.role !== 'admin') throw new Error('完整备份仅管理员可下载。'); return request('backup'); }
-    return Object.freeze({ init, read: () => state, refresh, transact, backup, signIn, profile: () => session?.profile || null, revision: () => revision, subscribe: listener => { listeners.add(listener); return () => listeners.delete(listener); } });
+    return Object.freeze({ init, read: () => state, refresh, refreshGroups, groups: () => groupCatalog ? clone(groupCatalog) : null, transact, backup, signIn, profile: () => session?.profile || null, revision: () => revision, subscribe: listener => { listeners.add(listener); return () => listeners.delete(listener); } });
   }
   root.WorkbenchStore = Object.freeze({ create, sessionKey: SESSION_KEY });
 }(window));

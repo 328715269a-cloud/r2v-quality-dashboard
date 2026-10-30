@@ -1,0 +1,472 @@
+{
+  "version": "20261030-prod86",
+  "status": "deployed",
+  "baseCommit": "f66d277",
+  "checkedAt": "2026-10-30T09:34:28.672Z",
+  "url": "https://quality.shangyidada.site/group-workbench/",
+  "change": {
+    "entryPoint": "管理员 > 任务导入 > 小组管理 · 新增小组",
+    "scope": "Admin creates a custom-named group in single or multi mode; shared directory feeds login, import, queues, filters, overview and exports.",
+    "safety": [
+      "Admin-only, append-only group_created event with stable random ID",
+      "Same-mode normalized duplicate-name rejection; same name across modes allowed",
+      "Directory carries only id/name/mode/retired public metadata",
+      "Short single-event transaction, revision checks, idempotency and audit",
+      "Incremental catalog cache; preserve drafts and existing selections",
+      "Group names rendered as text and exports retain formula escaping",
+      "Existing task group IDs, workflow and statistics formulas unchanged"
+    ],
+    "capability": {
+      "groupManagement": {
+        "supported": true,
+        "version": 1
+      }
+    },
+    "statisticsFormulasChanged": false,
+    "historicalDataRewritten": false
+  },
+  "deployment": {
+    "apiContainer": "r2v-group-workbench-api-prod86",
+    "apiPort": 3025,
+    "apiCodeDirectory": "/home/deploy/releases/group-workbench-api-prod86/api",
+    "retainedApi": "r2v-group-workbench-api-prod85",
+    "retainedApiPort": 3024,
+    "database": "/opt/r2v/group-workbench-data/workbench.sqlite",
+    "databaseMigration": false,
+    "backupOwnerUnchanged": true,
+    "productionBusinessWrites": 0,
+    "existingServicesRestarted": false,
+    "forcedRefresh": false,
+    "protectedExistingFiles": 320,
+    "existingContainers": 17,
+    "nginxMasterUnchanged": true,
+    "oldWorkersDrained": true,
+    "backup": "/opt/r2v/backups/group-workbench/20261030-prod86-dynamic-groups",
+    "sequence": "Same-image isolated API/WAL and frozen Chrome validation; prepare parallel API; online backup; graceful API route switch; retain old services and drain old requests; atomically activate new static index.",
+    "rollback": "After exposing group creation, keep dynamic-group-aware API and frontend; use a compatible forward fix. Never restore the shared business database or route back to prod85."
+  },
+  "validation": {
+    "runtime": {
+      "ok": true,
+      "runtime": "v22.23.2",
+      "checkedAt": "2026-10-30T09:29:40.515Z",
+      "productionDataAccessed": false,
+      "legacySourceVerified": true,
+      "legacySourceSha256": {
+        "workbench-api/server.cjs": "f15654a22285ac6eb5291c4a815dc7f55b8b509ff98b568c8e50303adb6136fa",
+        "workbench-api/rules.cjs": "35ebd623990ac64b445dbeed659d9f2c5e21f04632bcf636ee7ee45487961617",
+        "workbench-api/record-index.cjs": "8d38db075f3f5075b58dcb46fb9301d3823d5e54b69cf1d304460cde324d33a0",
+        "group-workbench/workflow.js": "99f53e8ba222f9f2055d51f894592555c983efe7746ce7d0d04ba354ac941556"
+      },
+      "sourceSha256": {
+        "workbench-api/server.cjs": "5022529a5d9bde2980f69d12f2e43c8db17a10919dfe36f2841d37a71fc90cf8",
+        "workbench-api/rules.cjs": "783427cd309b9390431abfa3949dd4b7e514afa4a02a9e76d5fc4488d658a809",
+        "workbench-api/record-index.cjs": "8d38db075f3f5075b58dcb46fb9301d3823d5e54b69cf1d304460cde324d33a0",
+        "group-workbench/workflow.js": "99f53e8ba222f9f2055d51f894592555c983efe7746ce7d0d04ba354ac941556",
+        "workbench-api/groups.cjs": "23f340408b25527bd77334ee3f896176e5d60d300bb431fad7772acb624274a2",
+        "group-workbench/reports.js": "7d3cff9a7b0a3138ff382223152991bda86fe9a103f096ad4896a5540ffec7f2"
+      },
+      "rejectedCases": 26,
+      "groupsCreated": 4,
+      "transactions": 35,
+      "tasks": 8,
+      "events": 57,
+      "directoryLockEvidence": [
+        {
+          "mode": "single",
+          "elapsedMs": 32.317,
+          "queries": 8,
+          "fullStateRead": false,
+          "taskProjectionCount": 0
+        },
+        {
+          "mode": "multi",
+          "elapsedMs": 0.537,
+          "queries": 8,
+          "fullStateRead": false,
+          "taskProjectionCount": 0
+        }
+      ],
+      "proofs": [
+        "管理员专属且独立原子新增；未登录、其他角色、空/超长/控制字符、非法模式/ID、混合操作均拒绝且零记录变化",
+        "自定义中文/英文/表情名云端持久化；单多可同名，模式内全半角/空格/大小写重复防护；两独立进程即时识别新组与旧API幂等重放；新增写锁内不加载全库状态、不投影任务，仅取10条时间尾部",
+        "并发新增同名组只有一次成功，重试返回同名提示；目录无人员、任务、负责人及会话信息",
+        "自定义单多组完成导入→标注→多次质检/验收返修→原组重提→混合实检/P2通过/拒绝/随批退回；现有组日设置及跨组隔离保持",
+        "角色全量与增量任务仅限本组，公共目录始终随响应携带，空增量也可同步组名；新增组不依赖完整历史下载",
+        "既有旧页面会话和原事件格式仍在prod85/候选双侧连续提交；新组同时通过完整校验和相关任务快速校验，不修改工作流",
+        "小组/人员/镜头统计、首验与非P2、任务/流水/日报导出使用真实组ID和自定义名称；旧记录逐项保持、结构不迁移、SQLite完整且无重复备份"
+      ]
+    },
+    "browserChecks": [
+      "version and admin entry",
+      "group management closed by default",
+      "worker cannot see group manager",
+      "unsupported API prevents write and retains custom name",
+      "admin creation writes one audited standalone event",
+      "creation leaves every existing task and business event unchanged",
+      "success clears name only, retains administrator import draft",
+      "normalized duplicate rejected without second write",
+      "same name allowed in other mode with different immutable ID",
+      "single import offers only the new single group",
+      "mode switch preserves unsaved group form and filters import by mode",
+      "already-open login can refresh new cloud group without losing name",
+      "already-open worker keeps draft and locked own group after directory update",
+      "other administrator new group syncs without clearing form",
+      "new group appears in overview and scopes exactly its tasks",
+      "reports label and aggregate dynamic group",
+      "new custom group supports fresh worker sign in",
+      "new group session survives reload",
+      "new group QC sees own pending task only",
+      "acceptance selects dynamic group and sees its own incoming case",
+      "custom names render as text in annotation rows",
+      "custom names render as text in all-task records",
+      "custom names render as text in timeline heading",
+      "real prod85 old page and old session still submit after new groups exist",
+      "no browser runtime errors or external requests"
+    ],
+    "browserErrors": [],
+    "store": {
+      "ok": true,
+      "checks": [
+        "public catalog loads before identity/session restoration; no task/session creation",
+        "catalog results are cloned and cannot be changed by callers",
+        "directory outage preserves existing session and obtains catalog through state",
+        "legacy API without catalog endpoint/fields still restores existing session",
+        "same-revision empty task delta can refresh catalog and notify without replacing task state",
+        "new revision containing no visible task records still publishes catalog change",
+        "late older public catalog cannot overwrite newer state catalog",
+        "public catalog refresh does not advance business revision or skip task updates",
+        "parallel catalog refreshes coalesce into one request",
+        "invalid catalog leaves prior directory/task snapshot intact",
+        "malformed task delta cannot publish its newer valid catalog or advance business revision",
+        "role scoping retains own group records only while names directory is shared",
+        "lost response retry uses identical transaction id/body and creates exactly one group event",
+        "failed save preserves directory, task history, session and draft; next save can retry",
+        "revision conflict retries fresh snapshot and does not duplicate or lose user input"
+      ],
+      "checkCount": 15,
+      "sharedStoreSha256": "cc5f7e089ad3cfd6ae05eca29b4d342903e32de6b4be56d4079771f0b47e0198",
+      "productionBusinessWrites": 0
+    },
+    "reports": [
+      {
+        "name": "scripts/verify-acceptance-non-p2-reports.cjs",
+        "passed": true,
+        "result": {
+          "ok": true,
+          "comparisons": 63,
+          "scenarios": [
+            {
+              "mode": "single",
+              "total": 31,
+              "p2": 2,
+              "nonP2": 29,
+              "nonP2Rate": "93.5%",
+              "firstAccuracy": "96.8%"
+            },
+            {
+              "mode": "multi",
+              "total": 31,
+              "p2": 2,
+              "nonP2": 29,
+              "nonP2Rate": "93.5%",
+              "firstAccuracy": "96.8%"
+            },
+            {
+              "name": "no-p2",
+              "total": 4,
+              "p2Count": 0,
+              "nonP2Count": 4,
+              "rate": 100
+            },
+            {
+              "name": "all-p2",
+              "total": 4,
+              "p2Count": 4,
+              "nonP2Count": 0,
+              "rate": 0
+            },
+            {
+              "name": "empty",
+              "total": 0,
+              "p2Count": 0,
+              "nonP2Count": 0,
+              "rate": null
+            }
+          ],
+          "checks": [
+            "2 of 31 is 93.5%",
+            "0 of N is 100%",
+            "N of N is 0%",
+            "empty is null/blank",
+            "ordinary fail is non-P2",
+            "cross-day/reinspection dedup unchanged",
+            "first accuracy and old first P2 share unchanged",
+            "single/multi/group/date CSV parity",
+            "source data immutable"
+          ]
+        },
+        "stderr": ""
+      },
+      {
+        "name": "scripts/verify-acceptance-p2-volume-reports.cjs",
+        "passed": true,
+        "result": {
+          "ok": true,
+          "scenario": {
+            "firstFailureThenP2": {
+              "total": 1,
+              "p2Count": 1,
+              "nonP2Count": 0,
+              "rate": 0
+            },
+            "firstAccuracyUnchanged": 0
+          },
+          "checks": [
+            "all actual rounds",
+            "TID cross-day dedup",
+            "unsampled first then actual",
+            "legacy ordinary decisions",
+            "reject/unsampled/QC P2 exclusion",
+            "released/deleted/invalid exclusions",
+            "Beijing midnight",
+            "mode/group isolation",
+            "cached no-global scan",
+            "browser parity",
+            "task/event/history/group/movie/daily/detail exports",
+            "immutable source"
+          ]
+        },
+        "stderr": ""
+      },
+      {
+        "name": "scripts/verify-acceptance-sampling-reports.cjs",
+        "passed": true,
+        "result": {
+          "ok": true,
+          "scenario": {
+            "returned": 100,
+            "inspected": 10,
+            "passed": 8,
+            "failed": 2,
+            "accuracy": "80.0%",
+            "reinspectionCompleted": 100
+          },
+          "checks": [
+            "first-round freeze",
+            "uninspected never promoted",
+            "legacy compatibility",
+            "rejection and release",
+            "ownership",
+            "Beijing dates",
+            "group person mode parity",
+            "flow and defect separation",
+            "history and denominator exports",
+            "production task columns",
+            "visibility and immutability"
+          ]
+        },
+        "stderr": ""
+      },
+      {
+        "name": "scripts/verify-acceptance-return-metric.cjs",
+        "passed": true,
+        "result": {
+          "ok": true,
+          "checks": 197,
+          "source": "group-workbench/app.js",
+          "coverage": [
+            "single/multi and group/role isolation",
+            "cross-day and duplicate-TID deduplication",
+            "actual failure and follow-batch return; final rejection excluded",
+            "release and deletion",
+            "Beijing dates, invalid ranges and empty days",
+            "cached facts and synchronization",
+            "actual renderer and card order; immutable synthetic histories"
+          ]
+        },
+        "stderr": ""
+      }
+    ],
+    "public": {
+      "ok": true,
+      "at": "2026-10-30T09:34:28.672Z",
+      "hashes": {
+        "ok": true,
+        "checks": [
+          "index",
+          "styles.20260922-prod25-today.css",
+          "styles.20260922-prod31-accept.css",
+          "styles.20260922-prod35-cards.css",
+          "first-qc-date.20260923-prod36.css",
+          "pagination.20260923-prod37.css",
+          "acceptance-filters.20260923-prod39.css",
+          "acceptance-finder.20260923-prod44.css",
+          "error-tids.20261008-prod70.css",
+          "/work-mode-entry.20260910.css",
+          "acceptance-sampling.20261020-prod74.css",
+          "data-io.20260920-prod8.js",
+          "shared-store.20261030-prod86-dynamic-groups.js",
+          "workflow.20261027-prod82-acceptance-p2.js",
+          "reports.20261027-prod84-non-p2-rate.js",
+          "app.20261030-prod86-dynamic-groups.js",
+          "export-worker.20261027-prod84-non-p2-rate.js",
+          "/",
+          "/group-beta/",
+          "/group-workbench-beta/"
+        ],
+        "groups": [
+          {
+            "id": "g01",
+            "name": "单镜头1组",
+            "defaultMode": "single"
+          },
+          {
+            "id": "g02",
+            "name": "单镜头2组",
+            "defaultMode": "single"
+          },
+          {
+            "id": "g03",
+            "name": "单镜头3组",
+            "defaultMode": "single"
+          },
+          {
+            "id": "g04",
+            "name": "单镜头4组",
+            "defaultMode": "single"
+          },
+          {
+            "id": "g05",
+            "name": "单镜头5组",
+            "defaultMode": "single",
+            "retired": true
+          },
+          {
+            "id": "s06",
+            "name": "单镜头6组",
+            "defaultMode": "single",
+            "retired": true
+          },
+          {
+            "id": "g06",
+            "name": "多镜头1组",
+            "defaultMode": "multi"
+          },
+          {
+            "id": "g07",
+            "name": "多镜头2组",
+            "defaultMode": "multi"
+          },
+          {
+            "id": "g08",
+            "name": "多镜头3组",
+            "defaultMode": "multi"
+          },
+          {
+            "id": "g09",
+            "name": "多镜头4组",
+            "defaultMode": "multi"
+          },
+          {
+            "id": "g10",
+            "name": "多镜头5组",
+            "defaultMode": "multi"
+          },
+          {
+            "id": "m06",
+            "name": "多镜头6组",
+            "defaultMode": "multi"
+          },
+          {
+            "id": "m07",
+            "name": "多镜头7组",
+            "defaultMode": "multi"
+          },
+          {
+            "id": "m08",
+            "name": "多镜头8组",
+            "defaultMode": "multi"
+          },
+          {
+            "id": "m09",
+            "name": "多镜头9组",
+            "defaultMode": "multi"
+          },
+          {
+            "id": "m10",
+            "name": "多镜头10组",
+            "defaultMode": "multi"
+          },
+          {
+            "id": "m11",
+            "name": "多镜头11组",
+            "defaultMode": "multi"
+          },
+          {
+            "id": "m12",
+            "name": "多镜头12组",
+            "defaultMode": "multi"
+          },
+          {
+            "id": "m_newcomer",
+            "name": "多镜头新人组",
+            "defaultMode": "multi"
+          }
+        ],
+        "revision": 33408,
+        "capabilities": {
+          "importDelete": {
+            "supported": true,
+            "enabled": true
+          },
+          "acceptanceInspection": {
+            "supported": true,
+            "version": 1
+          },
+          "acceptanceP2": {
+            "supported": true,
+            "version": 1
+          },
+          "acceptanceCrossMode": {
+            "supported": true,
+            "version": 1
+          },
+          "groupManagement": {
+            "supported": true,
+            "version": 1
+          }
+        }
+      },
+      "facts": {
+        "version": "20261030-prod86",
+        "publicDirectory": true,
+        "loginCounts": {
+          "single": 4,
+          "multi": 13
+        },
+        "adminManagementHiddenBeforeLogin": true,
+        "productionBusinessWrites": 0
+      },
+      "errors": []
+    }
+  },
+  "sourceSha256": {
+    "static": {
+      "index.html": "370d41ad08e2e6a50c81ea67b8a37bc6eb427b7f09f90abe282f3937f92c6c1f",
+      "app.20261030-prod86-dynamic-groups.js": "bf23950a7f3270a78b179cb0e9ba2f554fda31dcaf8641b68b22c362a982659a",
+      "shared-store.20261030-prod86-dynamic-groups.js": "cc5f7e089ad3cfd6ae05eca29b4d342903e32de6b4be56d4079771f0b47e0198",
+      "reports.20261027-prod84-non-p2-rate.js": "7d3cff9a7b0a3138ff382223152991bda86fe9a103f096ad4896a5540ffec7f2",
+      "workflow.20261027-prod82-acceptance-p2.js": "99f53e8ba222f9f2055d51f894592555c983efe7746ce7d0d04ba354ac941556",
+      "export-worker.20261027-prod84-non-p2-rate.js": "11bc349a60511f13e67f351fca62b6ec9e8dd54ec5f5aa2ddc69aa4988332b60",
+      "acceptance-sampling.20261020-prod74.css": "ca613dd96210538f7cadb5255a981a4f27a9767eea520cbf8774fa6bf1c0e17d"
+    },
+    "api": {
+      "workbench-api/server.cjs": "5022529a5d9bde2980f69d12f2e43c8db17a10919dfe36f2841d37a71fc90cf8",
+      "workbench-api/rules.cjs": "783427cd309b9390431abfa3949dd4b7e514afa4a02a9e76d5fc4488d658a809",
+      "workbench-api/groups.cjs": "23f340408b25527bd77334ee3f896176e5d60d300bb431fad7772acb624274a2",
+      "workbench-api/record-index.cjs": "8d38db075f3f5075b58dcb46fb9301d3823d5e54b69cf1d304460cde324d33a0",
+      "group-workbench/workflow.js": "99f53e8ba222f9f2055d51f894592555c983efe7746ce7d0d04ba354ac941556"
+    }
+  }
+}

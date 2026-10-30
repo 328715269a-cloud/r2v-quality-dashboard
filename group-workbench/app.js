@@ -1,11 +1,13 @@
 (function () {
   'use strict';
 
-  const GROUPS = [
+  const BUILTIN_GROUPS = [
     ...[1,2,3,4,5].map(number=>({id:'g0'+number,name:`单镜头${number}组`,leader:'',defaultMode:'single',members:[],retired:number===5})),
     ...[1,2,3,4,5,6,7,8,9,10,11,12].map(number=>({id:number<=5?'g'+String(number+5).padStart(2,'0'):'m'+String(number).padStart(2,'0'),name:`多镜头${number}组`,leader:'',defaultMode:'multi',members:[]})),
     {id:'m_newcomer',name:'多镜头新人组',leader:'',defaultMode:'multi',members:[]}
   ];
+  let GROUPS = BUILTIN_GROUPS.slice();
+  let groupCatalogSignature = '', groupCreateBusy = false;
   const QC_TAGS = ['命名/ID对齐错误', '分类/标签归属错误', '朝向覆盖缺失（正/侧/背面）', '景别/机位/角度/朝向判定错误', 'AI生成/图片来源异常', 'ID合并/拆分错误', '主体/对象漏标', '图片模糊/清晰度不足', '黑边/裁切不完整', '其他主体混入/画面污染'];
   const QC_TAG_COLORS = ['#e4574c', '#e8913a', '#c9a227', '#7fae4e', '#3fa17b', '#3f8fae', '#5a6fd0', '#9a5fd0', '#c95893', '#8a8f98'];
   const STATUS_META = Object.fromEntries(Object.entries(window.WorkbenchFlow.STATUS_META).filter(([key])=>key!=='deleted'));
@@ -196,6 +198,67 @@
     return mode === 'multi' ? '多镜头' : '单镜头';
   }
 
+  // Directory refresh only updates options; it never switches views or clears task drafts.
+  function syncGroupCatalog(repaint = true) {
+    const catalog=typeof store.groups==='function'?store.groups():null;
+    if(!Array.isArray(catalog))return false;
+    const defaults=new Map(BUILTIN_GROUPS.map(group=>[group.id,group]));
+    const next=catalog.map(group=>({...defaults.get(group.id),leader:'',members:[],...group}));
+    const signature=JSON.stringify(next.map(group=>[group.id,group.name,group.defaultMode,!!group.retired]));
+    if(signature===groupCatalogSignature)return false;
+    GROUPS=next;groupCatalogSignature=signature;
+    overviewComputationCache={source:null,identity:'',values:new Map(),contributions:new Map()};
+    overviewRenderedSource=null;
+    if(repaint){
+      configureScopeGroup($('scopeGroup').value||'all');
+      populateIdentityGroups($('identityMode').value,$('identityGroup').value);
+      const select=$('dispatchForm').elements.group,selected=select.value;
+      options(select,activeGroups().filter(group=>group.defaultMode===activeMode).map(group=>({value:group.id,label:group.name})),selected);
+      renderGroupManagement();
+    }
+    return true;
+  }
+  function renderGroupManagement() {
+    const panel=$('groupManagement');if(!panel)return;
+    panel.classList.toggle('hidden',profile?.role!=='admin');
+    const groups=activeGroups(),single=groups.filter(group=>group.defaultMode==='single'),multi=groups.filter(group=>group.defaultMode==='multi');
+    setText('groupManagementCount',`单镜头 ${single.length} 组 · 多镜头 ${multi.length} 组`);
+    setText('groupManagementSingle',single.map(group=>group.name).join('、'));
+    setText('groupManagementMulti',multi.map(group=>group.name).join('、'));
+  }
+  function groupNameKey(name) {return String(name).normalize('NFKC').replace(/\s/gu,'').toLowerCase();}
+  async function refreshGroupChoices(button=null) {
+    if(button)button.disabled=true;
+    try {if(typeof store.refreshGroups!=='function')throw new Error('当前页面的小组目录尚未更新，请保存填写内容后重新打开。');await store.refreshGroups();syncGroupCatalog();setText('identityGroupStatus','小组列表已更新');}
+    catch(error){setText('identityGroupStatus','暂时无法更新小组，请稍后重试。');showToast(error.message,'error');}
+    finally{if(button)button.disabled=false;}
+  }
+  async function createGroup(form) {
+    if(groupCreateBusy)return;
+    if(profile?.role!=='admin')throw new Error('仅管理员可以新增小组。');
+    const input=form.elements.groupName,mode=form.elements.groupMode.value,name=input.value.trim().normalize('NFC');
+    if(!['single','multi'].includes(mode)||!name||Array.from(name).length>40||/[\u0000-\u001f\u007f-\u009f]/u.test(name))throw new Error('请选择镜头类型，小组名称填写1至40个字，不能包含换行或控制字符。');
+    const identity=JSON.stringify(profile),groupId=uid('group'),eventId=uid('group_event');
+    const values=()=>JSON.stringify([form.elements.groupMode.value,form.elements.groupName.value.trim().normalize('NFC')]);
+    const expected=values(),controls=Array.from(form.querySelectorAll('input,select,button')),prior=controls.map(control=>control.disabled);
+    groupCreateBusy=true;controls.forEach(control=>control.disabled=true);form.setAttribute('aria-busy','true');setText('groupCreateResult','正在保存小组…');
+    try {
+      const response=await fetch('/group-workbench-api/health',{cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(10000)}),health=await response.json();
+      if(!response.ok||!health.capabilities?.groupManagement?.supported)throw new Error('云端暂未开放新增小组，名称已保留，请稍后重试。');
+      const saved=await mutate(()=>{
+        if(profile?.role!=='admin'||identity!==JSON.stringify(profile)||values()!==expected)throw new Error('身份或小组填写已变化，未保存，请重新核对。');
+        syncGroupCatalog();
+        if(GROUPS.some(group=>group.defaultMode===mode&&groupNameKey(group.name)===groupNameKey(name)))throw new Error('此镜头类型下已有同名小组，请使用其他名称。');
+        return {events:[{id:eventId,taskId:'group:'+groupId,type:'group_created',groupId,mode,name,workflowVersion:3,at:new Date().toISOString(),actor:profile.name,actorRole:'admin'}]};
+      },null,{form,errorTarget:'groupCreateResult'});
+      if(!saved)return;
+      syncGroupCatalog();renderGroupManagement();
+      if(identity===JSON.stringify(profile)&&values()===expected){input.value='';setText('groupCreateResult',`已新增「${name}」（${modeLabel(mode)}），登录和任务分配中已可选择。`);}
+      showToast(`已新增「${name}」，已保存到云端。`);
+    }catch(error){setText('groupCreateResult',error.message||'新增未完成，填写内容已保留。');showToast(error.message,'error');}
+    finally{groupCreateBusy=false;controls.forEach((control,i)=>control.disabled=prior[i]);form.removeAttribute('aria-busy');}
+  }
+
   function groupById(id) {
     return GROUPS.find((group) => group.id === id) || null;
   }
@@ -373,7 +436,7 @@
       $('sharedNewUpdatesLabel')?.classList.toggle('hidden',!sharedHasUpdates);setSharedStatus('ready',sharedHasUpdates?'已同步，当前填写内容已保留':'已连接共享数据');if(manual&&sharedHasUpdates)showToast('已同步云端数据，填写内容已保留。提交时会核对最新状态。');
     }catch(error){setSharedStatus('error',error.status===401?'身份验证已过期，请切换身份重新验证，填写内容已保留。':error.message);if(manual)showToast(error.message,'error');}
   }
-  function refreshState() { try { state = store.read(); return true; } catch (error) { showToast(error.message, 'error'); return false; } }
+  function refreshState() { try { state = store.read(); syncGroupCatalog(); return true; } catch (error) { showToast(error.message, 'error'); return false; } }
   function setText(id, value) { if ($(id)) $(id).textContent = String(value); }
   function showToast(message, tone = '') {
     const toast = $('toast'); toast.textContent = message; toast.className = `toast ${tone}`;
@@ -540,8 +603,8 @@
     const selectedMode=mode==='multi'?'multi':'single',groups=activeGroups().filter(group=>group.defaultMode===selectedMode);
     $('identityMode').value=selectedMode;
     options($('identityGroup'),groups.map(group=>({value:group.id,label:group.name})),selected);
-    setText('identityModeHelp',selectedMode==='single'?'单镜头共4个小组。':'多镜头共13个小组，含新人组。');
-    setText('identityGroupHelp',selectedMode==='single'?'请选择：单镜头1组至单镜头4组。':'请选择：多镜头1组至多镜头12组，或多镜头新人组。');
+    setText('identityModeHelp',`${modeLabel(selectedMode)}共 ${groups.length} 个小组。`);
+    setText('identityGroupHelp','请选择自己所属的小组；新小组由管理员添加。');
     if(state)populateLegacyIdentity();
   }
   function validWorkerProfile(value) { return value && /^\p{Script=Han}{1,20}$/u.test(value.name) && GROUPS.some(group => group.id === value.groupId && (!value.mode || group.defaultMode === value.mode)) && ['annotation','qc','acceptance'].includes(value.role); }
@@ -582,6 +645,7 @@
     populateLegacyIdentity();
     $('identityAdminName').value='';
     selectIdentityEntry(profile?.role==='admin'?'admin':'worker');
+    refreshGroupChoices();
   }
   function enterApp() {
     $('identityGate').classList.add('hidden');$('appShell').classList.remove('hidden');
@@ -590,6 +654,7 @@
     const visible=new Set(['overview','records',...({annotation:['tasks'],qc:['qc'],acceptance:['acceptance'],admin:['dispatch']})[profile.role]]);
     qsa('nav [data-view]').forEach(button=>button.classList.toggle('hidden',!visible.has(button.dataset.view)));
     $('modeSwitcher').classList.toggle('hidden',!canViewAllGroups());
+    renderGroupManagement();
     applyModule(mode,false);
     configureScopeGroup(canViewAllGroups()?'all':profile.groupId);
     activateView(({annotation:'tasks',qc:'qc',acceptance:'acceptance',admin:'dispatch'})[profile.role]);
@@ -995,7 +1060,7 @@
   function renderMyTasks() {
     rememberRejectForm();const filter=$('myTaskFilter').value;
     const rows=allTasks().filter(task=>task.mode===activeMode&&task.groupId===profile.groupId&&ownsTask(task)&&(filter==='actionable'?annotationStatuses.includes(task.status):matchesStatus(task,filter)));
-    $('myTasksBody').innerHTML=listPage('annotationTask',rows).map(task=>{const actionable=annotationStatuses.includes(task.status);return `<tr><td>${actionable?`<input type="checkbox" ${listCheckbox(task,'annotationTask')} aria-label="选择 ${escapeHtml(task.tid)}">`:''}</td><td>${tidMarkup(task)}</td><td>${escapeHtml(task.movie)}</td><td>${groupLabel(task.groupId)}</td><td>${modePill(task.mode)}</td><td>质检 ${task.qcRound} / 验收 ${task.acceptanceRound}</td><td>${statusPill(task)}</td><td>${formatDateTime(task.updatedAt)}</td><td><div class="row-actions">${actionable?`<button type="button" class="btn primary small" data-action="submit" data-task-id="${escapeHtml(task.id)}">${['annotating','unclaimed'].includes(task.status)?'提交完成':'返修完成'}</button><button type="button" class="btn ghost small" data-action="reject" data-task-id="${escapeHtml(task.id)}">拒绝</button>`:''}<button type="button" class="btn ghost small" data-action="open-timeline" data-task-id="${escapeHtml(task.id)}">详情</button></div></td></tr>`;}).join('')||emptyRow(9,'暂无符合条件的本人任务，可在上方登记 TID 或调整状态筛选。');renderListPager('annotationTask');restoreRejectForm();
+    $('myTasksBody').innerHTML=listPage('annotationTask',rows).map(task=>{const actionable=annotationStatuses.includes(task.status);return `<tr><td>${actionable?`<input type="checkbox" ${listCheckbox(task,'annotationTask')} aria-label="选择 ${escapeHtml(task.tid)}">`:''}</td><td>${tidMarkup(task)}</td><td>${escapeHtml(task.movie)}</td><td>${escapeHtml(groupLabel(task.groupId))}</td><td>${modePill(task.mode)}</td><td>质检 ${task.qcRound} / 验收 ${task.acceptanceRound}</td><td>${statusPill(task)}</td><td>${formatDateTime(task.updatedAt)}</td><td><div class="row-actions">${actionable?`<button type="button" class="btn primary small" data-action="submit" data-task-id="${escapeHtml(task.id)}">${['annotating','unclaimed'].includes(task.status)?'提交完成':'返修完成'}</button><button type="button" class="btn ghost small" data-action="reject" data-task-id="${escapeHtml(task.id)}">拒绝</button>`:''}<button type="button" class="btn ghost small" data-action="open-timeline" data-task-id="${escapeHtml(task.id)}">详情</button></div></td></tr>`;}).join('')||emptyRow(9,'暂无符合条件的本人任务，可在上方登记 TID 或调整状态筛选。');renderListPager('annotationTask');restoreRejectForm();
   }
   async function registerAnnotationTid() {
     const tid=$('taskSearchInput').value.trim().toUpperCase(),mode=activeMode,identity=JSON.stringify(profile);
@@ -1524,7 +1589,7 @@
     finally{qcMatchBusy=false;$('qcMatchBtn').disabled=false;}
   }
 
-  const EVENT_LABELS={task_deleted:'删除本次导入',dispatch:'导入任务',claim:'认领',submit:'提交',qc_fail:'质检打回',qc_pass:'质检通过并流入验收',qc_reject:'质检拒绝并废弃',annotator_reject:'标注拒绝，待质检确认',reject_confirm:'质检确认标注拒绝',reject_return:'质检不同意拒绝，退回标注',sent_acceptance:'历史送验收记录',acceptance_pass:'验收通过',acceptance_fail:'验收不通过，退回质检',acceptance_reject:'验收拒绝并废弃',package_built:'登记已建包',package_claimed:'登记已领取包',acceptance_route:'分派验收返修',qc_repair_done:'质检自行修改完成并流入验收',metadata_edit:'修改任务资料'};
+  const EVENT_LABELS={group_created:'新增小组',task_deleted:'删除本次导入',dispatch:'导入任务',claim:'认领',submit:'提交',qc_fail:'质检打回',qc_pass:'质检通过并流入验收',qc_reject:'质检拒绝并废弃',annotator_reject:'标注拒绝，待质检确认',reject_confirm:'质检确认标注拒绝',reject_return:'质检不同意拒绝，退回标注',sent_acceptance:'历史送验收记录',acceptance_pass:'验收通过',acceptance_fail:'验收不通过，退回质检',acceptance_reject:'验收拒绝并废弃',package_built:'登记已建包',package_claimed:'登记已领取包',acceptance_route:'分派验收返修',qc_repair_done:'质检自行修改完成并流入验收',metadata_edit:'修改任务资料'};
   function eventLabel(event) {
     if(event.acceptanceInspection&&!window.WorkbenchFlow.isAcceptanceReject(event)){
       const inspection=window.WorkbenchFlow.acceptanceInspection(event),action=window.WorkbenchFlow.acceptanceFlowAction(event);
@@ -1535,6 +1600,7 @@
     return window.WorkbenchFlow.isReworkAssignment(event)?'分配代修':window.WorkbenchFlow.isQcReject(event)?'质检拒绝并废弃':window.WorkbenchFlow.isAcceptanceReject(event)?'验收拒绝并废弃':event.type==='group_daily_edit'?'修改每日小组人数与总量':EVENT_LABELS[event.type]||event.type;
   }
   function eventDetail(event) {
+    if(event.type==='group_created')return `${modeLabel(event.mode)} · ${event.name}`;
     if(event.type==='group_daily_edit')return `${event.date} · ${groupLabel(event.groupId)} · 负责人 ${event.after.leader} · 总量 ${event.after.total} · 人数 ${event.after.headcount===null?'自动识别':event.after.headcount} · ${event.note||''}`;
     if(window.WorkbenchFlow.isReworkAssignment(event))return `${event.fromAssignee} → ${event.assignee} · ${event.note||'请假代修'}`;
     const parts=[];if(event.acceptanceIssueLevel==='P2')parts.push('P2 错误已修正');if(event.round)parts.push(`第 ${event.round} 轮`);if(event.pLevel)parts.push(event.pLevel);if(event.tags?.length)parts.push(event.tags.join('、'));
@@ -1582,7 +1648,7 @@
     $('recordStatusBoard').innerHTML=bucketChip+recordStateChip('all','全部',base.length,gateActive)+Object.entries(STATUS_META).filter(([key])=>key!=='annotating'&&key!=='qc_pack_unclaimed').map(([key,meta])=>recordStateChip(key,meta.label,key==='unclaimed'?c.annotation:c[key],gateActive,'all',overviewStateTone(key))).join('')+recordStateChip('pending_reqc','其中：待二次质检',c.qcSecond,gateActive,'2')+recordStateChip('pending_reqc','其中：待三次及以上质检',c.qcThirdPlus,gateActive,'3plus');
     const pageRows=listPage('records',gateActive?rows:[]);renderListPager('records');
     $('recordList').classList.toggle('hidden',!gateActive);$('recordBodyPager').classList.toggle('hidden',!gateActive);$('timelinePanel').classList.toggle('hidden',!gateActive);
-    if(gateActive)renderRowsBatched($('recordBody'),pageRows.map(task=>{const qc=firstEvent(task.id,event=>['qc_pass','qc_fail','qc_reject'].includes(event.type)),operator=window.WorkbenchReports.qcOperator(liveEvents(task.id)),operatorHint=operator.name?`${eventLabel({type:operator.type})} · ${formatDateTime(operator.at)}`:'尚无质检操作记录';return `<tr><td>${tidMarkup(task)}</td><td>${escapeHtml(task.movie)}</td><td>${groupLabel(task.groupId)}</td><td>${modePill(task.mode)}</td><td>${escapeHtml(task.assignee||'未认领')}</td><td class="records-qc-operator" title="${escapeHtml(operatorHint)}">${escapeHtml(operator.name||'暂无')}</td><td>质检 ${task.qcRound} / 验收 ${task.acceptanceRound}</td><td>${statusPill(task)}</td><td>${qc?(qc.type==='qc_pass'?'通过':window.WorkbenchFlow.isQcReject(qc)?'拒绝':escapeHtml(qc.pLevel||'打回')):'暂无'}</td><td>${formatDateTime(task.updatedAt)}</td><td><div class="row-actions"><button type="button" class="btn ghost small" data-action="timeline" data-task-id="${escapeHtml(task.id)}">查看</button><button type="button" class="btn ghost small" data-action="edit-task" data-task-id="${escapeHtml(task.id)}">修改 TID</button></div></td></tr>`;}),11,'当前筛选没有任务。');else {delete $('recordBody').dataset.renderToken;$('recordBody').replaceChildren();}
+    if(gateActive)renderRowsBatched($('recordBody'),pageRows.map(task=>{const qc=firstEvent(task.id,event=>['qc_pass','qc_fail','qc_reject'].includes(event.type)),operator=window.WorkbenchReports.qcOperator(liveEvents(task.id)),operatorHint=operator.name?`${eventLabel({type:operator.type})} · ${formatDateTime(operator.at)}`:'尚无质检操作记录';return `<tr><td>${tidMarkup(task)}</td><td>${escapeHtml(task.movie)}</td><td>${escapeHtml(groupLabel(task.groupId))}</td><td>${modePill(task.mode)}</td><td>${escapeHtml(task.assignee||'未认领')}</td><td class="records-qc-operator" title="${escapeHtml(operatorHint)}">${escapeHtml(operator.name||'暂无')}</td><td>质检 ${task.qcRound} / 验收 ${task.acceptanceRound}</td><td>${statusPill(task)}</td><td>${qc?(qc.type==='qc_pass'?'通过':window.WorkbenchFlow.isQcReject(qc)?'拒绝':escapeHtml(qc.pLevel||'打回')):'暂无'}</td><td>${formatDateTime(task.updatedAt)}</td><td><div class="row-actions"><button type="button" class="btn ghost small" data-action="timeline" data-task-id="${escapeHtml(task.id)}">查看</button><button type="button" class="btn ghost small" data-action="edit-task" data-task-id="${escapeHtml(task.id)}">修改 TID</button></div></td></tr>`;}),11,'当前筛选没有任务。');else {delete $('recordBody').dataset.renderToken;$('recordBody').replaceChildren();}
     if(gateActive)renderTimeline(selectedTimelineTaskId);
   }
   function renderTimeline(id) {
@@ -1592,7 +1658,7 @@
     const task=findTask(state,id),events=eventsForTask(id).slice().reverse();
     const ownership=task.assignmentId?`<p>初标：${escapeHtml(window.WorkbenchReports.annotationContributors(eventsForTask(id)).initial?.name||'暂无提交')} · 当前处理：${escapeHtml(task.assignee)}</p>`:'';
     const conflicts=new Map((task.legacyConflicts||[]).map(item=>[item.eventId,item.reason]));
-    $('timelinePanel').innerHTML=`<div class="panel-heading"><div><h3>${tidMarkup(task)}</h3><p>${escapeHtml(task.movie)} · ${groupLabel(task.groupId)} · ${escapeHtml(task.assignee||'未认领')}</p>${ownership}</div>${statusPill(task)}</div><ol class="timeline">${events.map(event=>`<li class="timeline-item${conflicts.has(event.id)?' timeline-conflict':''}"><div class="timeline-title">${escapeHtml(eventLabel(event))}${conflicts.has(event.id)?' <span class="tag">未计入进度</span>':''}</div><div class="timeline-meta">${formatDateTime(event.at)} · ${escapeHtml(event.actor||'演示系统')}</div><div class="timeline-note">${escapeHtml(eventDetail(event))}</div>${conflicts.has(event.id)?`<div class="timeline-conflict-reason">${escapeHtml(conflicts.get(event.id))} 原记录已保留。</div>`:''}</li>`).join('')}</ol>`;
+    $('timelinePanel').innerHTML=`<div class="panel-heading"><div><h3>${tidMarkup(task)}</h3><p>${escapeHtml(task.movie)} · ${escapeHtml(groupLabel(task.groupId))} · ${escapeHtml(task.assignee||'未认领')}</p>${ownership}</div>${statusPill(task)}</div><ol class="timeline">${events.map(event=>`<li class="timeline-item${conflicts.has(event.id)?' timeline-conflict':''}"><div class="timeline-title">${escapeHtml(eventLabel(event))}${conflicts.has(event.id)?' <span class="tag">未计入进度</span>':''}</div><div class="timeline-meta">${formatDateTime(event.at)} · ${escapeHtml(event.actor||'演示系统')}</div><div class="timeline-note">${escapeHtml(eventDetail(event))}</div>${conflicts.has(event.id)?`<div class="timeline-conflict-reason">${escapeHtml(conflicts.get(event.id))} 原记录已保留。</div>`:''}</li>`).join('')}</ol>`;
   }
   function showTaskEditor(id) {
     const task=findTask(state,id),target=$('taskEditor');target.classList.remove('hidden');
@@ -2274,9 +2340,12 @@
     $('identityForm').addEventListener('submit',event=>{event.preventDefault();const next={name:$('identityName').value.trim(),mode:$('identityMode').value,groupId:$('identityGroup').value,role:$('identityRole').value};if(!validWorkerProfile(next)){showToast('请填写1至20个中文汉字姓名，并选择对应小组和角色。','error');return;}saveIdentity(next,$('identityRolePin').value);});
     $('identityAdminForm').addEventListener('submit',event=>{event.preventDefault();saveIdentity({name:$('identityAdminName').value.trim(),role:'admin'},$('identityAdminPin').value);});
     $('identityRole').addEventListener('change',syncIdentityRole);
+    $('refreshIdentityGroups').addEventListener('click',event=>refreshGroupChoices(event.currentTarget));
+    ['input','change'].forEach(type=>$('groupCreateForm').addEventListener(type,()=>setText('groupCreateResult','')));
+    $('groupCreateForm').addEventListener('submit',event=>{event.preventDefault();createGroup(event.currentTarget).catch(error=>{setText('groupCreateResult',error.message);showToast(error.message,'error');});});
     $('sharedRefreshBtn').addEventListener('click',()=>syncShared(true));
     ['input','change'].forEach(type=>document.addEventListener(type,event=>{const form=event.target.closest('form');if(form&&!form.closest('#identityGate'))dirtyForms.add(form);}));
-    store.subscribe(detail=>{if(detail.kind==='sync'&&detail.changed)sharedHasUpdates=true;});
+    store.subscribe(detail=>{if(detail.kind==='groups'||detail.kind==='sync'||detail.kind==='saved')syncGroupCatalog();if(detail.kind==='sync'&&detail.changed)sharedHasUpdates=true;});
     setInterval(()=>{if(!document.hidden)syncShared();},8000);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncShared();});
     $('workerEntry').addEventListener('click',()=>selectIdentityEntry('worker'));
@@ -2373,9 +2442,9 @@
     document.addEventListener('change',event=>{if(!event.target.matches('#groupDailyForm [name="date"]'))return;const form=event.target.form,date=event.target.value;try{if(!date)throw new Error('请选择具体登记日期。');if(refreshState())showGroupDailyEditor(form.dataset.groupId,'date',date);}catch(error){event.target.value=form.dataset.date;showToast(error.message,'error');}});
   }
   async function init() {
-    try {state=await store.init();profile=store.profile();const retiredProfile=profile&&!validProfile(profile);initializeControls();initializeWorkflowControls();bindEvents();bindBulkEvents();bindModuleEvents();bindOverviewEvents();bindReassignEvents();if(profile&&!retiredProfile)enterApp();else{profile=null;showIdentity();if(retiredProfile)showToast('组别已更新，请选择当前作业类型与小组。');}}
+    try {state=await store.init();syncGroupCatalog(false);profile=store.profile();const retiredProfile=profile&&!validProfile(profile);initializeControls();initializeWorkflowControls();bindEvents();bindBulkEvents();bindModuleEvents();bindOverviewEvents();bindReassignEvents();if(profile&&!retiredProfile)enterApp();else{profile=null;showIdentity();if(retiredProfile)showToast('组别已更新，请选择当前作业类型与小组。');}}
     catch(error){$('appShell').classList.add('hidden');$('identityGate').classList.remove('hidden');const box=document.createElement('div');box.className='panel';const text=document.createElement('p');text.textContent='共享服务暂时无法连接，云端数据未清空。'+error.message;const button=document.createElement('button');button.type='button';button.className='btn primary';button.textContent='重试连接';button.addEventListener('click',()=>location.reload());box.append(text,button);$('identityGate').replaceChildren(box);}
   }
-  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20261029-prod85',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
+  window.GroupWorkbench={getState:()=>visibleStateSnapshot(),getTasks:()=>allTasks(),version:'20261030-prod86',revision:()=>store.revision(),rules:()=>({...FLOW}),activeMode:()=>activeMode,statusCounts:()=>counts(allTasks().filter(task=>task.mode===activeMode)),reports:()=>scopedReports()};
   init();
 })();

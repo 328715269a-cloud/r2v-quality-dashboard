@@ -5,8 +5,9 @@ const {DatabaseSync,backup:sqliteBackup}=require('node:sqlite');
 const {randomBytes,createHash,timingSafeEqual}=require('node:crypto');
 const fs=require('node:fs');
 const path=require('node:path');
-const {ApiError,check,object,profileInput,normalizeDelta,canNormalizeRelated}=require('./rules.cjs');
+const {ApiError,check,object,profileInput,normalizeDelta,canNormalizeRelated,canNormalizeGroup}=require('./rules.cjs');
 const {createRecordIndex}=require('./record-index.cjs');
+const {createGroupRegistry}=require('./groups.cjs');
 const API='/group-workbench-api/';
 const sha=value=>createHash('sha256').update(value).digest('hex');
 const canonical=value=>Array.isArray(value)?`[${value.map(canonical).join(',')}]`:value&&typeof value==='object'?`{${Object.keys(value).sort().map(k=>`${JSON.stringify(k)}:${canonical(value[k])}`).join(',')}}`:JSON.stringify(value);
@@ -68,13 +69,14 @@ function createService(options={}){
     check(!referenced,'所选任务已清理，本次操作未保存。请同步最新数据后重新选择任务。','TASK_REMOVED',409);
   }
   const creation=db.prepare('SELECT value FROM metadata WHERE key=?').get('createdAt').value;
-  const recordIndex=createRecordIndex(db),recordExists=db.prepare('SELECT 1 FROM records WHERE id=?');
+  const recordIndex=createRecordIndex(db),recordExists=db.prepare('SELECT 1 FROM records WHERE id=?'),groupRegistry=createGroupRegistry(db);
+  const groupDirectory=(revision=getRevision())=>groupRegistry.sync(revision,fullSnapshotRevision());
   function syncRecordIndex(){db.exec('BEGIN');try{recordIndex.sync(getRevision(),fullSnapshotRevision());db.exec('COMMIT');}catch(error){db.exec('ROLLBACK');throw error;}}
   // Warm only disposable memory before listening. No schema writes or background
   // consumers are introduced, and the existing backup owner stays unchanged.
   try{syncRecordIndex();}catch(error){db.close();throw error;}
   function collect(after){const out={tasks:[],events:[],batches:[]};for(const row of db.prepare('SELECT kind,json FROM records WHERE revision>? ORDER BY revision,ordinal').all(after))out[row.kind].push(JSON.parse(row.json));return out;}
-  function state(){return{version:3,createdAt:creation,...collect(-1),preferences:{}};}
+  function state(){return{version:3,createdAt:creation,...collect(-1),groups:groupDirectory(),preferences:{}};}
   function legacyState(raw){
     const deleted=new Set(raw.events.filter(event=>event.type==='task_deleted').map(event=>event.taskId));
     const tasks=raw.tasks.filter(task=>!deleted.has(task.id)),active=new Set(tasks.map(task=>task.id));
@@ -86,7 +88,7 @@ function createService(options={}){
   const attempts=new Map();
   function login(body,key='local'){
     check(object(body),'请求格式无效');key+=body.profile?.role==='admin'?':admin':['qc','acceptance'].includes(body.profile?.role)?':group':':registration';const window=Math.floor(Date.now()/600000),record=attempts.get(key);if(record&&record.window===window)check(record.count<30,'尝试次数较多，请稍后再试','RATE_LIMITED',429);
-    try{const profile=profileInput(body.profile);if(profile.role!=='annotation')checkPin(body.pin,profile.role==='admin'?'admin':'group');const token=randomBytes(32).toString('base64url'),at=Date.now();db.prepare('INSERT INTO sessions(token_hash,profile,created_at,expires_at) VALUES(?,?,?,?)').run(sha(token),JSON.stringify(profile),at,at+7*86400000);attempts.delete(key);return{token,profile,expiresAt:new Date(at+7*86400000).toISOString()};}
+    try{const profile=profileInput(body.profile,groupDirectory());if(profile.role!=='annotation')checkPin(body.pin,profile.role==='admin'?'admin':'group');const token=randomBytes(32).toString('base64url'),at=Date.now();db.prepare('INSERT INTO sessions(token_hash,profile,created_at,expires_at) VALUES(?,?,?,?)').run(sha(token),JSON.stringify(profile),at,at+7*86400000);attempts.delete(key);return{token,profile,expiresAt:new Date(at+7*86400000).toISOString()};}
     catch(error){attempts.set(key,{window,count:record?.window===window?record.count+1:1});if(attempts.size>5000){for(const[k,v]of attempts)if(v.window!==window)attempts.delete(k);}throw error;}
   }
   function transact(body,profile){
@@ -94,10 +96,13 @@ function createService(options={}){
     // PIN is validated separately and never persisted in the payload hash or audit.
     const payloadHash=sha(canonical({revision:body.revision,delta:body.delta,profile}));
     const prior=db.prepare('SELECT payload_hash,result FROM transactions WHERE id=?').get(body.id);if(prior){check(prior.payload_hash===payloadHash,'同一请求 ID 不能用于其他操作','IDEMPOTENCY_MISMATCH',409);return JSON.parse(prior.result);}
-    const related=options.relatedValidation!==false&&canNormalizeRelated(body.delta);
+    const related=options.relatedValidation!==false&&canNormalizeRelated(body.delta),groupOnly=canNormalizeGroup(body.delta);
     // Catch up committed records from old/new processes under a read snapshot,
     // before taking the write lock. Never mutate this cache with uncommitted data.
     if(related)syncRecordIndex();
+    // Adding one directory entry needs no task/history projection. Warm the
+    // incremental catalog before the short lock, then recheck inside it.
+    if(groupOnly)groupDirectory();
     db.exec('BEGIN IMMEDIATE');
     try{
       const concurrent=db.prepare('SELECT payload_hash,result FROM transactions WHERE id=?').get(body.id);if(concurrent){check(concurrent.payload_hash===payloadHash,'同一请求 ID 不能用于其他操作','IDEMPOTENCY_MISMATCH',409);db.exec('COMMIT');return JSON.parse(concurrent.result);}
@@ -105,9 +110,12 @@ function createService(options={}){
       const revision=getRevision();check(body.revision===revision,'共享数据已有更新，请同步后重试','REVISION_CONFLICT',409);
       if(related)check(recordIndex.matches(revision,fullSnapshotRevision()),'共享数据已有更新，请同步后重试','REVISION_CONFLICT',409);
       const relatedOnly=related&&!recordIndex.hasDuplicateTids();
-      const delta=normalizeDelta(relatedOnly?recordIndex.related(body.delta):state(),body.delta,profile,{pin:body.pin,checkPin,now:new Date().toISOString(),checkDeleteEnabled:()=>check(importDeleteEnabled(),'删除功能尚未开放，请稍后重试','IMPORT_DELETE_DISABLED',503),relatedOnly,recordExists:relatedOnly?key=>!!recordExists.get(key):undefined,clockEvents:relatedOnly?recordIndex.clockEvents():undefined});
+      const groups=groupDirectory(revision);
+      const validationState=groupOnly?{tasks:[],events:[],batches:[]}:relatedOnly?recordIndex.related(body.delta):state();
+      const recentEvents=groupOnly?db.prepare("SELECT json FROM records WHERE kind='events' ORDER BY revision DESC,ordinal DESC LIMIT 10").all().map(row=>JSON.parse(row.json)):relatedOnly?recordIndex.clockEvents():undefined;
+      const delta=normalizeDelta(validationState,body.delta,profile,{pin:body.pin,checkPin,now:new Date().toISOString(),checkDeleteEnabled:()=>check(importDeleteEnabled(),'删除功能尚未开放，请稍后重试','IMPORT_DELETE_DISABLED',503),relatedOnly,recordExists:relatedOnly||groupOnly?key=>!!recordExists.get(key):undefined,clockEvents:recentEvents,groups});
       check(delta.tasks.length+delta.events.length+delta.batches.length>0,'没有需要保存的操作','EMPTY_TRANSACTION');
-      const next=revision+1,result={revision:next,delta},at=new Date().toISOString();let ordinal=0;const insert=db.prepare('INSERT INTO records(id,kind,revision,ordinal,json) VALUES(?,?,?,?,?)');
+      const next=revision+1,result={revision:next,delta},at=new Date().toISOString();const createdGroup=delta.events.find(event=>event.type==='group_created');if(createdGroup)result.groups=[...groups,{id:createdGroup.groupId,name:createdGroup.name,defaultMode:createdGroup.mode}];let ordinal=0;const insert=db.prepare('INSERT INTO records(id,kind,revision,ordinal,json) VALUES(?,?,?,?,?)');
       for(const kind of ['tasks','batches','events'])for(const value of delta[kind])insert.run(value.id,kind,next,ordinal++,JSON.stringify(value));
       db.prepare('INSERT INTO transactions(id,revision,payload_hash,profile,created_at,result) VALUES(?,?,?,?,?,?)').run(body.id,next,payloadHash,JSON.stringify(profile),at,JSON.stringify(result));
       db.prepare('UPDATE metadata SET value=? WHERE key=?').run(String(next),'revision');db.exec('COMMIT');return result;
@@ -126,12 +134,13 @@ function createService(options={}){
     try{
       const url=new URL(request.url,'http://localhost');check(url.pathname.startsWith(API),'未找到接口','NOT_FOUND',404);const endpoint=url.pathname.slice(API.length);
       if(request.headers.origin)check(allowedOrigins.has(request.headers.origin),'请求来源不允许','ORIGIN_FORBIDDEN',403);
-      if(endpoint==='health'&&request.method==='GET')return respond(response,200,{ok:true,service:'r2v-group-workbench',schemaVersion:1,revision:getRevision(),capabilities:{importDelete:{supported:true,enabled:importDeleteEnabled()},acceptanceInspection:{supported:true,version:1},acceptanceP2:{supported:true,version:1},acceptanceCrossMode:{supported:true,version:1}},backup:{...backupState,mode:backupDelegated?'delegated':'local',delegated:backupDelegated}});
+      if(endpoint==='health'&&request.method==='GET')return respond(response,200,{ok:true,service:'r2v-group-workbench',schemaVersion:1,revision:getRevision(),capabilities:{importDelete:{supported:true,enabled:importDeleteEnabled()},acceptanceInspection:{supported:true,version:1},acceptanceP2:{supported:true,version:1},acceptanceCrossMode:{supported:true,version:1},groupManagement:{supported:true,version:1}},backup:{...backupState,mode:backupDelegated?'delegated':'local',delegated:backupDelegated}});
+      if(endpoint==='groups'&&request.method==='GET'){db.exec('BEGIN');try{const revision=getRevision(),groups=groupDirectory(revision);db.exec('COMMIT');return respond(response,200,{revision,groups});}catch(error){db.exec('ROLLBACK');throw error;}}
       if(endpoint==='session'&&request.method==='POST'){const source=String(request.headers['x-forwarded-for']||request.socket.remoteAddress||'unknown').split(',').at(-1).trim();return respond(response,200,login(await bodyOf(request),source));}
       const token=request.headers['x-workbench-session'],profile=authenticate(token);
       if(endpoint==='session'&&request.method==='GET')return respond(response,200,{profile});
       if(endpoint==='session'&&request.method==='DELETE'){db.prepare('DELETE FROM sessions WHERE token_hash=?').run(sha(token));return respond(response,200,{ok:true});}
-      if(endpoint==='state'&&request.method==='GET'){const after=url.searchParams.get('after');db.exec('BEGIN');try{const revision=getRevision();if(after!==null)check(/^\d+$/.test(after)&&Number.isSafeInteger(Number(after))&&Number(after)<=revision,'增量版本无效','INVALID_REVISION',400);const legacy=request.headers['x-workbench-client']!=='import-delete-v1'&&hasDeletedTasks();const barrier=fullSnapshotRevision(),full=after===null||Number(after)<barrier;const scoped=url.searchParams.get('scope')==='role-v1'&&['annotation','qc'].includes(profile.role);let result;if(scoped){recordIndex.sync(revision,barrier);const records=recordIndex.scoped(profile.groupId,legacy||full?-1:Number(after));const value={version:3,createdAt:creation,...records,preferences:{}};result=legacy?{revision,state:legacyState(value)}:full?{revision,state:value}:{revision,delta:records};}else result=legacy?{revision,state:legacyState(state())}:full?{revision,state:state()}:{revision,delta:collect(Number(after))};db.exec('COMMIT');return respond(response,200,result);}catch(error){db.exec('ROLLBACK');throw error;}}
+      if(endpoint==='state'&&request.method==='GET'){const after=url.searchParams.get('after');db.exec('BEGIN');try{const revision=getRevision();if(after!==null)check(/^\d+$/.test(after)&&Number.isSafeInteger(Number(after))&&Number(after)<=revision,'增量版本无效','INVALID_REVISION',400);const legacy=request.headers['x-workbench-client']!=='import-delete-v1'&&hasDeletedTasks();const barrier=fullSnapshotRevision(),full=after===null||Number(after)<barrier;const scoped=url.searchParams.get('scope')==='role-v1'&&['annotation','qc'].includes(profile.role),groups=groupDirectory(revision);let result;if(scoped){recordIndex.sync(revision,barrier);const records=recordIndex.scoped(profile.groupId,legacy||full?-1:Number(after));const value={version:3,createdAt:creation,...records,groups,preferences:{}};result=legacy?{revision,state:legacyState(value)}:full?{revision,state:value}:{revision,delta:records};}else result=legacy?{revision,state:legacyState(state())}:full?{revision,state:state()}:{revision,delta:collect(Number(after))};result.groups=groups;db.exec('COMMIT');return respond(response,200,result);}catch(error){db.exec('ROLLBACK');throw error;}}
       if(endpoint==='transactions'&&request.method==='POST')return respond(response,200,transact(await bodyOf(request),profile));
       if(endpoint==='backup'&&request.method==='GET')return respond(response,200,exportBackup());
       throw new ApiError(404,'NOT_FOUND','未找到接口');
