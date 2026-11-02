@@ -1,0 +1,19 @@
+[Unit]
+Description=Retain verified R2V backup copies without touching live data
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/r2v/maintenance/disk/retention.py --apply
+Nice=19
+IOSchedulingClass=idle
+CPUQuota=40%
+MemoryMax=256M
+TimeoutStartSec=45min
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/r2v/group-workbench-data/backups
+StandardOutput=journal
+StandardError=journal

@@ -1,0 +1,10 @@
+[Unit]
+Description=Prune duplicate backup copies after the hourly backup finishes
+
+[Timer]
+OnCalendar=*-*-* *:43:00
+Persistent=true
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

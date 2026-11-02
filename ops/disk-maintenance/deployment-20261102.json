@@ -1,0 +1,47 @@
+{
+  "checkedAt": "2026-11-02T04:28:51.199365+00:00",
+  "scope": "Backup copies and independent host maintenance only",
+  "frontendVersion": "prod86",
+  "apiVersion": "prod86",
+  "productionDataModified": false,
+  "oldModeBusinessDataDeleted": false,
+  "existingServicesUnchanged": 18,
+  "manualBackupsUnchanged": 12,
+  "disk": {
+    "beforeDisplayPercent": 77,
+    "afterDisplayPercent": 49,
+    "availableBytes": 31340953600,
+    "reclaimedBackupBytes": 17201381376
+  },
+  "retention": {
+    "runId": "9bbd4b3f357f4285b965b08369df9836",
+    "ok": true,
+    "verifiedRestorePoints": 59,
+    "retainedRestorePoints": 59,
+    "deletedRedundantCopies": 277,
+    "movedToTiered": 11,
+    "retainedAutoBackupBytes": 4406480896,
+    "policy": "48 hours hourly / 14 calendar days daily / 4 calendar weeks weekly; Asia/Shanghai",
+    "newHourlyBackupSucceededAt": "2026-11-02T04:28:34.734Z"
+  },
+  "verification": {
+    "isolatedLinuxTestsPassed": 14,
+    "maintenanceApiResponses": {"200": 563, "5xx": 0},
+    "successfulBusinessTransactionsObserved": 5,
+    "capacityTimerEnabled": true,
+    "retentionTimerEnabled": true,
+    "existingSixHourlyMonitorUpdated": "r2v-2",
+    "serverEvidence": "/opt/r2v/maintenance/disk/verified-20261102.json",
+    "localEvidence": "outputs/capacity-check-20261102/maintenance-final.json"
+  },
+  "limitations": {
+    "existingDockerLogBytesNotReclaimed": 10421050146,
+    "dockerLogArchiveExecuted": false,
+    "futureDockerLoggingConfigurationApplied": false,
+    "offServerFullBackupDownloaded": false,
+    "offServerDownloadStatus": "Automatic approval review rejected transfer of full production data to local workspace; explicit destination authorization required",
+    "preExistingApiHeapOutOfMemoryResolved": false,
+    "oldModeMaximumEstimatedBytes": 419016704,
+    "oldModeEstimateNote": "Tables plus attachment allocated bytes; retaining only the last week would remove almost all old records and SQL DELETE does not guarantee immediate filesystem space reclamation"
+  }
+}

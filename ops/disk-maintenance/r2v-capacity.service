@@ -1,0 +1,14 @@
+[Unit]
+Description=Read-only R2V disk and backup capacity sampling
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/r2v/maintenance/disk/capacity.py
+Nice=19
+TimeoutStartSec=30s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/r2v/maintenance/disk
